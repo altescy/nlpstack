@@ -1,5 +1,5 @@
 from nlpstack.torch.models.model import Model
 
 
-class TorchLabelAttentiveXmlClassifier(Model):
+class TorchLabelAttentiveClassifier(Model):
     ...
