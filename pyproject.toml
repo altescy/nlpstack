@@ -11,8 +11,10 @@ keywords=["python", "nlp"]
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0"
 numpy = "^1.24.3"
-scikit-learn = "^1.2.2"
-torch = "^2.0.0"
+scikit-learn = ">=1.0.0"
+torch = ">=2.0.0"
+collatable = ">=0.3.2"
+tqdm = "^4.65.0"
 
 [tool.poetry.dev-dependencies]
 python-language-server = "^0.36.2"
