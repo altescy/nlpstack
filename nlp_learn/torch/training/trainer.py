@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Sequence
 
+import torch
+
 from nlp_learn.common import tqdm
 from nlp_learn.data import DataLoader, Instance
 from nlp_learn.torch.models import Model
@@ -39,6 +41,7 @@ class Trainer:
             for epoch in epochbar:
                 epochbar.set_description(f"Epoch {epoch}")
 
+                model.train()
                 train_dataloader = self._train_dataloader(train)
                 with tqdm(train_dataloader, position=1, leave=False) as batchbar:
                     batchbar.set_description("Training")
@@ -56,8 +59,9 @@ class Trainer:
                         batchbar.set_postfix(loss=f"{loss.item():.4f}")
 
                 if valid is not None and self._valid_dataloader is not None:
+                    model.eval()
                     valid_dataloader = self._valid_dataloader(valid)
-                    with tqdm(valid_dataloader, position=1, leave=False) as batchbar:
+                    with torch.no_grad(), tqdm(valid_dataloader, position=1, leave=False) as batchbar:
                         batchbar.set_description("Validating")
 
                         for batch in batchbar:

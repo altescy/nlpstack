@@ -19,5 +19,5 @@ class OptimizerFactory:
 
 
 class AdamFactory(OptimizerFactory):
-    def __init__(self, **kwargs: dict[str, Any]) -> None:
+    def __init__(self, **kwargs: Any) -> None:
         super().__init__(torch.optim.Adam, **kwargs)

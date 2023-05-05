@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import functools
 import itertools
-import random
 from typing import Iterator, Mapping, Sequence, cast
 
 import numpy
@@ -18,6 +17,7 @@ from nlp_learn.torch.modules.seq2vec_encoders import BagOfEmbeddings
 from nlp_learn.torch.modules.text_embedders import TextEmbedder
 from nlp_learn.torch.modules.token_embedders import Embedding
 from nlp_learn.torch.training import Trainer
+from nlp_learn.torch.training.optimizers import AdamFactory
 from nlp_learn.torch.util import move_to_device
 
 
@@ -34,8 +34,8 @@ class BasicNeuralTextClassifier(BaseEstimator, ClassifierMixin):  # type: ignore
         oov_token: str = "@@UNKNOWN@@",
         max_epochs: int = 3,
         batch_size: int = 32,
+        learning_rate: float = 1e-3,
         trainer: Trainer | None = None,
-        random_state: int | None = None,
     ) -> None:
         super().__init__()
         self._classifier = classifier or TorchTextClassifier(
@@ -48,6 +48,7 @@ class BasicNeuralTextClassifier(BaseEstimator, ClassifierMixin):  # type: ignore
             train_dataloader=DataLoader(batch_size=batch_size, shuffle=True),
             valid_dataloader=DataLoader(batch_size=batch_size, shuffle=False),
             max_epochs=max_epochs,
+            optimizer_factory=AdamFactory(lr=learning_rate),
         )
         self.token_namespace = "tokens"
         self.label_namespace = "labels"
@@ -58,7 +59,6 @@ class BasicNeuralTextClassifier(BaseEstimator, ClassifierMixin):  # type: ignore
             oov_token={self.token_namespace: oov_token},
             special_tokens={self.token_namespace: {pad_token, oov_token}},
         )
-        self.random_state = random_state
 
     def _tokenize(self, documents: Sequence[str]) -> Sequence[list[Token]]:
         return Dataset.from_iterable(self._tokenizer.tokenize(document) for document in documents)
@@ -93,11 +93,6 @@ class BasicNeuralTextClassifier(BaseEstimator, ClassifierMixin):  # type: ignore
         return Instance(**fields)
 
     def fit(self, X: Sequence[str], y: Sequence[str]) -> BasicNeuralTextClassifier:
-        if self.random_state is not None:
-            random.seed(self.random_state)
-            numpy.random.seed(self.random_state)
-            torch.manual_seed(self.random_state)
-
         train_documents = X
         train_labels = y
 
@@ -135,8 +130,10 @@ class BasicNeuralTextClassifier(BaseEstimator, ClassifierMixin):  # type: ignore
         dataset = Dataset.from_iterable(self._text_to_instance(text) for text in tokenized_documents)
         probs: list[numpy.ndarray] = []
         device = self._classifier.get_device()
-        for batch in DataLoader(batch_size=batch_size)(dataset):
-            batch = move_to_device(batch, device)
-            output = self._classifier(**batch)
-            probs.append(output["probs"].detach().numpy())
-        return numpy.concatenate(probs)
+        self._classifier.eval()
+        with torch.no_grad():
+            for batch in DataLoader(batch_size=batch_size)(dataset):
+                batch = move_to_device(batch, device)
+                output = self._classifier(**batch)
+                probs.append(output["probs"].detach().numpy())
+            return numpy.concatenate(probs)
