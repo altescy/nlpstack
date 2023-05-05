@@ -4,8 +4,8 @@ from typing import Any, Iterable, Iterator, Sequence
 
 import numpy
 
-from nlp_learn.data.tokenizers import Token
-from nlp_learn.data.vocabulary import Vocabulary
+from nlpstack.data.tokenizers import Token
+from nlpstack.data.vocabulary import Vocabulary
 
 
 class TokenIndexer:

@@ -4,7 +4,7 @@ from typing import cast
 
 import torch
 
-from nlp_learn.torch.metrics.metric import Metric
+from nlpstack.torch.metrics.metric import Metric
 
 
 class Accuracy(Metric):

@@ -8,17 +8,17 @@ import numpy
 import torch
 from sklearn.base import BaseEstimator, ClassifierMixin
 
-from nlp_learn.data import DataLoader, Dataset, Instance, Vocabulary
-from nlp_learn.data.fields import Field, LabelField, MappingField, TextField
-from nlp_learn.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
-from nlp_learn.data.tokenizers import Token, Tokenizer, WhitespaceTokenizer
-from nlp_learn.torch.models.text_classifier import TorchTextClassifier
-from nlp_learn.torch.modules.seq2vec_encoders import BagOfEmbeddings
-from nlp_learn.torch.modules.text_embedders import TextEmbedder
-from nlp_learn.torch.modules.token_embedders import Embedding
-from nlp_learn.torch.training import Trainer
-from nlp_learn.torch.training.optimizers import AdamFactory
-from nlp_learn.torch.util import move_to_device
+from nlpstack.data import DataLoader, Dataset, Instance, Vocabulary
+from nlpstack.data.fields import Field, LabelField, MappingField, TextField
+from nlpstack.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
+from nlpstack.data.tokenizers import Token, Tokenizer, WhitespaceTokenizer
+from nlpstack.torch.models.text_classifier import TorchTextClassifier
+from nlpstack.torch.modules.seq2vec_encoders import BagOfEmbeddings
+from nlpstack.torch.modules.text_embedders import TextEmbedder
+from nlpstack.torch.modules.token_embedders import Embedding
+from nlpstack.torch.training import Trainer
+from nlpstack.torch.training.optimizers import AdamFactory
+from nlpstack.torch.util import move_to_device
 
 
 class BasicNeuralTextClassifier(BaseEstimator, ClassifierMixin):  # type: ignore[misc]

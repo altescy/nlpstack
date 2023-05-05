@@ -1,11 +1,11 @@
 [tool.poetry]
-name = "nlp-learn"
+name = "nlpstack"
 version = "0.1.0"
-description = "scikit-learn models for NLP tasks"
+description = "Modules for NLP"
 authors = ["altescy <altescy@fastmail.com>"]
 license = "MIT License"
 readme = "README.md"
-homepage = "https://github.com/altescy/nlp-learn"
+homepage = "https://github.com/altescy/nlpstack"
 keywords=["python", "nlp"]
 
 [tool.poetry.dependencies]

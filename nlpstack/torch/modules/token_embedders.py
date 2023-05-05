@@ -4,7 +4,7 @@ from typing import Any, cast
 
 import torch
 
-from nlp_learn.data import Vocabulary
+from nlpstack.data import Vocabulary
 
 
 class TokenEmbedder(torch.nn.Module):

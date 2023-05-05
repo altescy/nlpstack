@@ -1,5 +1,5 @@
-import nlp_learn
+import nlpstack
 
 
 def test_version() -> None:
-    assert nlp_learn.__version__ == "0.1.0"
+    assert nlpstack.__version__ == "0.1.0"

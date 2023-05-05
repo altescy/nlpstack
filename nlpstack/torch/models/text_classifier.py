@@ -4,13 +4,13 @@ from typing import Any, Mapping, Sequence
 
 import torch
 
-from nlp_learn.torch.metrics import Accuracy, Metric
-from nlp_learn.torch.models.model import Model
-from nlp_learn.torch.modules.feedforward import FeedForward
-from nlp_learn.torch.modules.seq2seq_encoders import Seq2SeqEncoder
-from nlp_learn.torch.modules.seq2vec_encoders import Seq2VecEncoder
-from nlp_learn.torch.modules.text_embedders import TextEmbedder
-from nlp_learn.torch.util import get_mask_from_text
+from nlpstack.torch.metrics import Accuracy, Metric
+from nlpstack.torch.models.model import Model
+from nlpstack.torch.modules.feedforward import FeedForward
+from nlpstack.torch.modules.seq2seq_encoders import Seq2SeqEncoder
+from nlpstack.torch.modules.seq2vec_encoders import Seq2VecEncoder
+from nlpstack.torch.modules.text_embedders import TextEmbedder
+from nlpstack.torch.util import get_mask_from_text
 
 
 class TorchTextClassifier(Model):

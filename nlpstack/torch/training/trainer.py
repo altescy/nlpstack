@@ -4,11 +4,11 @@ from typing import Sequence
 
 import torch
 
-from nlp_learn.common import tqdm
-from nlp_learn.data import DataLoader, Instance
-from nlp_learn.torch.models import Model
-from nlp_learn.torch.training.optimizers import AdamFactory, OptimizerFactory
-from nlp_learn.torch.util import move_to_device
+from nlpstack.common import tqdm
+from nlpstack.data import DataLoader, Instance
+from nlpstack.torch.models import Model
+from nlpstack.torch.training.optimizers import AdamFactory, OptimizerFactory
+from nlpstack.torch.util import move_to_device
 
 
 class Trainer:

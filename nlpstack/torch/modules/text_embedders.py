@@ -2,7 +2,7 @@ from typing import Mapping, cast
 
 import torch
 
-from nlp_learn.torch.modules.token_embedders import TokenEmbedder
+from nlpstack.torch.modules.token_embedders import TokenEmbedder
 
 
 class TextEmbedder(torch.nn.Module):

@@ -3,7 +3,7 @@ import random
 import numpy
 import torch
 
-from nlp_learn.text_classification.models import BasicNeuralTextClassifier
+from nlpstack.text_classification.models import BasicNeuralTextClassifier
 
 
 def test_basic_neural_text_classifier() -> None:
