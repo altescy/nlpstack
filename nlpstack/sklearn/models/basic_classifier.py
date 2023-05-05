@@ -12,7 +12,7 @@ from nlpstack.data import DataLoader, Dataset, Instance, Vocabulary
 from nlpstack.data.fields import Field, LabelField, MappingField, TextField
 from nlpstack.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Token, Tokenizer, WhitespaceTokenizer
-from nlpstack.torch.models.text_classifier import TorchTextClassifier
+from nlpstack.torch.models import TorchBasicClassifier
 from nlpstack.torch.modules.seq2vec_encoders import BagOfEmbeddings
 from nlpstack.torch.modules.text_embedders import TextEmbedder
 from nlpstack.torch.modules.token_embedders import Embedding
@@ -25,7 +25,7 @@ class BasicNeuralTextClassifier(BaseEstimator, ClassifierMixin):  # type: ignore
     def __init__(
         self,
         *,
-        classifier: TorchTextClassifier | None = None,
+        classifier: TorchBasicClassifier | None = None,
         tokenizer: Tokenizer | None = None,
         token_indexers: Mapping[str, TokenIndexer] | None = None,
         min_df: int | float = 1,
@@ -38,7 +38,7 @@ class BasicNeuralTextClassifier(BaseEstimator, ClassifierMixin):  # type: ignore
         trainer: Trainer | None = None,
     ) -> None:
         super().__init__()
-        self._classifier = classifier or TorchTextClassifier(
+        self._classifier = classifier or TorchBasicClassifier(
             embedder=TextEmbedder({"tokens": Embedding(64)}),
             encoder=BagOfEmbeddings(64),
         )

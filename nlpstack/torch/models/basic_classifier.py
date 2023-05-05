@@ -13,7 +13,7 @@ from nlpstack.torch.modules.text_embedders import TextEmbedder
 from nlpstack.torch.util import get_mask_from_text
 
 
-class TorchTextClassifier(Model):
+class TorchBasicClassifier(Model):
     def __init__(
         self,
         embedder: TextEmbedder,
