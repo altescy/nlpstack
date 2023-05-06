@@ -86,6 +86,7 @@ class EarlyStopping(Callback):
         if self._work_dir is not None:
             raise RuntimeError("work_dir is already set")
         self._work_dir = Path(tempfile.TemporaryDirectory().name)
+        self._work_dir.mkdir(parents=True, exist_ok=True)
 
     def unset_work_dir(self) -> None:
         if self._work_dir is None:
