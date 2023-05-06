@@ -181,7 +181,7 @@ class Trainer:
                                     total_loss=total_valid_loss,
                                     num_batches=num_valid_batches,
                                     reset=False,
-                                    prefix="train_",
+                                    prefix="valid_",
                                 )
 
                                 for callback in self._callbacks:
@@ -191,7 +191,7 @@ class Trainer:
                                         batch_inputs=batch,
                                         batch_outputs=output,
                                         batch_metrics=batch_valid_metrics,
-                                        is_training=True,
+                                        is_training=False,
                                         resources=resources,
                                     )
 
