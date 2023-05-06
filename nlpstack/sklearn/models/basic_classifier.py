@@ -16,13 +16,16 @@ from nlpstack.torch.models import TorchBasicClassifier
 from nlpstack.torch.modules.seq2vec_encoders import BagOfEmbeddings
 from nlpstack.torch.modules.text_embedders import TextEmbedder
 from nlpstack.torch.modules.token_embedders import Embedding
+from nlpstack.torch.picklable import TorchPicklable
 from nlpstack.torch.training import Trainer
 from nlpstack.torch.training.callbacks import Callback
 from nlpstack.torch.training.optimizers import AdamFactory
 from nlpstack.torch.util import move_to_device
 
 
-class BasicNeuralTextClassifier(BaseEstimator, ClassifierMixin):  # type: ignore[misc]
+class BasicNeuralTextClassifier(TorchPicklable, BaseEstimator, ClassifierMixin):  # type: ignore[misc]
+    cuda_dependent_attributes = ["_classifier"]
+
     def __init__(
         self,
         *,
