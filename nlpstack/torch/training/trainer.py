@@ -170,6 +170,8 @@ class Trainer:
                             num_valid_batches = 0
                             total_valid_loss = 0.0
                             for batch in batchbar:
+                                batch = move_to_device(batch, device)
+
                                 output = model(**batch)
                                 loss = output["loss"]
 
