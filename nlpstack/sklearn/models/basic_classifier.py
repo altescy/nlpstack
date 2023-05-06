@@ -17,6 +17,7 @@ from nlpstack.torch.modules.seq2vec_encoders import BagOfEmbeddings
 from nlpstack.torch.modules.text_embedders import TextEmbedder
 from nlpstack.torch.modules.token_embedders import Embedding
 from nlpstack.torch.training import Trainer
+from nlpstack.torch.training.callbacks import Callback
 from nlpstack.torch.training.optimizers import AdamFactory
 from nlpstack.torch.util import move_to_device
 
@@ -35,6 +36,7 @@ class BasicNeuralTextClassifier(BaseEstimator, ClassifierMixin):  # type: ignore
         max_epochs: int = 3,
         batch_size: int = 32,
         learning_rate: float = 1e-3,
+        training_callbacks: Sequence[Callback] | None = None,
         trainer: Trainer | None = None,
     ) -> None:
         super().__init__()
@@ -49,6 +51,7 @@ class BasicNeuralTextClassifier(BaseEstimator, ClassifierMixin):  # type: ignore
             valid_dataloader=DataLoader(batch_size=batch_size, shuffle=False),
             max_epochs=max_epochs,
             optimizer_factory=AdamFactory(lr=learning_rate),
+            callbacks=training_callbacks,
         )
         self.token_namespace = "tokens"
         self.label_namespace = "labels"
