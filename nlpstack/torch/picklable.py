@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import pickle
 import tempfile
-from typing import Any, ClassVar
+from os import PathLike
+from typing import Any, ClassVar, Type, TypeVar
 
 import torch
+
+Self = TypeVar("Self", bound="TorchPicklable")
 
 
 class TorchPicklable:  # type: ignore[misc]
@@ -26,7 +30,10 @@ class TorchPicklable:  # type: ignore[misc]
         with tempfile.SpooledTemporaryFile() as f:
             f.write(state.pop("__cuda_dependent_attributes__"))
             f.seek(0)
-            cuda_attrs = torch.load(f)
+            if not torch.cuda.is_available():
+                cuda_attrs = torch.load(f, map_location=torch.device("cpu"))
+            else:
+                cuda_attrs = torch.load(f)
 
         state.update(cuda_attrs)
         self.__dict__.update(state)
