@@ -1,13 +1,9 @@
 from __future__ import annotations
 
-import pickle
 import tempfile
-from os import PathLike
-from typing import Any, ClassVar, Type, TypeVar
+from typing import Any, ClassVar
 
 import torch
-
-Self = TypeVar("Self", bound="TorchPicklable")
 
 
 class TorchPicklable:  # type: ignore[misc]
