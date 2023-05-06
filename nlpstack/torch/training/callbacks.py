@@ -71,7 +71,7 @@ class EarlyStopping(Callback):
         self.metric = metric[1:] if metric.startswith(("+", "-")) else metric
         self.restore_best = restore_best
         self.direction = -1 if metric.startswith("-") else 1
-        self.best_metric = float("inf")
+        self.best_metric = -self.direction * float("inf")
         self.best_epoch = 0
         self.counter = 0
         self._work_dir: Path | None = None
@@ -107,7 +107,7 @@ class EarlyStopping(Callback):
         resources: dict[str, Any],
     ) -> None:
         del trainer, resources
-        self.best_metric = float("inf")
+        self.best_metric = -self.direction * float("inf")
         self.best_epoch = 0
         self.counter = 0
         self.set_work_dir()
