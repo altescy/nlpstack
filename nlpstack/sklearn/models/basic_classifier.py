@@ -90,9 +90,18 @@ class BasicNeuralTextClassifier(BaseEstimator, ClassifierMixin):  # type: ignore
             )
         return Instance(**fields)
 
-    def fit(self, X: Sequence[str], y: Sequence[str]) -> BasicNeuralTextClassifier:
+    def fit(
+        self,
+        X: Sequence[str],
+        y: Sequence[str],
+        *,
+        X_valid: Sequence[str] | None = None,
+        y_valid: Sequence[str] | None = None,
+    ) -> BasicNeuralTextClassifier:
         train_documents = X
         train_labels = y
+        valid_documents = X_valid
+        valid_labels = y_valid
 
         tokenized_documents = self._tokenize(train_documents)
         self._build_vocab(tokenized_documents, train_labels)
@@ -102,8 +111,14 @@ class BasicNeuralTextClassifier(BaseEstimator, ClassifierMixin):  # type: ignore
         train_dataset = Dataset.from_iterable(
             itertools.starmap(self._text_to_instance, zip(tokenized_documents, train_labels))
         )
+        valid_dataset: Dataset | None = None
+        if valid_documents is not None and valid_labels is not None:
+            tokenized_valid_documents = self._tokenize(valid_documents)
+            valid_dataset = Dataset.from_iterable(
+                itertools.starmap(self._text_to_instance, zip(tokenized_valid_documents, valid_labels))
+            )
 
-        self._trainer.train(self._classifier, train_dataset)
+        self._trainer.train(self._classifier, train_dataset, valid_dataset)
         return self
 
     def predict(
