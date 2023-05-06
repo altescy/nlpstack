@@ -21,6 +21,7 @@ class TorchBasicClassifier(Model):
         contextualizer: Seq2SeqEncoder | None = None,
         feedforward: FeedForward | None = None,
         metrics: Sequence[Metric] | None = None,
+        dropout: float | None = None,
     ) -> None:
         super().__init__()
         self._embedder = embedder
@@ -29,6 +30,8 @@ class TorchBasicClassifier(Model):
 
         self._contextualizer = contextualizer
         self._feedforward = feedforward
+
+        self._dropout = torch.nn.Dropout(dropout) if dropout is not None else None
 
         self._loss = torch.nn.CrossEntropyLoss()
 
@@ -50,6 +53,9 @@ class TorchBasicClassifier(Model):
 
         if self._feedforward is not None:
             encodings = self._feedforward(encodings)
+
+        if self._dropout is not None:
+            encodings = self._dropout(encodings)
 
         logits = self._classifier(encodings)
         probs = torch.nn.functional.softmax(logits, dim=-1)
