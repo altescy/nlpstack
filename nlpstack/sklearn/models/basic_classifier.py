@@ -64,15 +64,13 @@ class BasicNeuralTextClassifier(BaseEstimator, ClassifierMixin):  # type: ignore
         return Dataset.from_iterable(self._tokenizer.tokenize(document) for document in documents)
 
     def _build_vocab(self, tokenized_documents: Sequence[list[Token]], labels: Sequence[str]) -> None:
-        def token_iterator() -> Iterator[list[str]]:
-            for tokens in tokenized_documents:
-                yield [token.surface for token in tokens]
-
         def label_iterator() -> Iterator[list[str]]:
             for label in labels:
                 yield [label]
 
-        self.vocab.build_vocab_from_documents(self.token_namespace, token_iterator())
+        for token_indexer in self._token_indexers.values():
+            token_indexer.build_vocab(self.vocab, tokenized_documents)
+
         self.vocab.build_vocab_from_documents(self.label_namespace, label_iterator())
 
     def _text_to_instance(self, text: str | list[Token], label: str | None = None) -> Instance:
