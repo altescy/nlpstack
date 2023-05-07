@@ -134,8 +134,8 @@ class Trainer:
 
                             batch_train_metrics = self._get_metrics(
                                 training_state=state,
-                                total_loss=total_train_loss,
-                                num_batches=num_train_batches,
+                                total_loss=loss.item(),
+                                num_batches=1,
                                 reset=False,
                                 prefix="train_",
                             )
@@ -151,7 +151,14 @@ class Trainer:
                                     resources=resources,
                                 )
 
-                            batchbar.set_postfix(**{k[6:]: v for k, v in batch_train_metrics.items()})
+                            batchbar.set_postfix(
+                                **self._get_metrics(
+                                    training_state=state,
+                                    total_loss=total_train_loss,
+                                    num_batches=num_train_batches,
+                                    reset=False,
+                                )
+                            )
 
                     metrics = self._get_metrics(
                         training_state=state,
@@ -180,8 +187,8 @@ class Trainer:
 
                                 batch_valid_metrics = self._get_metrics(
                                     training_state=state,
-                                    total_loss=total_valid_loss,
-                                    num_batches=num_valid_batches,
+                                    total_loss=loss.item(),
+                                    num_batches=1,
                                     reset=False,
                                     prefix="valid_",
                                 )
@@ -197,7 +204,14 @@ class Trainer:
                                         resources=resources,
                                     )
 
-                                batchbar.set_postfix(**{k[6:]: v for k, v in batch_valid_metrics.items()})
+                                batchbar.set_postfix(
+                                    **self._get_metrics(
+                                        training_state=state,
+                                        total_loss=total_valid_loss,
+                                        num_batches=num_valid_batches,
+                                        reset=False,
+                                    )
+                                )
 
                         metrics.update(
                             self._get_metrics(
