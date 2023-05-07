@@ -4,9 +4,11 @@ from typing import Any, Mapping, Sequence
 
 import torch
 
+from nlpstack.data import Vocabulary
 from nlpstack.torch.metrics import Accuracy, Metric
 from nlpstack.torch.models.model import Model
 from nlpstack.torch.modules.feedforward import FeedForward
+from nlpstack.torch.modules.lazy import LazyLinearOutput
 from nlpstack.torch.modules.seq2seq_encoders import Seq2SeqEncoder
 from nlpstack.torch.modules.seq2vec_encoders import Seq2VecEncoder
 from nlpstack.torch.modules.text_embedders import TextEmbedder
@@ -22,20 +24,28 @@ class TorchBasicClassifier(Model):
         feedforward: FeedForward | None = None,
         metrics: Sequence[Metric] | None = None,
         dropout: float | None = None,
+        label_namespace: str = "labels",
     ) -> None:
         super().__init__()
         self._embedder = embedder
         self._encoder = encoder
-        self._classifier = torch.nn.Linear(encoder.get_output_dim(), 2)
+        self._classifier = LazyLinearOutput(
+            encoder.get_output_dim() if feedforward is None else feedforward.get_output_dim()
+        )
 
         self._contextualizer = contextualizer
         self._feedforward = feedforward
-
         self._dropout = torch.nn.Dropout(dropout) if dropout is not None else None
 
         self._loss = torch.nn.CrossEntropyLoss()
-
         self._metrics = metrics or [Accuracy()]
+
+        self._label_namespace = label_namespace
+
+    def setup(self, *args: Any, vocab: Vocabulary, **kwargs: Any) -> None:
+        super().setup(*args, vocab=vocab, **kwargs)
+        num_labels = vocab.get_vocab_size(self._label_namespace)
+        self._classifier.initialize_parameters(out_features=num_labels)
 
     def forward(  # type: ignore[override]
         self,

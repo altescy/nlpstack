@@ -39,6 +39,7 @@ class BasicNeuralTextClassifier(TorchPicklable, BaseEstimator, ClassifierMixin):
         max_epochs: int = 3,
         batch_size: int = 32,
         learning_rate: float = 1e-3,
+        label_namespace: str = "labels",
         training_callbacks: Sequence[Callback] | None = None,
         trainer: Trainer | None = None,
     ) -> None:
@@ -56,14 +57,13 @@ class BasicNeuralTextClassifier(TorchPicklable, BaseEstimator, ClassifierMixin):
             optimizer_factory=AdamFactory(lr=learning_rate),
             callbacks=training_callbacks,
         )
-        self.token_namespace = "tokens"
-        self.label_namespace = "labels"
+        self.label_namespace = label_namespace
         self.vocab = Vocabulary(
-            min_df={self.token_namespace: min_df},
-            max_df={self.token_namespace: max_df},
-            pad_token={self.token_namespace: pad_token},
-            oov_token={self.token_namespace: oov_token},
-            special_tokens={self.token_namespace: {pad_token, oov_token}},
+            min_df={"tokens": min_df},
+            max_df={"tokens": max_df},
+            pad_token={"tokens": pad_token},
+            oov_token={"tokens": oov_token},
+            special_tokens={"tokens": {pad_token, oov_token}},
         )
 
     def _tokenize(self, documents: Sequence[str]) -> Sequence[list[Token]]:
@@ -85,7 +85,11 @@ class BasicNeuralTextClassifier(TorchPicklable, BaseEstimator, ClassifierMixin):
         fields: dict[str, Field] = {}
         fields["text"] = MappingField(
             {
-                key: TextField(text, indexer=functools.partial(indexer, vocab=self.vocab))
+                key: TextField(
+                    text,
+                    indexer=functools.partial(indexer, vocab=self.vocab),
+                    padding_value=indexer.get_pad_index(self.vocab),
+                )
                 for key, indexer in self._token_indexers.items()
             }
         )
