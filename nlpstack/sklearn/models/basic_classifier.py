@@ -32,17 +32,28 @@ class BasicNeuralTextClassifier(TorchPicklable, BaseEstimator, ClassifierMixin):
         classifier: TorchBasicClassifier | None = None,
         tokenizer: Tokenizer | None = None,
         token_indexers: Mapping[str, TokenIndexer] | None = None,
-        min_df: int | float = 1,
-        max_df: int | float = 1.0,
-        pad_token: str = "@@PADDING@@",
-        oov_token: str = "@@UNKNOWN@@",
+        min_df: int | float | Mapping[str, int | float] = 1,
+        max_df: int | float | Mapping[str, int | float] = 1.0,
+        pad_token: str | Mapping[str, str] = "@@PADDING@@",
+        oov_token: str | Mapping[str, str] = "@@UNKNOWN@@",
         max_epochs: int = 3,
         batch_size: int = 32,
         learning_rate: float = 1e-3,
         label_namespace: str = "labels",
         training_callbacks: Sequence[Callback] | None = None,
         trainer: Trainer | None = None,
+        vocab: Vocabulary | None = None,
+        do_not_build_vocab: bool = False,
     ) -> None:
+        default_token_namespace = "tokens"
+        min_df = {default_token_namespace: min_df} if isinstance(min_df, (int, float)) else min_df
+        max_df = {default_token_namespace: max_df} if isinstance(max_df, (int, float)) else max_df
+        pad_token = {default_token_namespace: pad_token} if isinstance(pad_token, str) else pad_token
+        oov_token = {default_token_namespace: oov_token} if isinstance(oov_token, str) else oov_token
+        special_tokens = {
+            default_token_namespace: {pad_token[default_token_namespace], oov_token[default_token_namespace]}
+        }
+
         super().__init__()
         self._classifier = classifier or TorchBasicClassifier(
             embedder=TextEmbedder({"tokens": Embedding(64)}),
@@ -58,13 +69,14 @@ class BasicNeuralTextClassifier(TorchPicklable, BaseEstimator, ClassifierMixin):
             callbacks=training_callbacks,
         )
         self.label_namespace = label_namespace
-        self.vocab = Vocabulary(
-            min_df={"tokens": min_df},
-            max_df={"tokens": max_df},
-            pad_token={"tokens": pad_token},
-            oov_token={"tokens": oov_token},
-            special_tokens={"tokens": {pad_token, oov_token}},
+        self.vocab = vocab or Vocabulary(
+            min_df=min_df,
+            max_df=max_df,
+            pad_token=pad_token,
+            oov_token=oov_token,
+            special_tokens=special_tokens,
         )
+        self._do_not_build_vocab = do_not_build_vocab
 
     def _tokenize(self, documents: Sequence[str]) -> Sequence[list[Token]]:
         return Dataset.from_iterable(self._tokenizer.tokenize(document) for document in documents)
@@ -114,7 +126,9 @@ class BasicNeuralTextClassifier(TorchPicklable, BaseEstimator, ClassifierMixin):
         valid_labels = y_valid
 
         tokenized_documents = self._tokenize(train_documents)
-        self._build_vocab(tokenized_documents, train_labels)
+
+        if not self._do_not_build_vocab:
+            self._build_vocab(tokenized_documents, train_labels)
 
         self._classifier.setup(vocab=self.vocab)
 
