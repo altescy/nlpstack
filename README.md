@@ -1,6 +1,8 @@
 # 📚 NLPSTACK
 
 [![Actions Status](https://github.com/altescy/nlpstack/workflows/CI/badge.svg)](https://github.com/altescy/nlpstack/actions/workflows/ci.yml)
+[![Python version](https://img.shields.io/pypi/pyversions/nlpstack)](https://github.com/altescy/nlpstack)
+[![pypi version](https://img.shields.io/pypi/v/nlpstack)](https://pypi.org/project/nlpstack/)
 [![License](https://img.shields.io/github/license/altescy/nlpstack)](https://github.com/altescy/nlpstack/blob/master/LICENSE)
 
 A Python Library for Natural Language Processing
