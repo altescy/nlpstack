@@ -67,7 +67,7 @@ class OverallAccuracy(MultilabelClassificationMetric):
         self._total_count += gold.size(0) * gold.size(1)
 
     def get_metrics(self, reset: bool = False) -> dict[str, float]:
-        metrics = {"overall_accuracy": self._correct_count / self._total_count}
+        metrics = {"overall_accuracy": self._correct_count / self._total_count if self._total_count > 0 else 0.0}
         if reset:
             self.reset()
         return metrics
@@ -103,7 +103,7 @@ class AverageAccuracy(MultilabelClassificationMetric):
         self._total_count += gold.size(0)
 
     def get_metrics(self, reset: bool = True) -> dict[str, float]:
-        if self._correct_count is None:
+        if self._correct_count is None or self._total_count == 0:
             return {"average_accuracy": 0.0}
         accuracies = self._correct_count / self._total_count
         metrics = {

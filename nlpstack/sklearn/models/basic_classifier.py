@@ -220,3 +220,26 @@ class BasicNeuralTextClassifier(TorchPicklable, BaseEstimator, ClassifierMixin):
                 output = self._classifier(**batch)
                 probs.append(output["probs"].detach().numpy())
             return numpy.concatenate(probs)
+
+    def score(
+        self,
+        X: Sequence[str],
+        y: Sequence[str] | Sequence[Sequence[str]],
+        *,
+        metric: str | None = None,
+        batch_size: int = 64,
+    ) -> float:
+        metric = metric or ("accuracy" if not self._classifier.multilabel else "overall_accuracy")
+        device = self._classifier.get_device()
+
+        tokenized_documents = self._tokenize(X)
+        dataset = Dataset.from_iterable(itertools.starmap(self._text_to_instance, zip(tokenized_documents, y)))
+
+        self._classifier.eval()
+        self._classifier.get_metrics(reset=True)
+        with torch.no_grad():
+            for batch in DataLoader(batch_size=batch_size)(dataset):
+                batch = move_to_device(batch, device)
+                _ = self._classifier(**batch)
+
+        return self._classifier.get_metrics(reset=True)[metric]
