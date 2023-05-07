@@ -95,11 +95,11 @@ class AverageAccuracy(MultilabelClassificationMetric):
         pred, gold = self.detach_tensors(pred, gold)  # type: ignore[assignment]
         if pred.dtype in (torch.float, torch.double):
             pred = cast(torch.LongTensor, (pred > self._threshold).to(dtype=gold.dtype))
-        correct_count = (pred == gold).sum(dim=0)
+
         if self._correct_count is None:
-            self._correct_count = correct_count
-        else:
-            self._correct_count += correct_count
+            self._correct_count = torch.zeros(gold.size(1), dtype=torch.float, device=gold.device)
+
+        self._correct_count += (pred == gold).sum(dim=0)
         self._total_count += gold.size(0)
 
     def get_metrics(self, reset: bool = True) -> dict[str, float]:
