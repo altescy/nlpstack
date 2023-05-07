@@ -9,7 +9,7 @@ import torch
 from sklearn.base import BaseEstimator, ClassifierMixin
 
 from nlpstack.data import DataLoader, Dataset, Instance, Vocabulary
-from nlpstack.data.fields import Field, LabelField, MappingField, TextField
+from nlpstack.data.fields import Field, LabelField, MappingField, TensorField, TextField
 from nlpstack.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Token, Tokenizer, WhitespaceTokenizer
 from nlpstack.torch.models import TorchBasicClassifier
@@ -32,6 +32,7 @@ class BasicNeuralTextClassifier(TorchPicklable, BaseEstimator, ClassifierMixin):
         classifier: TorchBasicClassifier | None = None,
         tokenizer: Tokenizer | None = None,
         token_indexers: Mapping[str, TokenIndexer] | None = None,
+        multilabel: bool = False,
         min_df: int | float | Mapping[str, int | float] = 1,
         max_df: int | float | Mapping[str, int | float] = 1.0,
         pad_token: str | Mapping[str, str] = "@@PADDING@@",
@@ -60,6 +61,7 @@ class BasicNeuralTextClassifier(TorchPicklable, BaseEstimator, ClassifierMixin):
         self._classifier = classifier or TorchBasicClassifier(
             embedder=TextEmbedder({"tokens": Embedding(64)}),
             encoder=BagOfEmbeddings(64),
+            multilabel=multilabel,
         )
         self._tokenizer = tokenizer or WhitespaceTokenizer()
         self._token_indexers = token_indexers or {"tokens": SingleIdTokenIndexer()}
@@ -83,17 +85,22 @@ class BasicNeuralTextClassifier(TorchPicklable, BaseEstimator, ClassifierMixin):
     def _tokenize(self, documents: Sequence[str]) -> Sequence[list[Token]]:
         return Dataset.from_iterable(self._tokenizer.tokenize(document) for document in documents)
 
-    def _build_vocab(self, tokenized_documents: Sequence[list[Token]], labels: Sequence[str]) -> None:
+    def _build_vocab(
+        self, tokenized_documents: Sequence[list[Token]], labels: Sequence[str] | Sequence[Sequence[str]]
+    ) -> None:
         def label_iterator() -> Iterator[list[str]]:
             for label in labels:
-                yield [label]
+                if isinstance(label, str):
+                    yield [label]
+                else:
+                    yield list(label)
 
         for token_indexer in self._token_indexers.values():
             token_indexer.build_vocab(self.vocab, tokenized_documents)
 
         self.vocab.build_vocab_from_documents(self.label_namespace, label_iterator())
 
-    def _text_to_instance(self, text: str | list[Token], label: str | None = None) -> Instance:
+    def _text_to_instance(self, text: str | list[Token], label: str | list[str] | None = None) -> Instance:
         if isinstance(text, str):
             text = self._tokenizer.tokenize(text)
         fields: dict[str, Field] = {}
@@ -108,19 +115,27 @@ class BasicNeuralTextClassifier(TorchPicklable, BaseEstimator, ClassifierMixin):
             }
         )
         if label is not None:
-            fields["label"] = LabelField(
-                label,
-                vocab=self.vocab.get_token_to_index(self.label_namespace),
-            )
+            if self._classifier.multilabel:
+                assert isinstance(label, list)
+                binary_label = numpy.zeros(self.vocab.get_vocab_size(self.label_namespace), dtype=int)
+                for single_label in label:
+                    binary_label[self.vocab.get_index_by_token(self.label_namespace, single_label)] = 1
+                fields["label"] = TensorField(binary_label)
+            else:
+                assert isinstance(label, str)
+                fields["label"] = LabelField(
+                    label,
+                    vocab=self.vocab.get_token_to_index(self.label_namespace),
+                )
         return Instance(**fields)
 
     def fit(
         self,
         X: Sequence[str],
-        y: Sequence[str],
+        y: Sequence[str] | Sequence[Sequence[str]],
         *,
         X_valid: Sequence[str] | None = None,
-        y_valid: Sequence[str] | None = None,
+        y_valid: Sequence[str] | Sequence[Sequence[str]] | None = None,
     ) -> BasicNeuralTextClassifier:
         train_documents = X
         train_labels = y
@@ -147,17 +162,46 @@ class BasicNeuralTextClassifier(TorchPicklable, BaseEstimator, ClassifierMixin):
         self._trainer.train(self._classifier, train_dataset, valid_dataset)
         return self
 
+    def _predict_multilabel(
+        self,
+        X: Sequence[str],
+        *,
+        batch_size: int,
+        return_labels: bool,
+        threshold: float,
+    ) -> numpy.ndarray | list[list[str]]:
+        preds = self.predict_proba(X, batch_size=batch_size)
+        binary_labels = (preds >= threshold).astype(int)
+        if return_labels:
+            return [
+                [self.vocab.get_token_by_index(self.label_namespace, index) for index, label in enumerate(row) if label]
+                for row in binary_labels
+            ]
+        return binary_labels
+
+    def _predict_singlelabel(
+        self,
+        X: Sequence[str],
+        *,
+        batch_size: int,
+        return_labels: bool,
+    ) -> numpy.ndarray | list[str]:
+        preds = cast(numpy.ndarray, self.predict_proba(X, batch_size=batch_size).argmax(axis=1))
+        if return_labels:
+            return [self.vocab.get_token_by_index(self.label_namespace, pred) for pred in preds.tolist()]
+        return preds
+
     def predict(
         self,
         X: Sequence[str],
         *,
         batch_size: int = 64,
         return_labels: bool = True,
-    ) -> numpy.ndarray | list[str]:
-        preds = cast(numpy.ndarray, self.predict_proba(X, batch_size=batch_size).argmax(axis=1))
-        if return_labels:
-            return [self.vocab.get_token_by_index(self.label_namespace, pred) for pred in preds.tolist()]
-        return preds
+        threshold: float = 0.5,
+    ) -> numpy.ndarray | list[str] | list[list[str]]:
+        if self._classifier.multilabel:
+            return self._predict_multilabel(X, batch_size=batch_size, return_labels=return_labels, threshold=threshold)
+        return self._predict_singlelabel(X, batch_size=batch_size, return_labels=return_labels)
 
     def predict_proba(
         self,

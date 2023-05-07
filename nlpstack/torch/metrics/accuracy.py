@@ -4,11 +4,12 @@ from typing import cast
 
 import torch
 
-from nlpstack.torch.metrics.metric import Metric
+from nlpstack.torch.metrics.metric import ClassificationMetric, MultilabelClassificationMetric
 
 
-class Accuracy(Metric):
-    def __init__(self) -> None:
+class Accuracy(ClassificationMetric):
+    def __init__(self, topk: int = 1) -> None:
+        self._topk = topk
         self._correct_count = 0.0
         self._total_count = 0.0
 
@@ -21,10 +22,17 @@ class Accuracy(Metric):
         :param pred: (batch_size, ) or (batch_size, num_classes)
         :param gold: (batch_size, )
         """
-        if pred.dim() == 2:
-            pred = cast(torch.LongTensor, pred.argmax(dim=-1))
-        self._correct_count += (pred == gold).sum().item()
-        self._total_count += gold.size(0)
+        pred, gold = self.detach_tensors(pred, gold)  # type: ignore[assignment]
+        if self._topk == 1:
+            if pred.dim() == 2:
+                pred = cast(torch.LongTensor, pred.argmax(dim=-1))
+            self._correct_count += (pred == gold).sum().item()
+            self._total_count += gold.size(0)
+        else:
+            if pred.dim() == 2:
+                pred = cast(torch.LongTensor, pred.topk(self._topk, dim=-1)[1])
+            self._correct_count += (pred == gold.unsqueeze(-1)).sum().item()
+            self._total_count += gold.size(0)
 
     def get_metrics(self, reset: bool = False) -> dict[str, float]:
         metrics = {"accuracy": self._correct_count / self._total_count}
@@ -34,4 +42,77 @@ class Accuracy(Metric):
 
     def reset(self) -> None:
         self._correct_count = 0.0
+        self._total_count = 0.0
+
+
+class OverallAccuracy(MultilabelClassificationMetric):
+    def __init__(self, threshold: float = 0.5) -> None:
+        self._threshold = threshold
+        self._correct_count = 0.0
+        self._total_count = 0.0
+
+    def __call__(  # type: ignore[override]
+        self,
+        pred: torch.LongTensor | torch.FloatTensor,
+        gold: torch.LongTensor,
+    ) -> None:
+        """
+        :param pred: (batch_size, num_classes)
+        :param gold: (batch_size, num_classes)
+        """
+        pred, gold = self.detach_tensors(pred, gold)  # type: ignore[assignment]
+        if pred.dtype in (torch.float, torch.double):
+            pred = cast(torch.LongTensor, (pred > self._threshold).to(dtype=gold.dtype))
+        self._correct_count += (pred == gold).sum().item()
+        self._total_count += gold.size(0) * gold.size(1)
+
+    def get_metrics(self, reset: bool = False) -> dict[str, float]:
+        metrics = {"overall_accuracy": self._correct_count / self._total_count}
+        if reset:
+            self.reset()
+        return metrics
+
+    def reset(self) -> None:
+        self._correct_count = 0.0
+        self._total_count = 0.0
+
+
+class AverageAccuracy(MultilabelClassificationMetric):
+    def __init__(self, threshold: float = 0.5) -> None:
+        self._threshold = threshold
+        self._correct_count: torch.Tensor | None = None
+        self._total_count = 0.0
+
+    def __call__(  # type: ignore[override]
+        self,
+        pred: torch.LongTensor | torch.FloatTensor,
+        gold: torch.LongTensor,
+    ) -> None:
+        """
+        :param pred: (batch_size, num_classes)
+        :param gold: (batch_size, num_classes)
+        """
+        pred, gold = self.detach_tensors(pred, gold)  # type: ignore[assignment]
+        if pred.dtype in (torch.float, torch.double):
+            pred = cast(torch.LongTensor, (pred > self._threshold).to(dtype=gold.dtype))
+        correct_count = (pred == gold).sum(dim=0)
+        if self._correct_count is None:
+            self._correct_count = correct_count
+        else:
+            self._correct_count += correct_count
+        self._total_count += gold.size(0)
+
+    def get_metrics(self, reset: bool = True) -> dict[str, float]:
+        if self._correct_count is None:
+            return {"average_accuracy": 0.0}
+        accuracies = self._correct_count / self._total_count
+        metrics = {
+            "average_accuracy": accuracies.mean().item(),
+        }
+        if reset:
+            self.reset()
+        return metrics
+
+    def reset(self) -> None:
+        self._correct_count = None
         self._total_count = 0.0
