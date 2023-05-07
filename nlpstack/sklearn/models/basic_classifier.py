@@ -196,7 +196,7 @@ class BasicNeuralTextClassifier(TorchPicklable, BaseEstimator, ClassifierMixin):
         X: Sequence[str],
         *,
         batch_size: int = 64,
-        return_labels: bool = True,
+        return_labels: bool = False,
         threshold: float = 0.5,
     ) -> numpy.ndarray | list[str] | list[list[str]]:
         if self._classifier.multilabel:
