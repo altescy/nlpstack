@@ -6,7 +6,7 @@ authors = ["altescy <altescy@fastmail.com>"]
 license = "MIT License"
 readme = "README.md"
 homepage = "https://github.com/altescy/nlpstack"
-keywords=["python", "nlp"]
+keywords=["python", "nlp", "pytorch", "scikit-learn"]
 
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0"
