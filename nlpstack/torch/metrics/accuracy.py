@@ -35,6 +35,8 @@ class Accuracy(ClassificationMetric):
             self._total_count += gold.size(0)
 
     def get_metrics(self, reset: bool = False) -> dict[str, float]:
+        if self._total_count == 0:
+            return {"accuracy": 0.0}
         metrics = {"accuracy": self._correct_count / self._total_count}
         if reset:
             self.reset()
