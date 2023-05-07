@@ -143,3 +143,37 @@ class EarlyStopping(Callback):
             self.logger.info("Restoring best checkpoint...")
             self.load_checkpoint(training_state)
         self.unset_work_dir()
+
+
+class MlflowCallback(Callback):
+    def __init__(self) -> None:
+        import mlflow
+
+        self._mlflow = mlflow
+
+    def on_batch(
+        self,
+        trainer: "Trainer",
+        training_state: "TrainingState",
+        batch_inputs: dict[str, Any],
+        batch_outputs: dict[str, Any],
+        batch_metrics: dict[str, Any],
+        is_training: bool,
+        resources: dict[str, Any],
+    ) -> None:
+        if is_training:
+            self._mlflow.log_metric("epoch", training_state.epoch, step=training_state.step)
+            if "train_loss" in batch_metrics:
+                self._mlflow.log_metric("train_loss", batch_metrics["train_loss"], step=training_state.step)
+
+    def on_epoch(
+        self,
+        trainer: "Trainer",
+        training_state: "TrainingState",
+        metrics: dict[str, Any],
+        resources: dict[str, Any],
+    ) -> None:
+        for key, value in metrics.items():
+            if key in ("train_loss",):
+                continue
+            self._mlflow.log_metric(key, value, step=training_state.step)
