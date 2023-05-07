@@ -146,6 +146,15 @@ class Vocabulary:
             raise KeyError(f"Namespace {namespace} not found.")
         return len(self._index_to_token[namespace])
 
+    def has_namespace(self, namespace: str) -> bool:
+        return namespace in self._index_to_token
+
+    def clear(self, namespace: str) -> None:
+        if namespace not in self._index_to_token:
+            raise KeyError(f"Namespace {namespace} not found.")
+        self._token_to_index[namespace].clear()
+        self._index_to_token[namespace].clear()
+
     def build_vocab_from_documents(
         self,
         namespace: str,
