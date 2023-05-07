@@ -50,9 +50,11 @@ class BasicNeuralTextClassifier(TorchPicklable, BaseEstimator, ClassifierMixin):
         max_df = {default_token_namespace: max_df} if isinstance(max_df, (int, float)) else max_df
         pad_token = {default_token_namespace: pad_token} if isinstance(pad_token, str) else pad_token
         oov_token = {default_token_namespace: oov_token} if isinstance(oov_token, str) else oov_token
-        special_tokens = {
-            default_token_namespace: {pad_token[default_token_namespace], oov_token[default_token_namespace]}
-        }
+        special_tokens: dict[str, set[str]] = {}
+        for namespace, token in pad_token.items():
+            special_tokens.setdefault(namespace, set()).add(token)
+        for namespace, token in oov_token.items():
+            special_tokens.setdefault(namespace, set()).add(token)
 
         super().__init__()
         self._classifier = classifier or TorchBasicClassifier(
