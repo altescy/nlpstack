@@ -99,8 +99,8 @@ class TorchBasicClassifier(Model):
         }
 
         if label is not None:
-            label = label.float() if self._multilabel else label.long()
-            loss = self._loss(logits, label)
+            label_for_task = label.float() if self._multilabel else label.long()
+            loss = self._loss(logits, label_for_task)
             output["loss"] = loss
 
             for metric in self._metrics:
