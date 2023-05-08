@@ -13,7 +13,7 @@ With its key features listed below, NLPSTACK aims to become a go-to resource for
 - Built on top of [PyTorch](https://pytorch.org/), NLPSTACK offers ready-to-use modules for a seamless NLP experience.
 - Provides a [scikit-learn](https://scikit-learn.org/) compatible interface, ensuring familiar and easy usage.
 - Allows for seamless integration of models provided by the [🤗 Transformers](https://github.com/huggingface/transformers), enabling the use of powerful pre-trained models in your NLP workflows.
-- Adopts a dependency injection design pattern, which ensures high extensibility and makes it easy to modify specific processes.
+- Adopts a [dependency injection](https://en.wikipedia.org/wiki/Dependency_injection) design pattern, which ensures high extensibility and makes it easy to modify specific processes.
 - 🚧 **Currently in the preliminary stages of development**, NLPSTACK plans to offer user-friendly interfaces for a wide range of NLP tasks in the future, including text classification, sequence labeling, language model training..., and more!
 
 ## Installation
