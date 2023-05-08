@@ -14,4 +14,15 @@ With its key features listed below, NLPSTACK aims to become a go-to resource for
 - Provides a [scikit-learn](https://scikit-learn.org/) compatible interface, ensuring familiar and easy usage.
 - Allows for seamless integration of models provided by the [🤗 Transformers](https://github.com/huggingface/transformers), enabling the use of powerful pre-trained models in your NLP workflows.
 - Adopts a dependency injection design pattern, which ensures high extensibility and makes it easy to modify specific processes.
-- 🚧 **Currently in its early development stage**, NLPSTACK plans to offer user-friendly interfaces for a wide range of NLP tasks in the future, including text classification, sequence labeling, and language model training.
+- 🚧 **Currently in the preliminary stages of development**, NLPSTACK plans to offer user-friendly interfaces for a wide range of NLP tasks in the future, including text classification, sequence labeling, language model training..., and more!
+
+## Installation
+
+To install NLPSTACK, simply use the following command with pip:
+
+```bash
+pip install nlpstack
+```
+
+Please be aware that NLPSTACK is in its early development stages.
+As such, be prepared for the possibility of breaking changes as the library is being developed and refined.
