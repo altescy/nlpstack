@@ -10,8 +10,8 @@ A Python Library for Natural Language Processing
 NLPSTACK is a Python library designed to make natural language processing (NLP) tasks more accessible and efficient.
 With its key features listed below, NLPSTACK aims to become a go-to resource for developers working in NLP:
 
-- Built on top of PyTorch, NLPSTACK offers ready-to-use modules for a seamless NLP experience.
-- Provides a scikit-learn-compatible interface, ensuring familiar and easy usage.
-- Allows for seamless integration of models provided by the Transformers library, enabling the use of powerful pre-trained models in your NLP workflows.
+- Built on top of [PyTorch](https://pytorch.org/), NLPSTACK offers ready-to-use modules for a seamless NLP experience.
+- Provides a [scikit-learn](https://scikit-learn.org/) compatible interface, ensuring familiar and easy usage.
+- Allows for seamless integration of models provided by the [🤗 Transformers](https://github.com/huggingface/transformers), enabling the use of powerful pre-trained models in your NLP workflows.
 - Adopts a dependency injection design pattern, which ensures high extensibility and makes it easy to modify specific processes.
 - 🚧 **Currently in its early development stage**, NLPSTACK plans to offer user-friendly interfaces for a wide range of NLP tasks in the future, including text classification, sequence labeling, and language model training.
