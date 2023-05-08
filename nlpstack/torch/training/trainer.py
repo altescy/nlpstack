@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import warnings
 from logging import getLogger
 from typing import Any, Sequence
 
@@ -18,6 +19,20 @@ logger = getLogger(__name__)
 
 @dataclasses.dataclass
 class TrainingState:
+    """The state of the training loop.
+
+    TrainingState is a dataclass that stores the state of the training loop. It is used by the Trainer
+    class to store the current epoch, step, model, optimizer, and learning rate scheduler.
+
+    Attributes:
+        epoch (int): The current epoch.
+        step (int): The current step.
+        model (Model): The model being trained.
+        optimizer (torch.optim.Optimizer): The optimizer used for training.
+        lrscheduler(:obj:`torch.optim.lr_scheduler.LRScheduler`, optional): The learning rate scheduler used
+            for training. Defaults to None.
+    """
+
     epoch: int
     step: int
     model: Model
@@ -43,18 +58,61 @@ class TrainingState:
 
 
 class Trainer:
+    """Trainer for PyTorch models.
+
+    Trainer is a class that handles the training loop for PyTorch models. It is responsible for iterating
+    over the training data, computing the loss, and updating the model parameters by gradient descent.
+    """
+
     def __init__(
         self,
-        train_dataloader: DataLoader,
+        *,
+        max_epochs: int = 10,
+        batch_size: int | None = None,
+        learning_rate: float | None = None,
+        train_dataloader: DataLoader | None = None,
         valid_dataloader: DataLoader | None = None,
         optimizer_factory: OptimizerFactory | None = None,
         lrscheduler_factory: LRSchedulerFactory | None = None,
-        max_epochs: int = 10,
         callbacks: Sequence[Callback] | None = None,
     ) -> None:
-        self._train_dataloader = train_dataloader
-        self._valid_dataloader = valid_dataloader
-        self._optimizer_factory = optimizer_factory or AdamFactory()
+        """Initializes a new Trainer instance.
+
+        The __init__ method of Trainer takes a number of optional arguments that can be used to configure
+        the training loop. Please use callbacks if you need to customize the training loop such as early
+        stopping, checkpointing, logging, etc.
+
+        Args:
+            max_epochs (:obj:`int`, optional): The maximum number of epochs to train for. Defaults to 10.
+            batch_size (:obj:`int`, optional): The batch size to use for training. If train_dataloader or
+                valid_dataloader is provided, this is ignored. Defaults to 32.
+            learning_rate (:obj:`float`, optional): The learning rate to use for training. If optimizer_factory
+                is provided, this is ignored. Defaults to 1e-3.
+            train_dataloader (:obj:`DataLoader`, optional): The dataloader to use for training. If provided,
+                batch_size is ignored. Defaults to `DataLoader(batch_size, shuffled=True)`.
+            valid_dataloader (:obj:`DataLoader`, optional): The dataloader to use for validation. If provided,
+                batch_size is ignored. Defaults to `DataLoader(batch_size, shuffled=False)`.
+            optimizer_factory (:obj:`OptimizerFactory`, optional): The optimizer factory to use for training.
+                If provided, learning_rate is ignored. Defaults to `AdamFactory(lr=learning_rate)`.
+            lrscheduler_factory (:obj:`LRSchedulerFactory`, optional): The learning rate scheduler factory to
+                use for training. Defaults to None.
+            callbacks (:obj:`Sequence[Callback]`, optional): The callbacks to use for training. Defaults to None.
+        """
+
+        if batch_size is not None and train_dataloader is not None:
+            warnings.warn("batch_size is ignored when train_dataloader is provided")
+        if batch_size is not None and valid_dataloader is not None:
+            warnings.warn("batch_size is ignored when valid_dataloader is provided")
+        if learning_rate is not None and optimizer_factory is not None:
+            warnings.warn("learning_rate is ignored when optimizer_factory is provided")
+
+        learning_rate = learning_rate or 1e-3
+        available_dataloader = train_dataloader or valid_dataloader
+        batch_size = batch_size or (available_dataloader._batch_size if available_dataloader else 32)
+
+        self._train_dataloader = train_dataloader or DataLoader(batch_size=batch_size, shuffle=True)
+        self._valid_dataloader = valid_dataloader or DataLoader(batch_size=batch_size, shuffle=False)
+        self._optimizer_factory = optimizer_factory or AdamFactory(lr=learning_rate)
         self._lrscheduler_factory = lrscheduler_factory
         self._max_epochs = max_epochs
         self._callbacks = callbacks or []
@@ -80,6 +138,18 @@ class Trainer:
         valid: Sequence[Instance] | None = None,
         resources: dict[str, Any] | None = None,
     ) -> TrainingState:
+        """Runs the training/validation loop with the given model and training data.
+
+        Args:
+            model (:obj:`Model`): The model to train.
+            train (:obj:`Sequence[Instance]`): The training dataset.
+            valid (:obj:`Sequence[Instance]`, optional): The validation dataset. Defaults to None.
+            resources (:obj:`dict[str, Any]`, optional): Additional resources to pass to callbacks. Defaults to None.
+
+        Returns:
+            :obj:`TrainingState`: The final training state.
+        """
+
         if valid is not None and self._valid_dataloader is None:
             raise ValueError("valid_dataloader is required when valid is not None")
 
