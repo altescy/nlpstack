@@ -23,14 +23,6 @@ class TrainingState:
 
     TrainingState is a dataclass that stores the state of the training loop. It is used by the Trainer
     class to store the current epoch, step, model, optimizer, and learning rate scheduler.
-
-    Attributes:
-        epoch (int): The current epoch.
-        step (int): The current step.
-        model (Model): The model being trained.
-        optimizer (torch.optim.Optimizer): The optimizer used for training.
-        lrscheduler(:obj:`torch.optim.lr_scheduler.LRScheduler`, optional): The learning rate scheduler used
-            for training. Defaults to None.
     """
 
     epoch: int
