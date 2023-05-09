@@ -23,6 +23,13 @@ class TrainingState:
 
     TrainingState is a dataclass that stores the state of the training loop. It is used by the Trainer
     class to store the current epoch, step, model, optimizer, and learning rate scheduler.
+
+    Args:
+        epoch: The current epoch.
+        step: The current step.
+        model: The model being trained.
+        optimizer: The optimizer used for training.
+        lrscheduler: The learning rate scheduler used for training. Defaults to None.
     """
 
     epoch: int
@@ -54,6 +61,21 @@ class Trainer:
 
     Trainer is a class that handles the training loop for PyTorch models. It is responsible for iterating
     over the training data, computing the loss, and updating the model parameters by gradient descent.
+
+    Args:
+        max_epochs: The maximum number of epochs to train for. Defaults to 10.
+        batch_size: The batch size to use for training. If train_dataloader or valid_dataloader
+            is provided, this is ignored. Defaults to 32.
+        learning_rate: The learning rate to use for training. If optimizer_factory is provided,
+            this is ignored. Defaults to 1e-3.
+        train_dataloader: The dataloader to use for training. If provided, batch_size is ignored.
+            Defaults to `DataLoader(batch_size, shuffled=True)`.
+        valid_dataloader: The dataloader to use for validation. If provided, batch_size is ignored.
+            Defaults to `DataLoader(batch_size, shuffled=False)`.
+        optimizer_factory: The optimizer factory to use for training. If provided, learning_rate is
+            ignored. Defaults to `AdamFactory(lr=learning_rate)`.
+        lrscheduler_factory: The learning rate scheduler factory to use for training. Defaults to None.
+        callbacks: The callbacks to use for training. Defaults to None.
     """
 
     def __init__(
@@ -74,21 +96,6 @@ class Trainer:
         the training loop. Please use callbacks if you need to customize the training loop such as early
         stopping, checkpointing, logging, etc.
 
-        Args:
-            max_epochs (:obj:`int`, optional): The maximum number of epochs to train for. Defaults to 10.
-            batch_size (:obj:`int`, optional): The batch size to use for training. If train_dataloader or
-                valid_dataloader is provided, this is ignored. Defaults to 32.
-            learning_rate (:obj:`float`, optional): The learning rate to use for training. If optimizer_factory
-                is provided, this is ignored. Defaults to 1e-3.
-            train_dataloader (:obj:`DataLoader`, optional): The dataloader to use for training. If provided,
-                batch_size is ignored. Defaults to `DataLoader(batch_size, shuffled=True)`.
-            valid_dataloader (:obj:`DataLoader`, optional): The dataloader to use for validation. If provided,
-                batch_size is ignored. Defaults to `DataLoader(batch_size, shuffled=False)`.
-            optimizer_factory (:obj:`OptimizerFactory`, optional): The optimizer factory to use for training.
-                If provided, learning_rate is ignored. Defaults to `AdamFactory(lr=learning_rate)`.
-            lrscheduler_factory (:obj:`LRSchedulerFactory`, optional): The learning rate scheduler factory to
-                use for training. Defaults to None.
-            callbacks (:obj:`Sequence[Callback]`, optional): The callbacks to use for training. Defaults to None.
         """
 
         if batch_size is not None and train_dataloader is not None:
@@ -133,10 +140,10 @@ class Trainer:
         """Runs the training/validation loop with the given model and training data.
 
         Args:
-            model (:obj:`Model`): The model to train.
-            train (:obj:`Sequence[Instance]`): The training dataset.
-            valid (:obj:`Sequence[Instance]`, optional): The validation dataset. Defaults to None.
-            resources (:obj:`dict[str, Any]`, optional): Additional resources to pass to callbacks. Defaults to None.
+            model: The model to train.
+            train: The training dataset.
+            valid: The validation dataset. Defaults to None.
+            resources: Additional resources to pass to callbacks. Defaults to None.
 
         Returns:
             :obj:`TrainingState`: The final training state.
