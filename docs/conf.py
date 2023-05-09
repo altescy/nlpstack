@@ -10,7 +10,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath("../"))
 
-from nlpstack import __version__ as VERSION  # noqa: E402
+from nlpstack.version import VERSION, VERSION_SHORT  # noqa: E402
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -18,6 +18,7 @@ from nlpstack import __version__ as VERSION  # noqa: E402
 project = "NLPSTACK"
 copyright = "2023, altescy"
 author = "altescy"
+version = VERSION_SHORT
 release = VERSION
 
 # -- General configuration ---------------------------------------------------

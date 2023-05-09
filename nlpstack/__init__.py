@@ -1,3 +1,1 @@
-from importlib.metadata import version
-
-__version__ = version("nlpstack")
+from nlpstack.version import VERSION as __version__  # noqa: F401
