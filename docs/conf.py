@@ -3,7 +3,14 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-from importlib.metadata import version as get_version
+import os
+import sys
+
+# -- Path setup --------------------------------------------------------------
+
+sys.path.insert(0, os.path.abspath("../"))
+
+from nlpstack import __version__ as VERSION  # noqa: E402
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
@@ -11,7 +18,7 @@ from importlib.metadata import version as get_version
 project = "NLPSTACK"
 copyright = "2023, altescy"
 author = "altescy"
-release = get_version("nlpstack")
+release = VERSION
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
