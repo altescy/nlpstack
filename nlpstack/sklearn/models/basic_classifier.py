@@ -12,7 +12,7 @@ from nlpstack.data import DataLoader, Dataset, Instance, Vocabulary
 from nlpstack.data.fields import Field, LabelField, MappingField, TensorField, TextField
 from nlpstack.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Token, Tokenizer, WhitespaceTokenizer
-from nlpstack.torch.models import TorchBasicClassifier
+from nlpstack.torch.models.basic_classifier import ClassificationObjective, TorchBasicClassifier
 from nlpstack.torch.modules.seq2vec_encoders import BagOfEmbeddings
 from nlpstack.torch.modules.text_embedders import TextEmbedder
 from nlpstack.torch.modules.token_embedders import Embedding
@@ -32,7 +32,7 @@ class BasicNeuralTextClassifier(TorchPicklable, BaseEstimator, ClassifierMixin):
         classifier: TorchBasicClassifier | None = None,
         tokenizer: Tokenizer | None = None,
         token_indexers: Mapping[str, TokenIndexer] | None = None,
-        multilabel: bool = False,
+        objective: ClassificationObjective = "multiclass",
         min_df: int | float | Mapping[str, int | float] = 1,
         max_df: int | float | Mapping[str, int | float] = 1.0,
         pad_token: str | Mapping[str, str] = "@@PADDING@@",
@@ -61,7 +61,7 @@ class BasicNeuralTextClassifier(TorchPicklable, BaseEstimator, ClassifierMixin):
         self._classifier = classifier or TorchBasicClassifier(
             embedder=TextEmbedder({"tokens": Embedding(64)}),
             encoder=BagOfEmbeddings(64),
-            multilabel=multilabel,
+            objective=objective,
         )
         self._tokenizer = tokenizer or WhitespaceTokenizer()
         self._token_indexers = token_indexers or {"tokens": SingleIdTokenIndexer()}
@@ -115,18 +115,20 @@ class BasicNeuralTextClassifier(TorchPicklable, BaseEstimator, ClassifierMixin):
             }
         )
         if label is not None:
-            if self._classifier.multilabel:
+            if self._classifier.objective == "multilabel":
                 assert isinstance(label, list)
                 binary_label = numpy.zeros(self.vocab.get_vocab_size(self.label_namespace), dtype=int)
                 for single_label in label:
                     binary_label[self.vocab.get_index_by_token(self.label_namespace, single_label)] = 1
                 fields["label"] = TensorField(binary_label)
-            else:
+            elif self._classifier.objective == "multiclass":
                 assert isinstance(label, str)
                 fields["label"] = LabelField(
                     label,
                     vocab=self.vocab.get_token_to_index(self.label_namespace),
                 )
+            else:
+                raise ValueError(f"Unknown objective: {self._classifier.objective}")
         return Instance(**fields)
 
     def fit(
@@ -199,9 +201,11 @@ class BasicNeuralTextClassifier(TorchPicklable, BaseEstimator, ClassifierMixin):
         return_labels: bool = False,
         threshold: float = 0.5,
     ) -> numpy.ndarray | list[str] | list[list[str]]:
-        if self._classifier.multilabel:
+        if self._classifier.objective == "multilabel":
             return self._predict_multilabel(X, batch_size=batch_size, return_labels=return_labels, threshold=threshold)
-        return self._predict_singlelabel(X, batch_size=batch_size, return_labels=return_labels)
+        if self._classifier.objective == "multiclass":
+            return self._predict_singlelabel(X, batch_size=batch_size, return_labels=return_labels)
+        raise ValueError(f"Unknown objective: {self._classifier.objective}")
 
     def predict_proba(
         self,
@@ -229,7 +233,13 @@ class BasicNeuralTextClassifier(TorchPicklable, BaseEstimator, ClassifierMixin):
         metric: str | None = None,
         batch_size: int = 64,
     ) -> float:
-        metric = metric or ("accuracy" if not self._classifier.multilabel else "overall_accuracy")
+        if self._classifier.objective == "multiclass":
+            default_metric = "accuracy"
+        elif self._classifier.objective == "multilabel":
+            default_metric = "overall_accuracy"
+        else:
+            raise ValueError(f"Unknown objective: {self._classifier.objective}")
+        metric = metric or default_metric
         return self.compute_scores(X, y, batch_size=batch_size)[metric]
 
     def compute_scores(
