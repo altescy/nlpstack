@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import dataclasses
 import functools
 from typing import Any, Iterable, Iterator, Mapping, Sequence
 
@@ -11,14 +10,10 @@ from nlpstack.data.fields import Field, LabelField, MappingField, TensorField, T
 from nlpstack.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 
-
-@dataclasses.dataclass
-class ClassificationExample:
-    text: str | Sequence[Token]
-    label: str | Sequence[str] | None = None
+from .data import ClassificationExample, ClassificationPrediction, ClassifierInference
 
 
-class BasicClassificationDataModule(DataModule[ClassificationExample]):
+class BasicClassificationDataModule(DataModule[ClassificationExample, ClassifierInference, ClassificationPrediction]):
     def __init__(
         self,
         vocab: Vocabulary,
@@ -107,6 +102,15 @@ class BasicClassificationDataModule(DataModule[ClassificationExample]):
                     binary_label[self.vocab.get_index_by_token(self.label_namespace, single_label)] = 1
                 fields["label"] = TensorField(binary_label)
         return Instance(**fields)
+
+    def build_predictions(self, inference: ClassifierInference) -> Iterator[ClassificationPrediction]:
+        probs = inference.probs.tolist()  # Shape: (batch_size, num_labels)
+        indices = inference.probs.argmax(axis=1)
+        for index, prob in zip(indices, probs):
+            yield ClassificationPrediction(
+                label=self.vocab.get_token_by_index(self.label_namespace, index),
+                score=float(prob[index]),
+            )
 
     def read_dataset(
         self,

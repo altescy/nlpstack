@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Generic, Iterator, Optional, TypeVar
+from functools import cached_property
+from typing import Any, Callable, Generic, Iterator, Optional, Type, TypeVar
 
 from sklean.base import BaseEstimator
 
 from nlpstack.data import Dataset, Instance
 from nlpstack.data.datamodule import DataModule
 from nlpstack.torch.models import Model
-from nlpstack.torch.predictor import Predictor
+from nlpstack.torch.predictor import TorchPredictor
 from nlpstack.torch.training import Trainer
 
 Self = TypeVar("Self", bound="BaseEstimatorForTorch")
@@ -16,30 +17,38 @@ InputsX = TypeVar("InputsX")
 InputsY = TypeVar("InputsY")
 Outputs = TypeVar("Outputs")
 Example = TypeVar("Example")
+Inference = TypeVar("Inference")
 Prediction = TypeVar("Prediction")
 
 
-class BaseEstimatorForTorch(BaseEstimator, Generic[InputsX, InputsY, Outputs, Example, Prediction]):  # type: ignore[misc]
+class BaseEstimatorForTorch(BaseEstimator, Generic[InputsX, InputsY, Outputs, Example, Inference, Prediction]):  # type: ignore[misc]
     def __init__(
         self,
         *,
-        datamodule: DataModule[Example],
-        model: Model,
+        datamodule: DataModule[Example, Inference, Prediction],
+        model: Model[Any, Inference],
         trainer: Trainer,
-        predictor: Predictor[Example, Prediction],
         input_builder: Callable[[InputsX, Optional[InputsY]], Iterator[Example]],
         output_builder: Callable[[Iterator[Prediction]], Outputs],
+        predictor: Type[
+            TorchPredictor[Example, Prediction, DataModule[Example, Inference, Prediction]]
+        ] = TorchPredictor,
         **kwargs: Any,
     ) -> None:
         super().__init__()
         self.datamodule = datamodule
         self.model = model
         self.trainer = trainer
-        self.predictor = predictor
         self.kwargs = kwargs
+
+        self._predictor_factory = predictor
 
         self._input_builder = input_builder
         self._output_builder = output_builder
+
+    @cached_property
+    def _predictor(self) -> TorchPredictor[Example, Prediction, DataModule[Example, Inference, Prediction]]:
+        return self._predictor_factory(self.datamodule, self.model)
 
     def _read_dataset(
         self,
@@ -80,5 +89,5 @@ class BaseEstimatorForTorch(BaseEstimator, Generic[InputsX, InputsY, Outputs, Ex
 
     def predict(self, X: InputsX, **kwargs: Any) -> Outputs:
         dataset = self._build_examples(X, None)
-        predictions = self.predictor.predict(dataset, **kwargs)
+        predictions = self._predictor.predict(dataset, **kwargs)
         return self._output_builder(predictions)

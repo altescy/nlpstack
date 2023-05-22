@@ -7,22 +7,22 @@ import torch
 from nlpstack.data import Collator, DataModule
 from nlpstack.data.util import batched
 from nlpstack.torch.models import Model
+from nlpstack.torch.util import move_to_device, tensor_to_numpy
 
 Example = TypeVar("Example")
 Prediction = TypeVar("Prediction")
+TDataModule = TypeVar("TDataModule", bound=DataModule)
+TModel = TypeVar("TModel", bound=Model)
 
 
-class Predictor(Generic[Example, Prediction]):
+class TorchPredictor(Generic[Example, Prediction, TDataModule[Example, Prediction]]):
     def __init__(
         self,
-        datamodule: DataModule[Example],
+        datamodule: TDataModule,
         model: Model,
     ):
         self.datamodule = datamodule
         self.model = model
-
-    def generate_predictions_from_model_output(self, model_output: dict[str, list]) -> Iterator[Prediction]:
-        raise NotImplementedError
 
     def predict(
         self,
@@ -35,6 +35,6 @@ class Predictor(Generic[Example, Prediction]):
         with torch.no_grad():
             for batched_examples in batched(examples, batch_size):
                 instances = [self.datamodule.build_instance(example) for example in batched_examples]
-                batch = collator(instances)
-                model_output = self.model(**batch)
-                yield from self.generate_predictions_from_model_output(model_output)
+                batch = move_to_device(collator(instances), self.model.get_device())
+                model_output = tensor_to_numpy(self.model(**batch))
+                yield from self.datamodule.build_predictions(**model_output)
