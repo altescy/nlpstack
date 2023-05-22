@@ -1,25 +1,25 @@
 from __future__ import annotations
 
-from typing import Generic, Iterable, Iterator, TypeVar
+from typing import Any, Generic, Iterable, Iterator, TypeVar
 
 import torch
 
 from nlpstack.data import Collator, DataModule
 from nlpstack.data.util import batched
 from nlpstack.torch.models import Model
-from nlpstack.torch.util import move_to_device, tensor_to_numpy
+from nlpstack.torch.util import move_to_device
 
 Example = TypeVar("Example")
+Inference = TypeVar("Inference")
 Prediction = TypeVar("Prediction")
-TDataModule = TypeVar("TDataModule", bound=DataModule)
 TModel = TypeVar("TModel", bound=Model)
 
 
-class TorchPredictor(Generic[Example, Prediction, TDataModule[Example, Prediction]]):
+class TorchPredictor(Generic[Example, Inference, Prediction]):
     def __init__(
         self,
-        datamodule: TDataModule,
-        model: Model,
+        datamodule: DataModule[Example, Inference, Prediction],
+        model: Model[Any, Inference],
     ):
         self.datamodule = datamodule
         self.model = model
@@ -36,5 +36,5 @@ class TorchPredictor(Generic[Example, Prediction, TDataModule[Example, Predictio
             for batched_examples in batched(examples, batch_size):
                 instances = [self.datamodule.build_instance(example) for example in batched_examples]
                 batch = move_to_device(collator(instances), self.model.get_device())
-                model_output = tensor_to_numpy(self.model(**batch))
-                yield from self.datamodule.build_predictions(**model_output)
+                inference = self.model.infer(**batch)
+                yield from self.datamodule.build_predictions(inference)

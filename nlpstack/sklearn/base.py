@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Any, Callable, Generic, Iterator, Optional, Type, TypeVar
+from typing import Any, Callable, Generic, Iterator, Optional, TypeVar
 
 from sklean.base import BaseEstimator
 
@@ -30,8 +30,9 @@ class BaseEstimatorForTorch(BaseEstimator, Generic[InputsX, InputsY, Outputs, Ex
         trainer: Trainer,
         input_builder: Callable[[InputsX, Optional[InputsY]], Iterator[Example]],
         output_builder: Callable[[Iterator[Prediction]], Outputs],
-        predictor: Type[
-            TorchPredictor[Example, Prediction, DataModule[Example, Inference, Prediction]]
+        predictor_factory: Callable[
+            [DataModule[Example, Inference, Prediction], Model[Any, Inference]],
+            TorchPredictor[Example, Inference, Prediction],
         ] = TorchPredictor,
         **kwargs: Any,
     ) -> None:
@@ -41,13 +42,13 @@ class BaseEstimatorForTorch(BaseEstimator, Generic[InputsX, InputsY, Outputs, Ex
         self.trainer = trainer
         self.kwargs = kwargs
 
-        self._predictor_factory = predictor
+        self._predictor_factory = predictor_factory
 
         self._input_builder = input_builder
         self._output_builder = output_builder
 
     @cached_property
-    def _predictor(self) -> TorchPredictor[Example, Prediction, DataModule[Example, Inference, Prediction]]:
+    def _predictor(self) -> TorchPredictor[Example, Inference, Prediction]:
         return self._predictor_factory(self.datamodule, self.model)
 
     def _read_dataset(
