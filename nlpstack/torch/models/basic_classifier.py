@@ -108,8 +108,7 @@ class TorchBasicClassifier(Model):
 
         if label is not None:
             label_for_task = label.float() if isinstance(self._loss, torch.nn.BCEWithLogitsLoss) else label.long()
-            loss = self._loss(logits, label_for_task)
-            output["loss"] = loss
+            output["loss"] = self._loss(logits, label_for_task)
 
             for metric in self._metrics:
                 metric(probs, label)
