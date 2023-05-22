@@ -22,7 +22,7 @@ Prediction = TypeVar("Prediction")
 
 
 class BaseEstimatorForTorch(
-    BaseEstimator,
+    BaseEstimator,  # type: ignore[misc]
     Generic[
         InputsX,
         InputsY,
@@ -31,7 +31,7 @@ class BaseEstimatorForTorch(
         Inference,
         Prediction,
     ],
-):  # type: ignore[misc]
+):
     def __init__(
         self,
         *,
