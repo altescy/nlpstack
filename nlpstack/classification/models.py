@@ -3,7 +3,6 @@ from __future__ import annotations
 import dataclasses
 from typing import Any, Literal, Mapping, Sequence, Union, cast
 
-import numpy
 import torch
 
 from nlpstack.data import Vocabulary
@@ -22,6 +21,8 @@ from nlpstack.torch.modules.seq2vec_encoders import Seq2VecEncoder
 from nlpstack.torch.modules.text_embedders import TextEmbedder
 from nlpstack.torch.util import get_mask_from_text
 
+from .data import ClassificationInference
+
 ClassificationObjective = Literal["multiclass", "multilabel"]
 ClassificationMetrics = Union[Sequence[ClassificationMetric], Sequence[MultilabelClassificationMetric]]
 
@@ -33,14 +34,7 @@ class BasicClassifierOutput:
     loss: torch.FloatTensor | None = None
 
 
-@dataclasses.dataclass
-class BasicClassifierInference:
-    probs: numpy.ndarray
-    loss: float | None = None
-    metadata: dict[str, Any] | None = None
-
-
-class TorchBasicClassifier(Model[BasicClassifierOutput, BasicClassifierInference]):
+class TorchBasicClassifier(Model[BasicClassifierOutput, ClassificationInference]):
     def __init__(
         self,
         embedder: TextEmbedder,
@@ -135,9 +129,9 @@ class TorchBasicClassifier(Model[BasicClassifierOutput, BasicClassifierInference
         self,
         text: Mapping[str, Mapping[str, torch.Tensor]],
         label: torch.LongTensor | None = None,
-    ) -> BasicClassifierInference:
+    ) -> ClassificationInference:
         output = self.forward(text, label)
-        return BasicClassifierInference(
+        return ClassificationInference(
             probs=output.probs.detach().cpu().numpy(),
             loss=output.loss.detach().cpu().numpy() if output.loss is not None else None,
         )

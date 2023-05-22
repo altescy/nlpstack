@@ -15,7 +15,7 @@ class ClassificationExample:
 
 
 @dataclasses.dataclass
-class ClassifierInference:
+class ClassificationInference:
     probs: numpy.ndarray
     loss: float | None = None
     metadata: dict[str, Any] | None = None

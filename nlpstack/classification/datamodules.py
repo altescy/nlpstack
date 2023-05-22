@@ -10,10 +10,16 @@ from nlpstack.data.fields import Field, LabelField, MappingField, TensorField, T
 from nlpstack.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 
-from .data import ClassificationExample, ClassificationPrediction, ClassifierInference
+from .data import ClassificationExample, ClassificationInference, ClassificationPrediction
 
 
-class BasicClassificationDataModule(DataModule[ClassificationExample, ClassifierInference, ClassificationPrediction]):
+class BasicClassificationDataModule(
+    DataModule[
+        ClassificationExample,
+        ClassificationInference,
+        ClassificationPrediction,
+    ]
+):
     def __init__(
         self,
         vocab: Vocabulary,
@@ -103,7 +109,7 @@ class BasicClassificationDataModule(DataModule[ClassificationExample, Classifier
                 fields["label"] = TensorField(binary_label)
         return Instance(**fields)
 
-    def build_predictions(self, inference: ClassifierInference) -> Iterator[ClassificationPrediction]:
+    def build_predictions(self, inference: ClassificationInference) -> Iterator[ClassificationPrediction]:
         probs = inference.probs.tolist()  # Shape: (batch_size, num_labels)
         indices = inference.probs.argmax(axis=1)
         for index, prob in zip(indices, probs):
