@@ -34,6 +34,10 @@ class SklearnEstimatorForRune(
     def __init__(self, rune: Rune[Example, Prediction]) -> None:
         self._rune = rune
 
+    @property
+    def rune(self) -> Rune[Example, Prediction]:
+        return self._rune
+
     def fit(
         self: Self,
         X: InputsX,
