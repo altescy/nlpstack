@@ -10,7 +10,7 @@ def test_basic_classifier() -> None:
     ]
     y = ["positive", "negative", "positive", "negative"]
 
-    classifier = BasicClassifier(max_epochs=8)
+    classifier = BasicClassifier(max_epochs=16)
     classifier.fit(X, y)
 
     predictions = classifier.predict(X)
