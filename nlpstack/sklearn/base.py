@@ -61,7 +61,7 @@ class BaseEstimatorForTorch(
         self._output_builder = output_builder
 
     @cached_property
-    def _predictor(self) -> TorchPredictor[Example, Inference, Prediction]:
+    def predictor(self) -> TorchPredictor[Example, Inference, Prediction]:
         return self._predictor_factory(self.datamodule, self.model)
 
     def _read_dataset(
@@ -103,15 +103,17 @@ class BaseEstimatorForTorch(
         return self
 
     def predict(self, X: InputsX, **kwargs: Any) -> Outputs:
-        dataset = self._input_builder(X, None)
-        predictions = self._predictor.predict(dataset, **kwargs)
-        return self._output_builder(predictions)
+        return self._output_builder(self.generate_predictions(X, **kwargs))
 
     def score(self, X: InputsX, y: InputsY, *, metric: str | None = None, **kwargs: Any) -> float:
         return self.compute_metrics(X, y, **kwargs)[metric or self.primary_metric]
 
+    def generate_predictions(self, X: InputsX, **kwargs: Any) -> Iterator[Prediction]:
+        dataset = self._input_builder(X, None)
+        yield from self.predictor.predict(dataset, **kwargs)
+
     def compute_metrics(self, X: InputsX, y: InputsY, **kwargs: Any) -> dict[str, float]:
         dataset = self._input_builder(X, y)
         self.model.get_metrics(reset=True)
-        deque(self._predictor.predict(dataset, **kwargs), maxlen=0)
+        deque(self.predictor.predict(dataset, **kwargs), maxlen=0)
         return self.model.get_metrics()
