@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 import itertools
+import warnings
 from typing import Any, Iterator, Mapping, Sequence
 
 from nlpstack.data import DataLoader, Vocabulary
-from nlpstack.data.token_indexers import TokenIndexer
+from nlpstack.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 from nlpstack.sklearn.base import BaseEstimatorForTorch
 from nlpstack.torch.modules.seq2vec_encoders import BagOfEmbeddings
 from nlpstack.torch.modules.text_embedders import TextEmbedder
 from nlpstack.torch.modules.token_embedders import Embedding
+from nlpstack.torch.training import Trainer
 from nlpstack.torch.training.callbacks import Callback
 from nlpstack.torch.training.optimizers import AdamFactory
-from nlpstack.torch.traning import Trainer
 
 from .data import ClassificationExample, ClassificationInference, ClassificationPrediction
 from .datamodules import BasicClassificationDataModule
@@ -84,9 +85,18 @@ class BasicClassifier(
                     oov_token=oov_token,
                     special_tokens=special_tokens,
                 )
+            else:
+                if (min_df, max_df, pad_token, oov_token) != (1, 1.0, "@@PADDING@@", "@@UNKNOWN@@"):
+                    warnings.warn(
+                        "Ignoring min_df, max_df, pad_token, and oov_token because vocab is given.",
+                        UserWarning,
+                    )
 
             if tokenizer is None:
                 tokenizer = WhitespaceTokenizer()
+
+            if token_indexers is None:
+                token_indexers = {"tokens": SingleIdTokenIndexer()}
 
             datamodule = BasicClassificationDataModule(
                 vocab=vocab,
@@ -100,6 +110,12 @@ class BasicClassifier(
                 encoder=BagOfEmbeddings(64),
                 objective=objective,
             )
+        else:
+            if objective != classifier.objective:
+                warnings.warn(
+                    f"Ignoring objective={objective} because classifier (objective={classifier.objective}) is given.",
+                    UserWarning,
+                )
 
         if trainer is None:
             trainer = Trainer(
@@ -109,6 +125,12 @@ class BasicClassifier(
                 optimizer_factory=AdamFactory(lr=learning_rate),
                 callbacks=training_callbacks,
             )
+        else:
+            if (max_epochs, batch_size, learning_rate, training_callbacks) != (4, 32, 1e-3, None):
+                warnings.warn(
+                    "Ignoring max_epochs, batch_size, learning_rate, and training_callbacks because trainer is given.",
+                    UserWarning,
+                )
 
         super().__init__(
             datamodule=datamodule,

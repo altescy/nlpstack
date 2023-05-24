@@ -5,7 +5,6 @@ from typing import Any, Literal, Mapping, Sequence, Union, cast
 
 import torch
 
-from nlpstack.data import Vocabulary
 from nlpstack.torch.metrics import (
     Accuracy,
     AverageAccuracy,
@@ -22,6 +21,7 @@ from nlpstack.torch.modules.text_embedders import TextEmbedder
 from nlpstack.torch.util import get_mask_from_text
 
 from .data import ClassificationInference
+from .datamodules import BasicClassificationDataModule
 
 ClassificationObjective = Literal["multiclass", "multilabel"]
 ClassificationMetrics = Union[Sequence[ClassificationMetric], Sequence[MultilabelClassificationMetric]]
@@ -75,10 +75,15 @@ class TorchBasicClassifier(Model[BasicClassifierOutput, ClassificationInference]
     def objective(self) -> ClassificationObjective:
         return self._objective
 
-    def setup(self, *args: Any, vocab: Vocabulary, **kwargs: Any) -> None:
-        super().setup(*args, vocab=vocab, **kwargs)
+    def setup(
+        self,
+        *args: Any,
+        datamodule: BasicClassificationDataModule,
+        **kwargs: Any,
+    ) -> None:
+        super().setup(*args, datamodule=datamodule, vocab=datamodule.vocab, **kwargs)
         if self._objective in ("multiclass", "multilabel"):
-            num_labels = vocab.get_vocab_size(self._label_namespace)
+            num_labels = datamodule.vocab.get_vocab_size(self._label_namespace)
         else:
             raise ValueError(f"Unknown objective {self._objective}, expected one of 'multiclass', 'multilabel'")
         self._classifier.initialize_parameters(out_features=num_labels)

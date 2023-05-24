@@ -191,7 +191,7 @@ class Trainer:
                             batch = move_to_device(batch, device)
 
                             output = model(**batch)
-                            loss = output["loss"]
+                            loss = output.loss
 
                             optimizer.zero_grad()
                             loss.backward()

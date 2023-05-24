@@ -5,14 +5,20 @@ from typing import Any, Generic, Protocol, TypeVar
 
 import torch
 
-Output = TypeVar("Output")
-Inference = TypeVar("Inference")
-
 
 @typing.runtime_checkable
 class LazySetup(Protocol):
     def setup(self, *args: Any, **kwargs: Any) -> None:
         ...
+
+
+@typing.runtime_checkable
+class ModelOutputWithLoss(Protocol):
+    loss: torch.FloatTensor | None
+
+
+Output = TypeVar("Output", bound="ModelOutputWithLoss")
+Inference = TypeVar("Inference")
 
 
 class Model(torch.nn.Module, Generic[Output, Inference]):
