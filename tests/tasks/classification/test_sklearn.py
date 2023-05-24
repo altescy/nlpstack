@@ -1,4 +1,4 @@
-from nlpstack.classification.sklearn import BasicClassifier
+from nlpstack.tasks.classification.sklearn import BasicClassifier
 
 
 def test_basic_classifier() -> None:
