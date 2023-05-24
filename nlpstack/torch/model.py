@@ -21,7 +21,7 @@ Output = TypeVar("Output", bound="ModelOutputWithLoss")
 Inference = TypeVar("Inference")
 
 
-class Model(torch.nn.Module, Generic[Output, Inference]):
+class TorchModel(torch.nn.Module, Generic[Output, Inference]):
     def forward(self, *args: Any, **kwargs: Any) -> Output:
         raise NotImplementedError
 

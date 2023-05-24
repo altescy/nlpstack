@@ -12,7 +12,7 @@ from nlpstack.torch.metrics import (
     MultilabelClassificationMetric,
     OverallAccuracy,
 )
-from nlpstack.torch.models.model import Model
+from nlpstack.torch.model import TorchModel
 from nlpstack.torch.modules.feedforward import FeedForward
 from nlpstack.torch.modules.lazy import LazyLinearOutput
 from nlpstack.torch.modules.seq2seq_encoders import Seq2SeqEncoder
@@ -34,7 +34,7 @@ class BasicClassifierOutput:
     loss: torch.FloatTensor | None = None
 
 
-class TorchBasicClassifier(Model[BasicClassifierOutput, ClassificationInference]):
+class TorchBasicClassifier(TorchModel[BasicClassifierOutput, ClassificationInference]):
     def __init__(
         self,
         embedder: TextEmbedder,

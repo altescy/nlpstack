@@ -6,20 +6,20 @@ import torch
 
 from nlpstack.data import Collator, DataModule
 from nlpstack.data.util import batched
-from nlpstack.torch.models import Model
+from nlpstack.torch.model import TorchModel
 from nlpstack.torch.util import move_to_device
 
 Example = TypeVar("Example")
 Inference = TypeVar("Inference")
 Prediction = TypeVar("Prediction")
-TModel = TypeVar("TModel", bound=Model)
+TModel = TypeVar("TModel", bound=TorchModel)
 
 
 class TorchPredictor(Generic[Example, Inference, Prediction]):
     def __init__(
         self,
         datamodule: DataModule[Example, Inference, Prediction],
-        model: Model[Any, Inference],
+        model: TorchModel[Any, Inference],
     ):
         self.datamodule = datamodule
         self.model = model

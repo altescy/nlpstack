@@ -8,7 +8,7 @@ from sklearn.base import BaseEstimator
 
 from nlpstack.data import Dataset, Instance
 from nlpstack.data.datamodule import DataModule
-from nlpstack.torch.models import Model
+from nlpstack.torch.model import TorchModel
 from nlpstack.torch.predictor import TorchPredictor
 from nlpstack.torch.training import Trainer
 
@@ -39,10 +39,10 @@ class BaseEstimatorForTorch(
         self,
         *,
         datamodule: DataModule[Example, Inference, Prediction],
-        model: Model[Any, Inference],
+        model: TorchModel[Any, Inference],
         trainer: Trainer,
         predictor_factory: Callable[
-            [DataModule[Example, Inference, Prediction], Model[Any, Inference]],
+            [DataModule[Example, Inference, Prediction], TorchModel[Any, Inference]],
             TorchPredictor[Example, Inference, Prediction],
         ] = TorchPredictor,
         input_builder: Callable[[InputsX, Optional[InputsY]], Iterator[Example]],

@@ -9,7 +9,7 @@ import torch
 
 from nlpstack.common import tqdm
 from nlpstack.data import DataLoader, Instance
-from nlpstack.torch.models import Model
+from nlpstack.torch.model import TorchModel
 from nlpstack.torch.training.callbacks import Callback, StopEarly
 from nlpstack.torch.training.optimizers import AdamFactory, LRSchedulerFactory, OptimizerFactory
 from nlpstack.torch.util import move_to_device
@@ -34,7 +34,7 @@ class TrainingState:
 
     epoch: int
     step: int
-    model: Model
+    model: TorchModel
     optimizer: torch.optim.Optimizer
     lrscheduler: torch.optim.lr_scheduler.LRScheduler | None = None
 
@@ -132,7 +132,7 @@ class Trainer:
 
     def train(
         self,
-        model: Model,
+        model: TorchModel,
         train: Sequence[Instance],
         valid: Sequence[Instance] | None = None,
         resources: dict[str, Any] | None = None,
