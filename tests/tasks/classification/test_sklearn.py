@@ -1,4 +1,4 @@
-from nlpstack.tasks.classification.sklearn import BasicClassifier
+from nlpstack.tasks.classification.sklearn import SklearnBasicClassifier
 
 
 def test_basic_classifier() -> None:
@@ -10,7 +10,7 @@ def test_basic_classifier() -> None:
     ]
     y = ["positive", "negative", "positive", "negative"]
 
-    classifier = BasicClassifier(max_epochs=16, learning_rate=1e-2)
+    classifier = SklearnBasicClassifier(max_epochs=16, learning_rate=1e-2)
     classifier.fit(X, y)
 
     predictions = classifier.predict(X)
