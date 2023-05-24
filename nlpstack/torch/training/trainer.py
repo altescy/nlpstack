@@ -56,10 +56,10 @@ class TrainingState:
             self.lrscheduler.load_state_dict(state_dict["lr_scheduler"])
 
 
-class Trainer:
+class TorchTrainer:
     """Trainer for PyTorch models.
 
-    Trainer is a class that handles the training loop for PyTorch models. It is responsible for iterating
+    TorchTrainer is a class that handles the training loop for PyTorch models. It is responsible for iterating
     over the training data, computing the loss, and updating the model parameters by gradient descent.
 
     Args:

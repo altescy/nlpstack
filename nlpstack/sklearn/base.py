@@ -10,7 +10,7 @@ from nlpstack.data import Dataset, Instance
 from nlpstack.data.datamodule import DataModule
 from nlpstack.torch.model import TorchModel
 from nlpstack.torch.predictor import TorchPredictor
-from nlpstack.torch.training import Trainer
+from nlpstack.torch.training import TorchTrainer
 
 Self = TypeVar("Self", bound="BaseEstimatorForTorch")
 
@@ -40,7 +40,7 @@ class BaseEstimatorForTorch(
         *,
         datamodule: DataModule[Example, Inference, Prediction],
         model: TorchModel[Any, Inference],
-        trainer: Trainer,
+        trainer: TorchTrainer,
         predictor_factory: Callable[
             [DataModule[Example, Inference, Prediction], TorchModel[Any, Inference]],
             TorchPredictor[Example, Inference, Prediction],

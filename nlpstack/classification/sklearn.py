@@ -11,7 +11,7 @@ from nlpstack.sklearn.base import BaseEstimatorForTorch
 from nlpstack.torch.modules.seq2vec_encoders import BagOfEmbeddings
 from nlpstack.torch.modules.text_embedders import TextEmbedder
 from nlpstack.torch.modules.token_embedders import Embedding
-from nlpstack.torch.training import Trainer
+from nlpstack.torch.training import TorchTrainer
 from nlpstack.torch.training.callbacks import Callback
 from nlpstack.torch.training.optimizers import AdamFactory
 
@@ -65,7 +65,7 @@ class BasicClassifier(
         batch_size: int = 32,
         learning_rate: float = 1e-3,
         training_callbacks: Sequence[Callback] | None = None,
-        trainer: Trainer | None = None,
+        trainer: TorchTrainer | None = None,
         **kwargs: Any,
     ) -> None:
         if datamodule is None:
@@ -120,7 +120,7 @@ class BasicClassifier(
                 )
 
         if trainer is None:
-            trainer = Trainer(
+            trainer = TorchTrainer(
                 train_dataloader=DataLoader(batch_size=batch_size, shuffle=True),
                 valid_dataloader=DataLoader(batch_size=batch_size, shuffle=False),
                 max_epochs=max_epochs,
