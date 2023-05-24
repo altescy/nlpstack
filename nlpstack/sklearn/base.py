@@ -108,7 +108,10 @@ class BaseEstimatorForTorch(
         return self._output_builder(predictions)
 
     def score(self, X: InputsX, y: InputsY, *, metric: str | None = None, **kwargs: Any) -> float:
+        return self.compute_metrics(X, y, **kwargs)[metric or self.primary_metric]
+
+    def compute_metrics(self, X: InputsX, y: InputsY, **kwargs: Any) -> dict[str, float]:
         dataset = self._input_builder(X, y)
         self.model.get_metrics(reset=True)
         deque(self._predictor.predict(dataset, **kwargs), maxlen=0)
-        return self.model.get_metrics()[metric or self.primary_metric]
+        return self.model.get_metrics()
