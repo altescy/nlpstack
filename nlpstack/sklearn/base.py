@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import cached_property
 from typing import Any, Callable, Generic, Iterator, Optional, TypeVar
 
-from sklean.base import BaseEstimator
+from sklearn.base import BaseEstimator
 
 from nlpstack.data import Dataset, Instance
 from nlpstack.data.datamodule import DataModule
@@ -82,12 +82,13 @@ class BaseEstimatorForTorch(
         **kwargs: Any,
     ) -> Self:
         self.datamodule.setup(**self.kwargs, **kwargs)
-        self.model.setup(datamodule=self.datamodule, **self.kwargs, **kwargs)
 
         train_dataset = Dataset.from_iterable(self._read_dataset(X, y, is_training=True))
         valid_dataset: Dataset | None = None
         if X_valid is not None and y_valid is not None:
             valid_dataset = Dataset.from_iterable(self._read_dataset(X_valid, y_valid))
+
+        self.model.setup(datamodule=self.datamodule, **self.kwargs, **kwargs)
 
         self.trainer.train(
             model=self.model,
@@ -99,6 +100,6 @@ class BaseEstimatorForTorch(
         return self
 
     def predict(self, X: InputsX, **kwargs: Any) -> Outputs:
-        dataset = self._build_examples(X, None)
+        dataset = self._input_builder(X, None)
         predictions = self._predictor.predict(dataset, **kwargs)
         return self._output_builder(predictions)
