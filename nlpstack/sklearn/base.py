@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 from functools import cached_property
 from typing import Any, Callable, Generic, Iterator, Optional, TypeVar
 
@@ -38,12 +39,13 @@ class BaseEstimatorForTorch(
         datamodule: DataModule[Example, Inference, Prediction],
         model: Model[Any, Inference],
         trainer: Trainer,
-        input_builder: Callable[[InputsX, Optional[InputsY]], Iterator[Example]],
-        output_builder: Callable[[Iterator[Prediction]], Outputs],
         predictor_factory: Callable[
             [DataModule[Example, Inference, Prediction], Model[Any, Inference]],
             TorchPredictor[Example, Inference, Prediction],
         ] = TorchPredictor,
+        primary_metric: str,
+        input_builder: Callable[[InputsX, Optional[InputsY]], Iterator[Example]],
+        output_builder: Callable[[Iterator[Prediction]], Outputs],
         **kwargs: Any,
     ) -> None:
         super().__init__()
@@ -51,6 +53,8 @@ class BaseEstimatorForTorch(
         self.model = model
         self.trainer = trainer
         self.kwargs = kwargs
+
+        self._primary_metric = primary_metric
 
         self._predictor_factory = predictor_factory
 
@@ -103,3 +107,9 @@ class BaseEstimatorForTorch(
         dataset = self._input_builder(X, None)
         predictions = self._predictor.predict(dataset, **kwargs)
         return self._output_builder(predictions)
+
+    def score(self, X: InputsX, y: InputsY, *, metric: str | None = None, **kwargs: Any) -> float:
+        dataset = self._input_builder(X, y)
+        self.model.get_metrics(reset=True)
+        deque(self._predictor.predict(dataset, **kwargs), maxlen=0)
+        return self.model.get_metrics()[metric or self._primary_metric]

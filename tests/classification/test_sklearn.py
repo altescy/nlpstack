@@ -14,5 +14,7 @@ def test_basic_classifier() -> None:
     classifier.fit(X, y)
 
     predictions = classifier.predict(X)
-
     assert [pred.label for pred in predictions] == y
+
+    score = classifier.score(X, y)
+    assert score == 1.0
