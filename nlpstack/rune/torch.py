@@ -7,6 +7,7 @@ from typing import Any, Callable, Generic, Iterable, Iterator, Sequence, TypeVar
 from nlpstack.data import Dataset, Instance
 from nlpstack.data.datamodule import DataModule
 from nlpstack.torch.model import TorchModel
+from nlpstack.torch.picklable import TorchPicklable
 from nlpstack.torch.predictor import TorchPredictor
 from nlpstack.torch.training import TorchTrainer
 
@@ -20,9 +21,12 @@ Prediction = TypeVar("Prediction")
 
 
 class RuneForTorch(
+    TorchPicklable,
     Generic[Example, Inference, Prediction],
     Rune[Example, Prediction],
 ):
+    cuda_dependent_attributes = ["model"]
+
     def __init__(
         self,
         *,
