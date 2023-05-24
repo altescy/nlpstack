@@ -34,6 +34,8 @@ class BasicClassifier(
         ClassificationPrediction,
     ]
 ):
+    primary_metric = "accuracy"
+
     @staticmethod
     def input_builder(X: BasicInputsX, y: BasicInputsY | None) -> Iterator[ClassificationExample]:
         for text, label in itertools.zip_longest(X, y or []):
@@ -64,8 +66,6 @@ class BasicClassifier(
         learning_rate: float = 1e-3,
         training_callbacks: Sequence[Callback] | None = None,
         trainer: Trainer | None = None,
-        # evaluation configuration
-        primary_metric: str = "accuracy",
         **kwargs: Any,
     ) -> None:
         if datamodule is None:
@@ -138,7 +138,6 @@ class BasicClassifier(
             datamodule=datamodule,
             model=classifier,
             trainer=trainer,
-            primary_metric=primary_metric,
             input_builder=BasicClassifier.input_builder,
             output_builder=BasicClassifier.output_builder,
             **kwargs,

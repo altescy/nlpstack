@@ -33,6 +33,8 @@ class BaseEstimatorForTorch(
         Prediction,
     ],
 ):
+    primary_metric: str
+
     def __init__(
         self,
         *,
@@ -43,7 +45,6 @@ class BaseEstimatorForTorch(
             [DataModule[Example, Inference, Prediction], Model[Any, Inference]],
             TorchPredictor[Example, Inference, Prediction],
         ] = TorchPredictor,
-        primary_metric: str,
         input_builder: Callable[[InputsX, Optional[InputsY]], Iterator[Example]],
         output_builder: Callable[[Iterator[Prediction]], Outputs],
         **kwargs: Any,
@@ -53,8 +54,6 @@ class BaseEstimatorForTorch(
         self.model = model
         self.trainer = trainer
         self.kwargs = kwargs
-
-        self._primary_metric = primary_metric
 
         self._predictor_factory = predictor_factory
 
@@ -112,4 +111,4 @@ class BaseEstimatorForTorch(
         dataset = self._input_builder(X, y)
         self.model.get_metrics(reset=True)
         deque(self._predictor.predict(dataset, **kwargs), maxlen=0)
-        return self.model.get_metrics()[metric or self._primary_metric]
+        return self.model.get_metrics()[metric or self.primary_metric]
