@@ -26,7 +26,7 @@ class Accuracy(ClassificationMetric):
         self._total += len(inference.labels)
 
     def compute(self) -> dict[str, float]:
-        return {"accuracy": self._correct / self._total}
+        return {"accuracy": self._correct / self._total if self._total else 0.0}
 
     def reset(self) -> None:
         self._correct = 0
