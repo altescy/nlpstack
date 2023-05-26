@@ -3,18 +3,21 @@ from __future__ import annotations
 import dataclasses
 import warnings
 from logging import getLogger
-from typing import Any, Sequence
+from typing import Any, Sequence, TypeVar
 
 import torch
 
 from nlpstack.common import tqdm
 from nlpstack.data import DataLoader, Instance
+from nlpstack.evaluation import EmptyMetric, Metric
 from nlpstack.torch.model import TorchModel
 from nlpstack.torch.training.callbacks import Callback, StopEarly
 from nlpstack.torch.training.optimizers import AdamFactory, LRSchedulerFactory, OptimizerFactory
 from nlpstack.torch.util import move_to_device
 
 logger = getLogger(__name__)
+
+Inference = TypeVar("Inference")
 
 
 @dataclasses.dataclass
@@ -118,23 +121,33 @@ class TorchTrainer:
 
     def _get_metrics(
         self,
-        training_state: TrainingState,
         total_loss: float,
         num_batches: int,
+        training_state: TrainingState,
+        metric: Metric[Inference],
         reset: bool = False,
         prefix: str | None = None,
     ) -> dict[str, float]:
-        metrics = training_state.model.get_metrics(reset=reset)
+        metrics: dict[str, float] = {}
         metrics["loss"] = total_loss / num_batches if num_batches > 0 else 0.0
+
+        if metric is not None:
+            metrics.update(metric.compute())
+            if reset:
+                metric.reset()
+
         if prefix is not None:
             metrics = {f"{prefix}{k}": v for k, v in metrics.items()}
+
         return metrics
 
     def train(
         self,
-        model: TorchModel,
+        model: TorchModel[Inference],
         train: Sequence[Instance],
         valid: Sequence[Instance] | None = None,
+        *,
+        metric: Metric[Inference] | None = None,
         resources: dict[str, Any] | None = None,
     ) -> TrainingState:
         """Runs the training/validation loop with the given model and training data.
@@ -152,6 +165,7 @@ class TorchTrainer:
         if valid is not None and self._valid_dataloader is None:
             raise ValueError("valid_dataloader is required when valid is not None")
 
+        metric = metric or EmptyMetric()
         resources = resources or {}
 
         device = model.get_device()
@@ -181,6 +195,7 @@ class TorchTrainer:
                     epochbar.set_description(f"Epoch {epoch}")
 
                     model.train()
+                    metric.reset()
                     train_dataloader = self._train_dataloader(train)
                     with tqdm(train_dataloader, position=1, leave=False) as batchbar:
                         batchbar.set_description("Training")
@@ -201,10 +216,13 @@ class TorchTrainer:
                             num_train_batches += 1
                             total_train_loss += loss.item()
 
+                            metric.update(output.inference)
+
                             batch_train_metrics = self._get_metrics(
                                 training_state=state,
                                 total_loss=loss.item(),
                                 num_batches=1,
+                                metric=metric,
                                 reset=False,
                                 prefix="train_",
                             )
@@ -225,6 +243,7 @@ class TorchTrainer:
                                     training_state=state,
                                     total_loss=total_train_loss,
                                     num_batches=num_train_batches,
+                                    metric=metric,
                                     reset=False,
                                 )
                             )
@@ -233,12 +252,14 @@ class TorchTrainer:
                         training_state=state,
                         total_loss=total_train_loss,
                         num_batches=num_train_batches,
+                        metric=metric,
                         reset=True,
                         prefix="train_",
                     )
 
                     if valid is not None and self._valid_dataloader is not None:
                         model.eval()
+                        metric.reset()
                         valid_dataloader = self._valid_dataloader(valid)
                         with torch.no_grad(), tqdm(valid_dataloader, position=1, leave=False) as batchbar:
                             batchbar.set_description("Validating")
@@ -254,10 +275,13 @@ class TorchTrainer:
                                 num_valid_batches += 1
                                 total_valid_loss += loss.item()
 
+                                metric.update(output.inference)
+
                                 batch_valid_metrics = self._get_metrics(
                                     training_state=state,
                                     total_loss=loss.item(),
                                     num_batches=1,
+                                    metric=metric,
                                     reset=False,
                                     prefix="valid_",
                                 )
@@ -278,6 +302,7 @@ class TorchTrainer:
                                         training_state=state,
                                         total_loss=total_valid_loss,
                                         num_batches=num_valid_batches,
+                                        metric=metric,
                                         reset=False,
                                     )
                                 )
@@ -287,6 +312,7 @@ class TorchTrainer:
                                 training_state=state,
                                 total_loss=total_valid_loss,
                                 num_batches=num_valid_batches,
+                                metric=metric,
                                 reset=True,
                                 prefix="valid_",
                             )

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Generic, Iterator, Optional, TypeVar
+from typing import Any, Callable, Generic, Iterator, Mapping, Optional, TypeVar
 
 from sklearn.base import BaseEstimator
 
@@ -13,7 +13,6 @@ InputsX = TypeVar("InputsX")
 InputsY = TypeVar("InputsY")
 Outputs = TypeVar("Outputs")
 Example = TypeVar("Example")
-Inference = TypeVar("Inference")
 Prediction = TypeVar("Prediction")
 
 
@@ -65,6 +64,6 @@ class SklearnEstimatorForRune(
         dataset = self.input_builder(X, None)
         yield from self._rune.predict(dataset, **kwargs)
 
-    def compute_metrics(self, X: InputsX, y: InputsY, **kwargs: Any) -> dict[str, float]:
+    def compute_metrics(self, X: InputsX, y: InputsY, **kwargs: Any) -> Mapping[str, float]:
         dataset = self.input_builder(X, y)
         return self._rune.evaluate(dataset, **kwargs)

@@ -6,7 +6,7 @@ from typing import Any, Iterable, Iterator, Mapping, Sequence
 import numpy
 
 from nlpstack.data import DataModule, Dataset, Instance, Token, Vocabulary
-from nlpstack.data.fields import Field, LabelField, MappingField, TensorField, TextField
+from nlpstack.data.fields import Field, LabelField, MappingField, MetadataField, TextField
 from nlpstack.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 
@@ -44,7 +44,7 @@ class BasicClassificationDataModule(
         if not dataset:
             return []
 
-        def generator() -> Iterator[ClassificationExample]:
+        def tokenized_document_generator() -> Iterator[ClassificationExample]:
             for example in dataset:
                 if isinstance(example.text, str):
                     tokenized_text = self._tokenizer.tokenize(example.text)
@@ -55,7 +55,7 @@ class BasicClassificationDataModule(
                     label=example.label,
                 )
 
-        return Dataset.from_iterable(generator())
+        return Dataset.from_iterable(tokenized_document_generator())
 
     def _build_vocab(self, dataset: Sequence[ClassificationExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
@@ -67,10 +67,7 @@ class BasicClassificationDataModule(
             for example in dataset:
                 label = example.label
                 assert label is not None, "Dataset must have labels."
-                if isinstance(label, str):
-                    yield [label]
-                else:
-                    yield list(label)
+                yield [label]
 
         for token_indexer in self._token_indexers.values():
             token_indexer.build_vocab(self.vocab, text_iterator())
@@ -80,6 +77,7 @@ class BasicClassificationDataModule(
     def build_instance(self, example: ClassificationExample) -> Instance:
         text = example.text
         label = example.label
+        metadata = example.metadata
 
         if isinstance(text, str):
             text = self._tokenizer.tokenize(text)
@@ -96,27 +94,46 @@ class BasicClassificationDataModule(
             }
         )
 
+        if metadata is not None:
+            fields["metadata"] = MetadataField(metadata)
+
         if label is not None:
-            if isinstance(label, str):
-                fields["label"] = LabelField(
-                    label,
-                    vocab=self.vocab.get_token_to_index(self.label_namespace),
-                )
-            else:
-                binary_label = numpy.zeros(self.vocab.get_vocab_size(self.label_namespace), dtype=int)
-                for single_label in label:
-                    binary_label[self.vocab.get_index_by_token(self.label_namespace, single_label)] = 1
-                fields["label"] = TensorField(binary_label)
+            fields["label"] = LabelField(
+                label,
+                vocab=self.vocab.get_token_to_index(self.label_namespace),
+            )
+
         return Instance(**fields)
 
     def build_predictions(self, inference: ClassificationInference) -> Iterator[ClassificationPrediction]:
-        probs = inference.probs.tolist()  # Shape: (batch_size, num_labels)
-        indices = inference.probs.argmax(axis=1)
-        for index, prob in zip(indices, probs):
+        sorted_indices = inference.probs.argsort(axis=1)[:, ::-1].tolist()
+        sorted_probs = inference.probs.take(sorted_indices).tolist()
+        for i, (top_indices, top_probs) in enumerate(zip(sorted_indices, sorted_probs)):
             yield ClassificationPrediction(
-                label=self.vocab.get_token_by_index(self.label_namespace, index),
-                score=float(prob[index]),
+                top_probs=top_probs,
+                top_labels=[self.vocab.get_token_by_index(self.label_namespace, index) for index in top_indices],
+                metadata=inference.metadata[i] if inference.metadata is not None else None,
             )
+
+    def build_inference(
+        self,
+        examples: Sequence[ClassificationExample],
+        predictions: Sequence[ClassificationPrediction],
+    ) -> ClassificationInference:
+        probs: list[list[float]] = []
+        labels: list[int] = []
+        metadata: list[dict[str, Any]] = []
+        for example, prediction in zip(examples, predictions):
+            assert example.label is not None
+            probs.append(prediction.top_probs)
+            labels.append(self.vocab.get_index_by_token(self.label_namespace, example.label))
+            metadata.append(example.metadata or {})
+
+        return ClassificationInference(
+            probs=numpy.array(probs),
+            labels=numpy.array(labels),
+            metadata=metadata,
+        )
 
     def read_dataset(
         self,

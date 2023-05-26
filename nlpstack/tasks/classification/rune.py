@@ -16,7 +16,8 @@ from nlpstack.torch.training.optimizers import AdamFactory
 
 from .data import ClassificationExample, ClassificationInference, ClassificationPrediction
 from .datamodules import BasicClassificationDataModule
-from .models import ClassificationObjective, TorchBasicClassifier
+from .metrics import Accuracy, ClassificationMetric
+from .models import TorchBasicClassifier
 
 
 class BasicClassifier(
@@ -39,7 +40,6 @@ class BasicClassifier(
         token_indexers: Mapping[str, TokenIndexer] | None = None,
         datamodule: BasicClassificationDataModule | None = None,
         # model configuration
-        objective: ClassificationObjective = "multiclass",
         classifier: TorchBasicClassifier | None = None,
         # training configuration
         max_epochs: int = 4,
@@ -47,6 +47,8 @@ class BasicClassifier(
         learning_rate: float = 1e-3,
         training_callbacks: Sequence[Callback] | None = None,
         trainer: TorchTrainer | None = None,
+        # evaluation configuration
+        metric: ClassificationMetric | Sequence[ClassificationMetric] | None = None,
         **kwargs: Any,
     ) -> None:
         if datamodule is None:
@@ -91,14 +93,7 @@ class BasicClassifier(
             classifier = TorchBasicClassifier(
                 embedder=TextEmbedder({"tokens": Embedding(64)}),
                 encoder=BagOfEmbeddings(64),
-                objective=objective,
             )
-        else:
-            if objective != classifier.objective:
-                warnings.warn(
-                    f"Ignoring objective={objective} because classifier (objective={classifier.objective}) is given.",
-                    UserWarning,
-                )
 
         if trainer is None:
             trainer = TorchTrainer(
@@ -115,9 +110,13 @@ class BasicClassifier(
                     UserWarning,
                 )
 
+        if metric is None:
+            metric = Accuracy()
+
         super().__init__(
             datamodule=datamodule,
             model=classifier,
             trainer=trainer,
+            metric=metric,
             **kwargs,
         )

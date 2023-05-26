@@ -5,6 +5,8 @@ from typing import Any, Generic, Protocol, TypeVar
 
 import torch
 
+Inference = TypeVar("Inference")
+
 
 @typing.runtime_checkable
 class LazySetup(Protocol):
@@ -13,23 +15,17 @@ class LazySetup(Protocol):
 
 
 @typing.runtime_checkable
-class ModelOutputWithLoss(Protocol):
+class TorchModelOutput(Protocol[Inference]):
+    inference: Inference
     loss: torch.FloatTensor | None
 
 
-Output = TypeVar("Output", bound="ModelOutputWithLoss")
-Inference = TypeVar("Inference")
-
-
-class TorchModel(torch.nn.Module, Generic[Output, Inference]):
-    def forward(self, *args: Any, **kwargs: Any) -> Output:
+class TorchModel(torch.nn.Module, Generic[Inference]):
+    def forward(self, *args: Any, **kwargs: Any) -> TorchModelOutput[Inference]:
         raise NotImplementedError
 
     def infer(self, *args: Any, **kwargs: Any) -> Inference:
-        raise NotImplementedError
-
-    def get_metrics(self, reset: bool = False) -> dict[str, float]:
-        raise NotImplementedError
+        return self.forward(*args, **kwargs).inference
 
     def get_device(self) -> torch.device:
         return next(self.parameters()).device

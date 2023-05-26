@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from collections import deque
+import itertools
 from functools import cached_property
-from typing import Any, Callable, Generic, Iterable, Iterator, Sequence, TypeVar
+from typing import Any, Callable, Generic, Iterable, Iterator, Mapping, Sequence, TypeVar
 
 from nlpstack.data import Dataset, Instance
 from nlpstack.data.datamodule import DataModule
+from nlpstack.evaluation import EmptyMetric, Evaluator, Metric, MultiMetrics, SimpleEvaluator
 from nlpstack.torch.model import TorchModel
 from nlpstack.torch.picklable import TorchPicklable
 from nlpstack.torch.predictor import TorchPredictor
@@ -31,12 +32,17 @@ class RuneForTorch(
         self,
         *,
         datamodule: DataModule[Example, Inference, Prediction],
-        model: TorchModel[Any, Inference],
+        model: TorchModel[Inference],
         trainer: TorchTrainer,
+        metric: Metric[Inference] | Sequence[Metric[Inference]] | None = None,
         predictor_factory: Callable[
-            [DataModule[Example, Inference, Prediction], TorchModel[Any, Inference]],
+            [DataModule[Example, Inference, Prediction], TorchModel[Inference]],
             TorchPredictor[Example, Inference, Prediction],
         ] = TorchPredictor,
+        evaluator_factory: Callable[
+            [DataModule[Example, Inference, Prediction], Metric[Inference]],
+            Evaluator[Example, Prediction],
+        ] = SimpleEvaluator,
         **kwargs: Any,
     ) -> None:
         self.datamodule = datamodule
@@ -44,11 +50,24 @@ class RuneForTorch(
         self.trainer = trainer
         self.kwargs = kwargs
 
+        self.metric: Metric[Inference]
+        if metric is None:
+            self.metric = EmptyMetric()
+        elif isinstance(metric, Sequence):
+            self.metric = MultiMetrics(metric)
+        else:
+            self.metric = metric
+
         self._predictor_factory = predictor_factory
+        self._evaluator_factory = evaluator_factory
 
     @cached_property
     def predictor(self) -> TorchPredictor[Example, Inference, Prediction]:
         return self._predictor_factory(self.datamodule, self.model)
+
+    @cached_property
+    def evaluator(self) -> Evaluator[Example, Prediction]:
+        return self._evaluator_factory(self.datamodule, self.metric)
 
     def train(
         self: Self,
@@ -70,6 +89,7 @@ class RuneForTorch(
             model=self.model,
             train=train_instances,
             valid=valid_instances,
+            metric=self.metric,
             resources=resources,
         )
 
@@ -78,7 +98,7 @@ class RuneForTorch(
     def predict(self, dataset: Iterable[Example], **kwargs: Any) -> Iterator[Prediction]:
         yield from self.predictor.predict(dataset, **kwargs)
 
-    def evaluate(self, dataset: Iterable[Example], **kwargs: Any) -> dict[str, float]:
-        self.model.get_metrics(reset=True)
-        deque(self.predictor.predict(dataset, **kwargs), maxlen=0)
-        return self.model.get_metrics()
+    def evaluate(self, dataset: Iterable[Example], **kwargs: Any) -> Mapping[str, float]:
+        examples, examples_for_prediction = itertools.tee(dataset)
+        predictions = self.predict(examples_for_prediction, **kwargs)
+        return self.evaluator.evaluate(examples, predictions)

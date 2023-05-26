@@ -11,17 +11,30 @@ from nlpstack.data import Token
 @dataclasses.dataclass
 class ClassificationExample:
     text: str | Sequence[Token]
-    label: str | Sequence[str] | None = None
+    label: str | None = None
+    metadata: dict[str, Any] | None = None
 
 
 @dataclasses.dataclass
 class ClassificationInference:
     probs: numpy.ndarray
-    loss: float | None = None
-    metadata: dict[str, Any] | None = None
+    labels: numpy.ndarray | None = None
+    metadata: list[dict[str, Any]] | None = None
 
 
 @dataclasses.dataclass
 class ClassificationPrediction:
-    label: str
-    score: float
+    top_probs: list[float]
+    top_labels: list[str]
+    metadata: dict[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        assert len(self.top_probs) == len(self.top_labels)
+
+    @property
+    def label(self) -> str:
+        return self.top_labels[0]
+
+    @property
+    def prob(self) -> float:
+        return self.top_probs[0]

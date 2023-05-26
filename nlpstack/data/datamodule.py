@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Generic, Iterable, Iterator, TypeVar
+from typing import Any, Generic, Iterable, Iterator, Sequence, TypeVar
 
 from collatable import Instance
 
@@ -17,6 +17,13 @@ class DataModule(Generic[Example, Inference, Prediction]):
         raise NotImplementedError
 
     def build_predictions(self, inference: Inference) -> Iterator[Prediction]:
+        raise NotImplementedError
+
+    def build_inference(
+        self,
+        examples: Sequence[Example],
+        predictions: Sequence[Prediction],
+    ) -> Inference:
         raise NotImplementedError
 
     def read_dataset(

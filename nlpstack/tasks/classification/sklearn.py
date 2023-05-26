@@ -12,7 +12,8 @@ from nlpstack.torch.training.callbacks import Callback
 
 from .data import ClassificationExample, ClassificationPrediction
 from .datamodules import BasicClassificationDataModule
-from .models import ClassificationObjective, TorchBasicClassifier
+from .metrics import ClassificationMetric
+from .models import TorchBasicClassifier
 from .rune import BasicClassifier as BasicClassifier
 
 BasicInputsX = Sequence[str]
@@ -53,7 +54,6 @@ class SklearnBasicClassifier(
         token_indexers: Mapping[str, TokenIndexer] | None = None,
         datamodule: BasicClassificationDataModule | None = None,
         # model configuration
-        objective: ClassificationObjective = "multiclass",
         classifier: TorchBasicClassifier | None = None,
         # training configuration
         max_epochs: int = 4,
@@ -61,6 +61,8 @@ class SklearnBasicClassifier(
         learning_rate: float = 1e-3,
         training_callbacks: Sequence[Callback] | None = None,
         trainer: TorchTrainer | None = None,
+        # evaluation configuration
+        metric: ClassificationMetric | Sequence[ClassificationMetric] | None = None,
         **kwargs: Any,
     ) -> None:
         rune = BasicClassifier(
@@ -71,13 +73,13 @@ class SklearnBasicClassifier(
             vocab=vocab,
             tokenizer=tokenizer,
             token_indexers=token_indexers,
-            objective=objective,
             classifier=classifier,
             max_epochs=max_epochs,
             batch_size=batch_size,
             learning_rate=learning_rate,
             training_callbacks=training_callbacks,
             trainer=trainer,
+            metric=metric,
             **kwargs,
         )
         super().__init__(rune)

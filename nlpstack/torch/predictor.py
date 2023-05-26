@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Generic, Iterable, Iterator, TypeVar
+from typing import Generic, Iterable, Iterator, TypeVar
 
 import torch
 
@@ -12,14 +12,13 @@ from nlpstack.torch.util import move_to_device
 Example = TypeVar("Example")
 Inference = TypeVar("Inference")
 Prediction = TypeVar("Prediction")
-TModel = TypeVar("TModel", bound=TorchModel)
 
 
 class TorchPredictor(Generic[Example, Inference, Prediction]):
     def __init__(
         self,
         datamodule: DataModule[Example, Inference, Prediction],
-        model: TorchModel[Any, Inference],
+        model: TorchModel[Inference],
     ):
         self.datamodule = datamodule
         self.model = model
