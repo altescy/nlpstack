@@ -117,8 +117,8 @@ class BasicClassificationDataModule(
 
     def build_inference(
         self,
-        examples: Sequence[ClassificationExample],
-        predictions: Sequence[ClassificationPrediction],
+        examples: Iterable[ClassificationExample],
+        predictions: Iterable[ClassificationPrediction],
     ) -> ClassificationInference:
         probs: list[list[float]] = []
         labels: list[int] = []
