@@ -10,7 +10,7 @@ from typing import Any
 import torch
 
 if typing.TYPE_CHECKING:
-    from nlpstack.torch.training.trainer import Trainer, TrainingState
+    from nlpstack.torch.training.trainer import TorchTrainer, TrainingState
 
 
 class StopEarly(Exception):
@@ -24,7 +24,7 @@ class Callback:
 
     def on_start(
         self,
-        trainer: "Trainer",
+        trainer: "TorchTrainer",
         training_state: "TrainingState",
         resources: dict[str, Any],
     ) -> None:
@@ -32,7 +32,7 @@ class Callback:
 
     def on_batch(
         self,
-        trainer: "Trainer",
+        trainer: "TorchTrainer",
         training_state: "TrainingState",
         batch_inputs: dict[str, Any],
         batch_outputs: dict[str, Any],
@@ -44,7 +44,7 @@ class Callback:
 
     def on_epoch(
         self,
-        trainer: "Trainer",
+        trainer: "TorchTrainer",
         training_state: "TrainingState",
         metrics: dict[str, Any],
         resources: dict[str, Any],
@@ -53,7 +53,7 @@ class Callback:
 
     def on_end(
         self,
-        trainer: "Trainer",
+        trainer: "TorchTrainer",
         training_state: "TrainingState",
         resources: dict[str, Any],
     ) -> None:
@@ -102,7 +102,7 @@ class EarlyStopping(Callback):
 
     def on_start(
         self,
-        trainer: "Trainer",
+        trainer: "TorchTrainer",
         training_state: "TrainingState",
         resources: dict[str, Any],
     ) -> None:
@@ -115,7 +115,7 @@ class EarlyStopping(Callback):
 
     def on_epoch(
         self,
-        trainer: "Trainer",
+        trainer: "TorchTrainer",
         training_state: "TrainingState",
         metrics: dict[str, Any],
         resources: dict[str, Any],
@@ -133,7 +133,7 @@ class EarlyStopping(Callback):
 
     def on_end(
         self,
-        trainer: "Trainer",
+        trainer: "TorchTrainer",
         training_state: "TrainingState",
         resources: dict[str, Any],
     ) -> None:
@@ -153,7 +153,7 @@ class MlflowCallback(Callback):
 
     def on_batch(
         self,
-        trainer: "Trainer",
+        trainer: "TorchTrainer",
         training_state: "TrainingState",
         batch_inputs: dict[str, Any],
         batch_outputs: dict[str, Any],
@@ -168,7 +168,7 @@ class MlflowCallback(Callback):
 
     def on_epoch(
         self,
-        trainer: "Trainer",
+        trainer: "TorchTrainer",
         training_state: "TrainingState",
         metrics: dict[str, Any],
         resources: dict[str, Any],

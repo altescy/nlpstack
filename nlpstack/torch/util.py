@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Mapping, TypeVar, cast
+from typing import Any, Mapping, TypeVar, cast
 
 import numpy
 import torch
@@ -47,5 +47,22 @@ def move_to_device(obj: T, device: int | torch.device) -> T:
         return cast(T, obj.__class__(*(move_to_device(item, device) for item in obj)))
     elif isinstance(obj, tuple):
         return cast(T, tuple(move_to_device(item, device) for item in obj))
+
+    return obj
+
+
+def tensor_to_numpy(obj: Any) -> Any:
+    if isinstance(obj, torch.Tensor):
+        return obj.detach().cpu().numpy()
+    elif isinstance(obj, dict):
+        for key, value in obj.items():
+            obj[key] = tensor_to_numpy(value)
+        return obj
+    elif isinstance(obj, list):
+        for i, item in enumerate(obj):
+            obj[i] = tensor_to_numpy(item)
+        return obj
+    elif isinstance(obj, tuple):
+        return tuple(tensor_to_numpy(item) for item in obj)
 
     return obj

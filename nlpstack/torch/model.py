@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import typing
-from typing import Any, Protocol
+from typing import Any, Generic, Protocol, TypeVar
 
 import torch
+
+Inference = TypeVar("Inference")
 
 
 @typing.runtime_checkable
@@ -12,12 +14,18 @@ class LazySetup(Protocol):
         ...
 
 
-class Model(torch.nn.Module):
-    def forward(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+@typing.runtime_checkable
+class TorchModelOutput(Protocol[Inference]):
+    inference: Inference
+    loss: torch.FloatTensor | None
+
+
+class TorchModel(torch.nn.Module, Generic[Inference]):
+    def forward(self, *args: Any, **kwargs: Any) -> TorchModelOutput[Inference]:
         raise NotImplementedError
 
-    def get_metrics(self, reset: bool = False) -> dict[str, float]:
-        raise NotImplementedError
+    def infer(self, *args: Any, **kwargs: Any) -> Inference:
+        return self.forward(*args, **kwargs).inference
 
     def get_device(self) -> torch.device:
         return next(self.parameters()).device

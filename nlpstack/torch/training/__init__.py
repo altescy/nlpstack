@@ -1,1 +1,1 @@
-from nlpstack.torch.training.trainer import Trainer  # noqa: F401
+from nlpstack.torch.training.trainer import TorchTrainer  # noqa: F401
