@@ -95,10 +95,22 @@ class RuneForTorch(
 
         return self
 
-    def predict(self, dataset: Iterable[Example], **kwargs: Any) -> Iterator[Prediction]:
-        yield from self.predictor.predict(dataset, **kwargs)
+    def predict(
+        self,
+        dataset: Iterable[Example],
+        *,
+        batch_size: int = 32,
+        **kwargs: Any,
+    ) -> Iterator[Prediction]:
+        yield from self.predictor.predict(dataset, batch_size=batch_size, **kwargs)
 
-    def evaluate(self, dataset: Iterable[Example], **kwargs: Any) -> Mapping[str, float]:
+    def evaluate(
+        self,
+        dataset: Iterable[Example],
+        *,
+        batch_size: int = 32,
+        **kwargs: Any,
+    ) -> Mapping[str, float]:
         examples, examples_for_prediction = itertools.tee(dataset)
-        predictions = self.predict(examples_for_prediction, **kwargs)
-        return self.evaluator.evaluate(examples, predictions)
+        predictions = self.predict(examples_for_prediction, batch_size=batch_size, **kwargs)
+        return self.evaluator.evaluate(examples, predictions, batch_size=batch_size, **kwargs)

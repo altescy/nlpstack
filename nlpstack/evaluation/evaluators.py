@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Generic, Iterable, Iterator, Mapping, TypeVar
+from typing import Any, Generic, Iterable, Iterator, Mapping, TypeVar
 
 from nlpstack.data.datamodule import DataModule
 
@@ -16,6 +16,7 @@ class Evaluator(Generic[Example, Prediction]):
         self,
         examples: Iterable[Example],
         predictions: Iterable[Prediction],
+        **kwargs: Any,
     ) -> Mapping[str, float]:
         raise NotImplementedError
 
@@ -38,6 +39,7 @@ class SimpleEvaluator(
         predictions: Iterable[Prediction],
         *,
         batch_size: int = 32,
+        **kwargs: Any,
     ) -> Mapping[str, float]:
         self.metric.reset()
 
