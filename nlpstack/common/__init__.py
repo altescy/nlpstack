@@ -1,1 +1,1 @@
-from nlpstack.common.tqdm import tqdm  # noqa: F401
+from nlpstack.common.progressbar import ProgressBar  # noqa: F401

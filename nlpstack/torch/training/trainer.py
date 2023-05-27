@@ -7,7 +7,7 @@ from typing import Any, Sequence, TypeVar
 
 import torch
 
-from nlpstack.common import tqdm
+from nlpstack.common import ProgressBar
 from nlpstack.data import DataLoader, Instance
 from nlpstack.evaluation import EmptyMetric, Metric
 from nlpstack.torch.model import TorchModel
@@ -182,6 +182,22 @@ class TorchTrainer:
 
         metrics: dict[str, float] = {}
 
+        total_batches = self._max_epochs * len(self._train_dataloader(train))
+        if valid is not None:
+            total_batches += self._max_epochs * len(self._valid_dataloader(valid))
+
+        # setup progress bar
+        epoch_digits = len(str(self._max_epochs))
+        totalbar_desc = "Epoch {epoch:$edig$d}/$meps$"
+        totalbar_desc = totalbar_desc.replace("$edig$", str(epoch_digits)).replace("$meps$", str(self._max_epochs))
+        trainbar_desc = "Training"
+        validbar_desc = "Validating"
+        max_desc_len = max(len(totalbar_desc.format(epoch=0)), len(trainbar_desc), len(validbar_desc))
+        totalbar_template = "{desc:<$mdl$s}  {percentage:3d}%  {bar}  {elapsed_time}<{remaining_time}"
+        batchbar_template = "{desc:<$mdl$s}  {percentage:3d}%  {bar}  {average_iterations}it/s"
+        totalbar_template = totalbar_template.replace("$mdl$", str(max_desc_len))
+        batchbar_template = batchbar_template.replace("$mdl$", str(max_desc_len))
+
         for callback in self._callbacks:
             callback.on_start(
                 trainer=self,
@@ -190,16 +206,19 @@ class TorchTrainer:
             )
 
         try:
-            with tqdm(range(1, self._max_epochs + 1), position=0, leave=True) as epochbar:
-                for epoch in epochbar:
-                    epochbar.set_description(f"Epoch {epoch}")
+            with ProgressBar[int](total_batches, desc="", template=totalbar_template) as totalbar:
+                for epoch in range(1, self._max_epochs + 1):
+                    totalbar.set_description(totalbar_desc.format(epoch=epoch))
 
                     model.train()
                     metric.reset()
                     train_dataloader = self._train_dataloader(train)
-                    with tqdm(train_dataloader, position=1, leave=False) as batchbar:
-                        batchbar.set_description("Training")
-
+                    with ProgressBar(
+                        train_dataloader,
+                        desc=trainbar_desc,
+                        template=batchbar_template,
+                        leave=False,
+                    ) as batchbar:
                         num_train_batches = 0
                         total_train_loss = 0.0
                         for batch in batchbar:
@@ -239,14 +258,19 @@ class TorchTrainer:
                                 )
 
                             batchbar.set_postfix(
-                                **self._get_metrics(
-                                    training_state=state,
-                                    total_loss=total_train_loss,
-                                    num_batches=num_train_batches,
-                                    metric=metric,
-                                    reset=False,
-                                )
+                                **{
+                                    key: f"{value:.2f}"
+                                    for key, value in self._get_metrics(
+                                        training_state=state,
+                                        total_loss=total_train_loss,
+                                        num_batches=num_train_batches,
+                                        metric=metric,
+                                        reset=False,
+                                    ).items()
+                                }
                             )
+
+                            totalbar.update()
 
                     metrics = self._get_metrics(
                         training_state=state,
@@ -261,8 +285,13 @@ class TorchTrainer:
                         model.eval()
                         metric.reset()
                         valid_dataloader = self._valid_dataloader(valid)
-                        with torch.no_grad(), tqdm(valid_dataloader, position=1, leave=False) as batchbar:
-                            batchbar.set_description("Validating")
+                        with torch.no_grad(), ProgressBar(
+                            valid_dataloader,
+                            desc=validbar_desc,
+                            template=batchbar_template,
+                            leave=False,
+                        ) as batchbar:
+                            batchbar.set_description(validbar_desc)
 
                             num_valid_batches = 0
                             total_valid_loss = 0.0
@@ -270,7 +299,7 @@ class TorchTrainer:
                                 batch = move_to_device(batch, device)
 
                                 output = model(**batch)
-                                loss = output["loss"]
+                                loss = output.loss
 
                                 num_valid_batches += 1
                                 total_valid_loss += loss.item()
@@ -298,14 +327,19 @@ class TorchTrainer:
                                     )
 
                                 batchbar.set_postfix(
-                                    **self._get_metrics(
-                                        training_state=state,
-                                        total_loss=total_valid_loss,
-                                        num_batches=num_valid_batches,
-                                        metric=metric,
-                                        reset=False,
-                                    )
+                                    **{
+                                        key: f"{value:.2f}"
+                                        for key, value in self._get_metrics(
+                                            training_state=state,
+                                            total_loss=total_valid_loss,
+                                            num_batches=num_valid_batches,
+                                            metric=metric,
+                                            reset=False,
+                                        ).items()
+                                    }
                                 )
+
+                                totalbar.update()
 
                         metrics.update(
                             self._get_metrics(
@@ -320,6 +354,11 @@ class TorchTrainer:
 
                     if lrscheduler is not None:
                         lrscheduler.step()
+
+                    logger.info(
+                        f"Epoch {epoch}/{self._max_epochs} - "
+                        + " ".join(f"{key}={value:.2f}" for key, value in metrics.items())
+                    )
 
                     state.epoch += 1
 
