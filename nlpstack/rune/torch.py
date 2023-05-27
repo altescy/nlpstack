@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import cached_property
+from logging import getLogger
 from typing import Any, Callable, Generic, Iterable, Iterator, Mapping, Sequence, TypeVar
 
 from nlpstack.data import Dataset, Instance
@@ -12,6 +13,8 @@ from nlpstack.torch.predictor import TorchPredictor
 from nlpstack.torch.training import TorchTrainer
 
 from .base import Rune
+
+logger = getLogger(__name__)
 
 Self = TypeVar("Self", bound="RuneForTorch")
 
@@ -75,15 +78,20 @@ class RuneForTorch(
         resources: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Self:
+        logger.info("Setup datamodule...")
         self.datamodule.setup(**self.kwargs, **kwargs)
 
+        logger.info("Reading training dataset...")
         train_instances = Dataset.from_iterable(self.datamodule.read_dataset(train_dataset, is_training=True))
         valid_instances: Dataset[Instance] | None = None
         if valid_dataset is not None:
+            logger.info("Reading validation dataset...")
             valid_instances = Dataset.from_iterable(self.datamodule.read_dataset(valid_dataset))
 
+        logger.info("Setup model...")
         self.model.setup(datamodule=self.datamodule, **self.kwargs, **kwargs)
 
+        logger.info("Start training...")
         self.trainer.train(
             model=self.model,
             train=train_instances,

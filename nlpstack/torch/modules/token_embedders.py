@@ -19,8 +19,8 @@ class PassThroughTokenEmbedder(TokenEmbedder):
         super().__init__()
         self._embedding_dim = embedding_dim
 
-    def forward(self, embeddings: torch.FloatTensor, **kwargs: Any) -> torch.FloatTensor:
-        return embeddings
+    def forward(self, embeddings: torch.Tensor, **kwargs: Any) -> torch.FloatTensor:
+        return cast(torch.FloatTensor, embeddings.float())
 
     def get_output_dim(self) -> int:
         return self._embedding_dim

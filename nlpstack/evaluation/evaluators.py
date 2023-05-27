@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Generic, Iterable, Mapping, TypeVar
 
+from nlpstack.common import ProgressBar
+
 from .metrics import Metric
 
 Example = TypeVar("Example")
@@ -28,6 +30,8 @@ class SimpleEvaluator(Generic[Inference], Evaluator[Inference]):
         **kwargs: Any,
     ) -> Mapping[str, float]:
         self.metric.reset()
-        for inference in inferences:
-            self.metric.update(inference)
+        with ProgressBar(inferences, desc="Evaluating") as progressbar:
+            for inference in progressbar:
+                self.metric.update(inference)
+                progressbar.set_postfix(**{key: f"{value:.2f}" for key, value in self.metric.compute().items()})
         return self.metric.compute()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+from logging import getLogger
 from typing import Any, Mapping, Sequence
 
 from nlpstack.data import DataLoader, Vocabulary
@@ -18,6 +19,8 @@ from .data import ClassificationExample, ClassificationInference, Classification
 from .datamodules import BasicClassificationDataModule
 from .metrics import Accuracy, ClassificationMetric
 from .models import TorchBasicClassifier
+
+logger = getLogger(__name__)
 
 
 class BasicClassifier(
