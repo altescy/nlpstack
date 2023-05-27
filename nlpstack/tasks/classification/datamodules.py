@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import functools
+from logging import getLogger
 from typing import Any, Iterable, Iterator, Mapping, Sequence
 
 import numpy
 
+from nlpstack.common import ProgressBar
 from nlpstack.data import DataModule, Dataset, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, LabelField, MappingField, MetadataField, TextField
 from nlpstack.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 
 from .data import ClassificationExample, ClassificationInference, ClassificationPrediction
+
+logger = getLogger(__name__)
 
 
 class BasicClassificationDataModule(
@@ -69,7 +73,7 @@ class BasicClassificationDataModule(
                 assert label is not None, "Dataset must have labels."
                 yield [label]
 
-        for token_indexer in self._token_indexers.values():
+        for name, token_indexer in self._token_indexers.items():
             token_indexer.build_vocab(self.vocab, text_iterator())
 
         self.vocab.build_vocab_from_documents(self._label_namespace, label_iterator())
@@ -142,8 +146,10 @@ class BasicClassificationDataModule(
         **kwargs: Any,
     ) -> Iterator[Instance]:
         if is_training:
-            dataset = self._tokenize(dataset)
+            logger.info("Tokenizing dataset and building vocabulary...")
+            dataset = self._tokenize(ProgressBar(dataset, desc="Tokenizing dataset"))
             self._build_vocab(dataset)
 
-        for example in dataset:
+        logger.info("Building instances...")
+        for example in ProgressBar(dataset, desc="Building instances"):
             yield self.build_instance(example)
