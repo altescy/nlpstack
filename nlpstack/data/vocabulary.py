@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
 
 
@@ -9,6 +9,8 @@ class Vocabulary:
         self,
         min_df: Mapping[str, int | float] = {},
         max_df: Mapping[str, int | float] = {},
+        min_count: Mapping[str, int] = {},
+        max_count: Mapping[str, int] = {},
         pad_token: Mapping[str, str] = {},
         oov_token: Mapping[str, str] = {},
         bos_token: Mapping[str, str] = {},
@@ -31,6 +33,8 @@ class Vocabulary:
 
         self._min_df = min_df
         self._max_df = max_df
+        self._min_count = min_count
+        self._max_count = max_count
         self._pad_token = pad_token
         self._oov_token = oov_token
         self._bos_token = bos_token
@@ -39,6 +43,7 @@ class Vocabulary:
         self._ignored_tokens = ignored_tokens
         self._token_to_index: dict[str, dict[str, int]] = {}
         self._index_to_token: dict[str, dict[int, str]] = {}
+        self._token_to_count: dict[str, dict[str, int]] = {}
 
     def get_token_by_index(self, namespace: str, index: int) -> str:
         if namespace not in self._index_to_token:
@@ -141,6 +146,21 @@ class Vocabulary:
             raise KeyError(f"Namespace {namespace} not found.")
         return {token for token in self._special_tokens.get(namespace, set())}
 
+    def get_token_count(self, namespace: str, token: str) -> int:
+        if namespace not in self._token_to_count:
+            raise KeyError(f"Namespace {namespace} not found.")
+        return self._token_to_count[namespace].get(token, 0)
+
+    def get_total_tokens(self, namespace: str) -> int:
+        if namespace not in self._token_to_count:
+            raise KeyError(f"Namespace {namespace} not found.")
+        return sum(self._token_to_count[namespace].values())
+
+    def get_token_to_count(self, namespace: str) -> Mapping[str, int]:
+        if namespace not in self._token_to_count:
+            raise KeyError(f"Namespace {namespace} not found.")
+        return self._token_to_count[namespace]
+
     def get_vocab_size(self, namespace: str) -> int:
         if namespace not in self._index_to_token:
             raise KeyError(f"Namespace {namespace} not found.")
@@ -148,6 +168,31 @@ class Vocabulary:
 
     def has_namespace(self, namespace: str) -> bool:
         return namespace in self._index_to_token
+
+    def has_token(self, namespace: str, token: str) -> bool:
+        if namespace not in self._token_to_index:
+            raise KeyError(f"Namespace {namespace} not found.")
+        return token in self._token_to_index[namespace]
+
+    def has_pad_token(self, namespace: str) -> bool:
+        if namespace not in self._token_to_index:
+            raise KeyError(f"Namespace {namespace} not found.")
+        return self._pad_token.get(namespace) in self._token_to_index[namespace]
+
+    def has_oov_token(self, namespace: str) -> bool:
+        if namespace not in self._token_to_index:
+            raise KeyError(f"Namespace {namespace} not found.")
+        return self._oov_token.get(namespace) in self._token_to_index[namespace]
+
+    def has_bos_token(self, namespace: str) -> bool:
+        if namespace not in self._token_to_index:
+            raise KeyError(f"Namespace {namespace} not found.")
+        return self._bos_token.get(namespace) in self._token_to_index[namespace]
+
+    def has_eos_token(self, namespace: str) -> bool:
+        if namespace not in self._token_to_index:
+            raise KeyError(f"Namespace {namespace} not found.")
+        return self._eos_token.get(namespace) in self._token_to_index[namespace]
 
     def clear(self, namespace: str) -> None:
         if namespace not in self._index_to_token:
@@ -165,6 +210,7 @@ class Vocabulary:
 
         self._token_to_index[namespace] = {}
         self._index_to_token[namespace] = {}
+        self._token_to_count[namespace] = {}
 
         for token in self._special_tokens.get(namespace, set()):
             index = len(self._token_to_index[namespace])
@@ -172,10 +218,12 @@ class Vocabulary:
             self._index_to_token[namespace][index] = token
 
         num_documents = 0
+        token_count: dict[str, int] = defaultdict(int)
         document_frequency: dict[str, int] = defaultdict(int)
         for tokens in documents:
             num_documents += 1
-            for token in set(tokens):
+            for token, count in Counter(tokens).items():
+                token_count[token] += count
                 document_frequency[token] += 1
 
         min_df = self._min_df.get(namespace, 0)
@@ -183,10 +231,18 @@ class Vocabulary:
         abs_min_df = min_df if isinstance(min_df, int) else int(min_df * num_documents)
         abs_max_df = max_df if isinstance(max_df, int) else int(max_df * num_documents)
 
-        for token, df in document_frequency.items():
-            if token in self._ignored_tokens.get(namespace, set()):
+        min_count = self._min_count.get(namespace, 0)
+        max_count = self._max_count.get(namespace, float("inf"))
+
+        ignored_tokens = self._ignored_tokens.get(namespace, set())
+
+        for token in token_count:
+            if token in ignored_tokens:
                 continue
-            if abs_min_df <= df <= abs_max_df:
+            count = token_count[token]
+            df = document_frequency[token]
+            if (abs_min_df <= df <= abs_max_df) and (min_count <= count <= max_count):
                 index = len(self._token_to_index[namespace])
                 self._token_to_index[namespace][token] = index
                 self._index_to_token[namespace][index] = token
+                self._token_to_count[namespace][token] = count
