@@ -63,6 +63,7 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
         self,
         text: Mapping[str, Mapping[str, torch.Tensor]],
         label: torch.LongTensor | None = None,
+        metadata: list[Any] | None = None,
     ) -> BasicClassifierOutput:
         mask = get_mask_from_text(text)
 
@@ -82,7 +83,7 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
         logits = cast(torch.FloatTensor, self._classifier(encodings))
         probs = cast(torch.FloatTensor, torch.nn.functional.softmax(logits, dim=-1))
 
-        inference = ClassificationInference(probs=probs.detach().cpu().numpy())
+        inference = ClassificationInference(probs=probs.detach().cpu().numpy(), metadata=metadata)
         output = BasicClassifierOutput(inference=inference, logits=logits)
 
         if label is not None:
