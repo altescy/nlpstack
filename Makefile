@@ -7,6 +7,11 @@ MODULE   := nlp_learn
 .PHONY: all
 all: format lint test
 
+.PHONY: setup
+setup:
+	poetry install --extras all
+	poetry run python -m spacy download en_core_web_sm
+
 .PHONY: test
 test:
 	PYTHONPATH=$(PWD) $(PYTEST)

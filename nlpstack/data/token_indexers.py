@@ -50,6 +50,26 @@ class SingleIdTokenIndexer(TokenIndexer):
         return {"token_ids": numpy.array(token_ids, dtype=int), "mask": numpy.array(mask, dtype=bool)}
 
 
+class TokenVectorIndexer(TokenIndexer):
+    def __init__(self, namespace: str | None = None) -> None:
+        self._namespace = namespace
+
+    def build_vocab(self, vocab: Vocabulary, documents: Iterable[Sequence[Token]]) -> None:
+        if self._namespace is not None:
+            raise ValueError("Currently, TokenVectorIndexer does not support building vocabulary.")
+
+    def get_pad_index(self, vocab: Vocabulary) -> int:
+        return 0
+
+    def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> dict[str, Any]:
+        if not all(token.vector is not None for token in tokens):
+            raise ValueError("TokenVectorIndexer requires all tokens to have vector.")
+        return {
+            "embeddings": numpy.array([token.vector for token in tokens], dtype=float),
+            "mask": numpy.array([True] * len(tokens), dtype=bool),
+        }
+
+
 class PretrainedTransformerIndexer(TokenIndexer):
     def __init__(
         self,
