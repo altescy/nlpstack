@@ -21,6 +21,7 @@ class JsonlReader:
         self.test_filename = test_filename
 
     def __call__(self, subset: str) -> Iterator[ClassificationExample]:
+        filename: Optional[str]
         if subset == "train":
             filename = self.train_filename
         elif subset == "valid":
