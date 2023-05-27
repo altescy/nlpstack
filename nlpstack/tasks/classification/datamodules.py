@@ -4,8 +4,6 @@ import functools
 from logging import getLogger
 from typing import Any, Iterable, Iterator, Mapping, Sequence
 
-import numpy
-
 from nlpstack.common import ProgressBar
 from nlpstack.data import DataModule, Dataset, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, LabelField, MappingField, MetadataField, TextField
@@ -118,26 +116,6 @@ class BasicClassificationDataModule(
                 top_labels=[self.vocab.get_token_by_index(self.label_namespace, index) for index in top_indices],
                 metadata=inference.metadata[i] if inference.metadata is not None else None,
             )
-
-    def build_inference(
-        self,
-        examples: Iterable[ClassificationExample],
-        predictions: Iterable[ClassificationPrediction],
-    ) -> ClassificationInference:
-        probs: list[list[float]] = []
-        labels: list[int] = []
-        metadata: list[dict[str, Any]] = []
-        for example, prediction in zip(examples, predictions):
-            assert example.label is not None
-            probs.append(prediction.top_probs)
-            labels.append(self.vocab.get_index_by_token(self.label_namespace, example.label))
-            metadata.append(example.metadata or {})
-
-        return ClassificationInference(
-            probs=numpy.array(probs),
-            labels=numpy.array(labels),
-            metadata=metadata,
-        )
 
     def read_dataset(
         self,
