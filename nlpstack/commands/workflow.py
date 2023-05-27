@@ -1,5 +1,6 @@
 import argparse
 import importlib
+from typing import Any
 
 from nlpstack.workflows import Workflow
 
@@ -25,19 +26,24 @@ class WorkflowCommand(Subcommand):
             self.parser.print_help()
             exit(1)
 
-        workflowpath = args.workflow
-        if ":" not in workflowpath:
-            workflowpath = f"__main__:{workflowpath}"
+        workflow: Any
 
-        modulename, classname = workflowpath.rsplit(":", 1)
+        workflowname = args.workflow
         try:
-            module = importlib.import_module(modulename)
-            workflow = getattr(module, classname)
-            if workflow is None:
-                raise AttributeError
-        except (ImportError, AttributeError):
-            print(f"Could not find workflow {workflowpath}")
-            exit(1)
+            workflow = Workflow.by_name(workflowname)
+        except KeyError:
+            if ":" not in workflowname:
+                workflowname = f"__main__:{workflowname}"
+
+            modulename, classname = workflowname.rsplit(":", 1)
+            try:
+                module = importlib.import_module(modulename)
+                workflow = getattr(module, classname)
+                if workflow is None:
+                    raise AttributeError
+            except (ImportError, AttributeError):
+                print(f"Could not find workflow {workflowname}")
+                exit(1)
 
         if not issubclass(workflow, Workflow):
             print(f"{args.workflow} is not a subclass of Workflow")

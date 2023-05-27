@@ -33,6 +33,7 @@ class RuneConfig(Generic[Example, Prediction]):
         return coltbuilder(config, RuneConfig)
 
 
+@Workflow.register("rune")
 class RuneWorkflow(Workflow):
     def train(
         self,

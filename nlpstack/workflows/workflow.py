@@ -1,10 +1,27 @@
 import argparse
 import inspect
 import typing
-from typing import Callable, Iterator, Optional, Sequence, Union
+from typing import Callable, ClassVar, Dict, Iterator, Optional, Sequence, Type, Union
 
 
 class Workflow:
+    _registry: ClassVar[Dict[str, Type["Workflow"]]] = {}
+
+    @classmethod
+    def register(self, name: str, exist_ok: bool = False) -> Callable[[Type["Workflow"]], Type["Workflow"]]:
+        def wrapper(workflow: Type["Workflow"]) -> Type["Workflow"]:
+            if not exist_ok and name in self._registry:
+                raise ValueError(f"Workflow '{name}' was already registered.")
+
+            self._registry[name] = workflow
+            return workflow
+
+        return wrapper
+
+    @classmethod
+    def by_name(cls, name: str) -> Type["Workflow"]:
+        return cls._registry[name]
+
     @staticmethod
     def _setup_parser(parser: argparse.ArgumentParser, func: Callable) -> argparse.ArgumentParser:
         parser.set_defaults(__func=func)
@@ -75,53 +92,3 @@ class Workflow:
         params = vars(namespace)
         func = params.pop("__func")
         func(cls(), **params)
-
-
-class MyWorkflow(Workflow):
-    """My workflow."""
-
-    def greet(
-        self,
-        name: str,
-        *,
-        greeting: str = "Hello",
-    ) -> None:
-        """Greet someone."""
-        print(f"{greeting}, {name}!")
-
-
-if __name__ == "__main__":
-    import importlib
-
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("workflow", nargs="?", help="workflow name to run formatted as module:classname")
-    parser.add_argument("args", nargs=argparse.REMAINDER, help="arguments to pass to the workflow")
-    parser.add_argument("--help", action="store_true", help="show this help message and exit")
-    args = parser.parse_args()
-
-    if not args.workflow:
-        parser.print_help()
-        exit(1)
-
-    workflowpath = args.workflow
-    if ":" not in workflowpath:
-        workflowpath = f"__main__:{workflowpath}"
-
-    modulename, classname = workflowpath.rsplit(":", 1)
-    try:
-        module = importlib.import_module(modulename)
-        workflow = getattr(module, classname)
-        if workflow is None:
-            raise AttributeError
-    except (ImportError, AttributeError):
-        print(f"Could not find workflow {workflowpath}")
-        exit(1)
-
-    if inspect.getmro(workflow)[1] is Workflow:
-        print(f"{args.workflow} is not a subclass of Workflow")
-        exit(1)
-
-    if args.help:
-        args.args = ["--help"]
-
-    workflow.run(args.args)
