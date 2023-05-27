@@ -27,11 +27,12 @@ def generate_dataset(size: int) -> list[ClassificationExample]:
 
 
 def main() -> None:
-    train_dataset = generate_dataset(10000)
-    valid_dataset = generate_dataset(10000)
+    train_dataset = generate_dataset(5000)
+    valid_dataset = generate_dataset(1000)
     test_dataset = generate_dataset(1000)
 
     model = BasicClassifier(max_epochs=10)
+
     model.train(train_dataset, valid_dataset)
     metrics = model.evaluate(test_dataset)
     print(metrics)
