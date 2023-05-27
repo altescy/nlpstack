@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import itertools
 from functools import cached_property
 from typing import Any, Callable, Generic, Iterable, Iterator, Mapping, Sequence, TypeVar
 
@@ -40,8 +39,8 @@ class RuneForTorch(
             TorchPredictor[Example, Inference, Prediction],
         ] = TorchPredictor,
         evaluator_factory: Callable[
-            [DataModule[Example, Inference, Prediction], Metric[Inference]],
-            Evaluator[Example, Prediction],
+            [Metric[Inference]],
+            Evaluator[Inference],
         ] = SimpleEvaluator,
         **kwargs: Any,
     ) -> None:
@@ -66,8 +65,8 @@ class RuneForTorch(
         return self._predictor_factory(self.datamodule, self.model)
 
     @cached_property
-    def evaluator(self) -> Evaluator[Example, Prediction]:
-        return self._evaluator_factory(self.datamodule, self.metric)
+    def evaluator(self) -> Evaluator[Inference]:
+        return self._evaluator_factory(self.metric)
 
     def train(
         self: Self,
@@ -111,6 +110,5 @@ class RuneForTorch(
         batch_size: int = 32,
         **kwargs: Any,
     ) -> Mapping[str, float]:
-        examples, examples_for_prediction = itertools.tee(dataset)
-        predictions = self.predict(examples_for_prediction, batch_size=batch_size, **kwargs)
-        return self.evaluator.evaluate(examples, predictions, batch_size=batch_size, **kwargs)
+        inferences = self.predictor.infer(dataset, batch_size=batch_size, **kwargs)
+        return self.evaluator.evaluate(inferences, batch_size=batch_size, **kwargs)

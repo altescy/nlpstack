@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Generic, Iterable, Iterator, TypeVar
+from typing import Any, Generic, Iterable, Iterator, TypeVar
 
 import torch
 
@@ -23,17 +23,27 @@ class TorchPredictor(Generic[Example, Inference, Prediction]):
         self.datamodule = datamodule
         self.model = model
 
-    def predict(
+    def infer(
         self,
         examples: Iterable[Example],
         *,
         batch_size: int = 64,
-    ) -> Iterator[Prediction]:
+        **kwargs: Any,
+    ) -> Iterator[Inference]:
         collator = Collator()
         self.model.eval()
         with torch.no_grad():
             for batched_examples in batched(examples, batch_size):
                 instances = [self.datamodule.build_instance(example) for example in batched_examples]
                 batch = move_to_device(collator(instances), self.model.get_device())
-                inference = self.model.infer(**batch)
-                yield from self.datamodule.build_predictions(inference)
+                yield self.model.infer(**batch)
+
+    def predict(
+        self,
+        examples: Iterable[Example],
+        *,
+        batch_size: int = 64,
+        **kwargs: Any,
+    ) -> Iterator[Prediction]:
+        for inference in self.infer(examples, batch_size=batch_size):
+            yield from self.datamodule.build_predictions(inference)
