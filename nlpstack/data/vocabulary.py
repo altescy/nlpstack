@@ -45,6 +45,11 @@ class Vocabulary:
         self._index_to_token: dict[str, dict[int, str]] = {}
         self._token_to_count: dict[str, dict[str, int]] = {}
 
+    def __getitem__(self, namespace: str) -> Mapping[str, int]:
+        if namespace not in self._token_to_index:
+            raise KeyError(f"Namespace {namespace} not found.")
+        return self._token_to_index[namespace]
+
     def get_token_by_index(self, namespace: str, index: int) -> str:
         if namespace not in self._index_to_token:
             raise KeyError(f"Namespace {namespace} not found.")
