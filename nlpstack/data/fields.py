@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 from typing import Any, Iterator, Mapping, Sequence
 
 from collatable.fields.adjacency_field import AdjacencyField  # noqa: F401
@@ -13,8 +14,12 @@ from collatable.fields.sequence_field import SequenceField  # noqa: F401
 from collatable.fields.sequence_label_field import SequenceLabelField  # noqa: F401
 from collatable.fields.span_field import SpanField  # noqa: F401
 from collatable.fields.tensor_field import TensorField  # noqa: F401
-from collatable.fields.text_field import TextField  # noqa: F401
+from collatable.fields.text_field import TextField as SingleTextField
 from collatable.typing import DataArray
+
+from nlpstack.data.token_indexers import TokenIndexer
+from nlpstack.data.tokenizers import Token
+from nlpstack.data.vocabulary import Vocabulary
 
 
 class MappingField(Field):
@@ -48,3 +53,22 @@ class MappingField(Field):
             return super().collate(arrays)  # type: ignore[no-any-return]
         arrays = [x.as_array() for x in arrays]
         return {key: field.collate([x[key] for x in arrays]) for key, field in self._mapping.items()}
+
+
+class TextField(MappingField):
+    def __init__(
+        self,
+        text: Sequence[Token],
+        vocab: Vocabulary,
+        indexers: Mapping[str, TokenIndexer],
+    ) -> None:
+        super().__init__(
+            {
+                key: SingleTextField(
+                    text,
+                    indexer=functools.partial(indexer, vocab=vocab),
+                    padding_value=indexer.get_pad_index(vocab),
+                )
+                for key, indexer in indexers.items()
+            }
+        )
