@@ -50,6 +50,8 @@ class Workflow:
                 param.POSITIONAL_OR_KEYWORD,
             )
 
+            name = name.replace("_", "-")
+
             help_message = f"{arg_type.__name__}" if arg_type else "str"
             if optional:
                 help_message += f" (default: {default})"
@@ -91,4 +93,5 @@ class Workflow:
         namespace = parser.parse_args(args)
         params = vars(namespace)
         func = params.pop("__func")
-        func(cls(), **params)
+        kwargs = {k.replace("-", "_"): v for k, v in params.items()}
+        func(cls(), **kwargs)

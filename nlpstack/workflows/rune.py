@@ -94,3 +94,32 @@ class RuneWorkflow(Workflow):
 
         predictions = rune.predict(rune_config.reader(dataset))
         rune_config.writer(output_filename, predictions)
+
+    def evaluate(
+        self,
+        config_filename: str,
+        archive_filename: str,
+        dataset_filename: str,
+        *,
+        output_filename: Optional[str] = None,
+    ) -> None:
+        rune_config = RuneConfig.from_file(config_filename)
+
+        if rune_config.reader is None:
+            print("No reader given.")
+            exit(1)
+
+        with minato.open(archive_filename, "rb") as pklfile:
+            rune = pickle.load(pklfile)
+
+        if not isinstance(rune, Rune):
+            print("Given archive is not a Rune.")
+            exit(1)
+
+        metrics = rune.evaluate(rune_config.reader(dataset_filename))
+
+        if output_filename is None:
+            print(json.dumps(metrics, indent=2))
+        else:
+            with minato.open(output_filename, "w") as jsonfile:
+                json.dump(metrics, jsonfile, ensure_ascii=False)
