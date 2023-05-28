@@ -72,9 +72,9 @@ class RuneWorkflow(Workflow):
         self,
         config_filename: str,
         archive_filename: str,
-        output_filename: str,
         *,
-        dataset: str = "valid",
+        input_filename: str,
+        output_filename: str,
     ) -> None:
         rune_config = RuneConfig.from_file(config_filename)
 
@@ -92,15 +92,15 @@ class RuneWorkflow(Workflow):
             print("Given archive is not a Rune.")
             exit(1)
 
-        predictions = rune.predict(rune_config.reader(dataset))
+        predictions = rune.predict(rune_config.reader(input_filename))
         rune_config.writer(output_filename, predictions)
 
     def evaluate(
         self,
         config_filename: str,
         archive_filename: str,
-        dataset_filename: str,
         *,
+        input_filename: str,
         output_filename: Optional[str] = None,
     ) -> None:
         rune_config = RuneConfig.from_file(config_filename)
@@ -116,7 +116,7 @@ class RuneWorkflow(Workflow):
             print("Given archive is not a Rune.")
             exit(1)
 
-        metrics = rune.evaluate(rune_config.reader(dataset_filename))
+        metrics = rune.evaluate(rune_config.reader(input_filename))
 
         if output_filename is None:
             print(json.dumps(metrics, indent=2))

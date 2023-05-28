@@ -50,21 +50,25 @@ class Workflow:
                 param.POSITIONAL_OR_KEYWORD,
             )
 
-            name = name.replace("_", "-")
-
             help_message = f"{arg_type.__name__}" if arg_type else "str"
             if optional:
                 help_message += f" (default: {default})"
+            elif not positional:
+                help_message += " (required)"
 
             argparse_kwargs = {
                 "help": help_message,
                 "type": arg_type,
-                "default": default,
             }
+            if optional:
+                argparse_kwargs["default"] = default
+            elif not positional:
+                argparse_kwargs["required"] = True
 
             if positional:
                 parser.add_argument(name, **argparse_kwargs)
             else:
+                name = name.replace("_", "-")
                 parser.add_argument("--" + name, **argparse_kwargs)
 
         return parser
