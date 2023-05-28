@@ -22,9 +22,10 @@ def test_run_workflow_predict(tmp_path: Path) -> None:
             "predict",
             "tests/fixtures/configs/rune_workflow.jsonnet",
             "tests/fixtures/archives/classifier.pkl",
-            f"{output_filename}",
-            "--dataset",
+            "--input-filename",
             "./tests/fixtures/data/classification.jsonl",
+            "--output-filename",
+            f"{output_filename}",
         ]
     )
     assert output_filename.is_file()
@@ -37,6 +38,7 @@ def test_run_workflow_evaluate(tmp_path: Path) -> None:
             "evaluate",
             "tests/fixtures/configs/rune_workflow.jsonnet",
             "tests/fixtures/archives/classifier.pkl",
+            "--input-filename",
             "tests/fixtures/data/classification.jsonl",
             "--output-filename",
             f"{metrics_filename}",
