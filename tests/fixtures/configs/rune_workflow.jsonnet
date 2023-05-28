@@ -1,5 +1,5 @@
 {
-  rune: {
+  model: {
     type: 'nlpstack.tasks.classification.rune.BasicClassifier',
     max_epochs: 10,
   },

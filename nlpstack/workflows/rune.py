@@ -23,7 +23,7 @@ coltbuilder = colt.ColtBuilder(typekey="type")
 
 @dataclasses.dataclass
 class RuneConfig(Generic[Example, Prediction]):
-    rune: Optional[Rune[Example, Prediction]] = None
+    model: Optional[Rune[Example, Prediction]] = None
     reader: Optional[Callable[[str], Iterator[Example]]] = None
     writer: Optional[Callable[[str, Iterable[Prediction]], None]] = None
     train_dataset_filename: Optional[str] = None
@@ -46,8 +46,8 @@ class RuneWorkflow(Workflow):
         logger.info("Loading config from %s", config_filename)
         rune_config = RuneConfig.from_file(config_filename)
 
-        if rune_config.rune is None:
-            print("No rune given.")
+        if rune_config.model is None:
+            print("No model given.")
             exit(1)
         if rune_config.reader is None:
             print("No reader given.")
@@ -61,12 +61,12 @@ class RuneWorkflow(Workflow):
         if rune_config.valid_dataset_filename is not None:
             valid_examples = Dataset.from_iterable(rune_config.reader(rune_config.valid_dataset_filename))
 
-        rune = rune_config.rune
-        rune.train(train_examples, valid_examples)
+        model = rune_config.model
+        model.train(train_examples, valid_examples)
 
         logger.info("Saving archive to %s", archive_filename)
         with minato.open(archive_filename, "wb") as pklfile:
-            pickle.dump(rune, pklfile)
+            pickle.dump(model, pklfile)
 
     def predict(
         self,
@@ -86,13 +86,13 @@ class RuneWorkflow(Workflow):
             exit(1)
 
         with minato.open(archive_filename, "rb") as pklfile:
-            rune = pickle.load(pklfile)
+            model = pickle.load(pklfile)
 
-        if not isinstance(rune, Rune):
-            print("Given archive is not a Rune.")
+        if not isinstance(model, Rune):
+            print("Given model is not a Rune.")
             exit(1)
 
-        predictions = rune.predict(rune_config.reader(input_filename))
+        predictions = model.predict(rune_config.reader(input_filename))
         rune_config.writer(output_filename, predictions)
 
     def evaluate(
@@ -110,13 +110,13 @@ class RuneWorkflow(Workflow):
             exit(1)
 
         with minato.open(archive_filename, "rb") as pklfile:
-            rune = pickle.load(pklfile)
+            model = pickle.load(pklfile)
 
-        if not isinstance(rune, Rune):
-            print("Given archive is not a Rune.")
+        if not isinstance(model, Rune):
+            print("Given model is not a Rune.")
             exit(1)
 
-        metrics = rune.evaluate(rune_config.reader(input_filename))
+        metrics = model.evaluate(rune_config.reader(input_filename))
 
         if output_filename is None:
             print(json.dumps(metrics, indent=2))
