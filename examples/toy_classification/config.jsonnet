@@ -21,7 +21,6 @@
   },
   reader: {
     type: 'nlpstack.tasks.classification.io.JsonlReader',
-
   },
   writer: {
     type: 'nlpstack.tasks.classification.io.JsonlWriter',
