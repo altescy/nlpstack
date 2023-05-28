@@ -1,11 +1,9 @@
-from __future__ import annotations
-
-from typing import Iterable, Iterator, TypeVar
+from typing import Iterable, Iterator, List, TypeVar
 
 T = TypeVar("T")
 
 
-def batched(iterable: Iterable[T], batch_size: int) -> Iterator[list[T]]:
+def batched(iterable: Iterable[T], batch_size: int) -> Iterator[List[T]]:
     batch = []
     for item in iterable:
         batch.append(item)

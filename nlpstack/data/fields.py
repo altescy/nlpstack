@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 import functools
-from typing import Any, Iterator, Mapping, Sequence
+from typing import Any, Dict, Iterator, Mapping, Sequence
 
 from collatable.fields.adjacency_field import AdjacencyField  # noqa: F401
 from collatable.fields.field import Field  # noqa: F401
@@ -42,7 +40,7 @@ class MappingField(Field):
     def __repr__(self) -> str:
         return f"MappingField({self._mapping})"
 
-    def as_array(self) -> dict[str, Any]:
+    def as_array(self) -> Dict[str, Any]:
         return {key: field.as_array() for key, field in self._mapping.items()}
 
     def collate(  # type: ignore[override]

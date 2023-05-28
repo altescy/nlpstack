@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 from logging import getLogger
-from typing import Any, Iterable, Iterator, Mapping, Sequence
+from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence
 
 from nlpstack.common import ProgressBar
 from nlpstack.data import DataModule, Dataset, Instance, Token, Vocabulary
@@ -24,8 +22,8 @@ class BasicClassificationDataModule(
     def __init__(
         self,
         vocab: Vocabulary,
-        tokenizer: Tokenizer | None = None,
-        token_indexers: Mapping[str, TokenIndexer] | None = None,
+        tokenizer: Optional[Tokenizer] = None,
+        token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
         label_namespace: str = "labels",
     ) -> None:
         self._vocab = vocab
@@ -64,7 +62,7 @@ class BasicClassificationDataModule(
                 assert not isinstance(example.text, str), "Dataset must be tokenized."
                 yield example.text
 
-        def label_iterator() -> Iterator[list[str]]:
+        def label_iterator() -> Iterator[List[str]]:
             for example in dataset:
                 label = example.label
                 assert label is not None, "Dataset must have labels."
@@ -83,7 +81,7 @@ class BasicClassificationDataModule(
         if isinstance(text, str):
             text = self._tokenizer.tokenize(text)
 
-        fields: dict[str, Field] = {}
+        fields: Dict[str, Field] = {}
         fields["text"] = TextField(text, self.vocab, self._token_indexers)
 
         if metadata is not None:

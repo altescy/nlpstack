@@ -1,17 +1,15 @@
-from __future__ import annotations
-
 import tempfile
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Dict, Sequence
 
 import torch
 
 
 class TorchPicklable:  # type: ignore[misc]
-    cuda_dependent_attributes: ClassVar[list[str]] = []
+    cuda_dependent_attributes: ClassVar[Sequence[str]] = []
 
-    def __getstate__(self) -> dict[str, Any]:
+    def __getstate__(self) -> Dict[str, Any]:
         state = self.__dict__.copy()
-        cuda_attrs: dict[str, Any] = {}
+        cuda_attrs: Dict[str, Any] = {}
         for attr in self.cuda_dependent_attributes:
             if attr in state:
                 cuda_attrs[attr] = state.pop(attr)
@@ -22,7 +20,7 @@ class TorchPicklable:  # type: ignore[misc]
             state["__cuda_dependent_attributes__"] = f.read()
         return state
 
-    def __setstate__(self, state: dict[str, Any]) -> None:
+    def __setstate__(self, state: Dict[str, Any]) -> None:
         with tempfile.SpooledTemporaryFile() as f:
             f.write(state.pop("__cuda_dependent_attributes__"))
             f.seek(0)

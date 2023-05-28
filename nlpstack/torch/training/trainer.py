@@ -1,9 +1,7 @@
-from __future__ import annotations
-
 import dataclasses
 import warnings
 from logging import getLogger
-from typing import Any, Sequence, TypeVar
+from typing import Any, Dict, Mapping, Optional, Sequence, TypeVar
 
 import torch
 
@@ -39,9 +37,9 @@ class TrainingState:
     step: int
     model: TorchModel
     optimizer: torch.optim.Optimizer
-    lrscheduler: torch.optim.lr_scheduler.LRScheduler | None = None
+    lrscheduler: Optional[torch.optim.lr_scheduler.LRScheduler] = None
 
-    def state_dict(self) -> dict[str, Any]:
+    def state_dict(self) -> Dict[str, Any]:
         return {
             "epoch": self.epoch,
             "step": self.step,
@@ -50,7 +48,7 @@ class TrainingState:
             "lrscheduler": self.lrscheduler.state_dict() if self.lrscheduler else None,
         }
 
-    def load_state_dict(self, state_dict: dict[str, Any]) -> None:
+    def load_state_dict(self, state_dict: Dict[str, Any]) -> None:
         self.epoch = state_dict["epoch"]
         self.step = state_dict["step"]
         self.model.load_state_dict(state_dict["model"])
@@ -85,13 +83,13 @@ class TorchTrainer:
         self,
         *,
         max_epochs: int = 10,
-        batch_size: int | None = None,
-        learning_rate: float | None = None,
-        train_dataloader: DataLoader | None = None,
-        valid_dataloader: DataLoader | None = None,
-        optimizer_factory: OptimizerFactory | None = None,
-        lrscheduler_factory: LRSchedulerFactory | None = None,
-        callbacks: Sequence[Callback] | None = None,
+        batch_size: Optional[int] = None,
+        learning_rate: Optional[float] = None,
+        train_dataloader: Optional[DataLoader] = None,
+        valid_dataloader: Optional[DataLoader] = None,
+        optimizer_factory: Optional[OptimizerFactory] = None,
+        lrscheduler_factory: Optional[LRSchedulerFactory] = None,
+        callbacks: Optional[Sequence[Callback]] = None,
     ) -> None:
         """Initializes a new Trainer instance.
 
@@ -126,9 +124,9 @@ class TorchTrainer:
         training_state: TrainingState,
         metric: Metric[Inference],
         reset: bool = False,
-        prefix: str | None = None,
-    ) -> dict[str, float]:
-        metrics: dict[str, float] = {}
+        prefix: Optional[str] = None,
+    ) -> Dict[str, float]:
+        metrics: Dict[str, float] = {}
         metrics["loss"] = total_loss / num_batches if num_batches > 0 else 0.0
 
         if metric is not None:
@@ -145,10 +143,10 @@ class TorchTrainer:
         self,
         model: TorchModel[Inference],
         train: Sequence[Instance],
-        valid: Sequence[Instance] | None = None,
+        valid: Optional[Sequence[Instance]] = None,
         *,
-        metric: Metric[Inference] | None = None,
-        resources: dict[str, Any] | None = None,
+        metric: Optional[Metric[Inference]] = None,
+        resources: Optional[Mapping[str, Any]] = None,
     ) -> TrainingState:
         """Runs the training/validation loop with the given model and training data.
 
@@ -180,7 +178,7 @@ class TorchTrainer:
             lrscheduler=lrscheduler,
         )
 
-        metrics: dict[str, float] = {}
+        metrics: Dict[str, float] = {}
 
         total_batches = self._max_epochs * len(self._train_dataloader(train))
         if valid is not None:

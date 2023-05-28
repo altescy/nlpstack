@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from typing import Literal, Sequence
+from typing import Dict, Literal, Optional, Sequence, Union
 
 import numpy
 
@@ -25,7 +23,7 @@ class Accuracy(ClassificationMetric):
         self._correct += (inference.labels[:, None] == topk).any(axis=1).sum()
         self._total += len(inference.labels)
 
-    def compute(self) -> dict[str, float]:
+    def compute(self) -> Dict[str, float]:
         return {"accuracy": self._correct / self._total if self._total else 0.0}
 
     def reset(self) -> None:
@@ -40,15 +38,15 @@ class FBeta(ClassificationMetric):
     def __init__(
         self,
         beta: float = 1.0,
-        average: FBetaAverage | Sequence[FBetaAverage] = "macro",
-        topk: int | None = None,
+        average: Union[FBetaAverage, Sequence[FBetaAverage]] = "macro",
+        topk: Optional[int] = None,
     ) -> None:
         self.beta = beta
         self.average = (average,) if isinstance(average, str) else average
         self.topk = topk
-        self._true_positive: numpy.ndarray | None = None
-        self._false_positive: numpy.ndarray | None = None
-        self._false_negative: numpy.ndarray | None = None
+        self._true_positive: Optional[numpy.ndarray] = None
+        self._false_positive: Optional[numpy.ndarray] = None
+        self._false_negative: Optional[numpy.ndarray] = None
 
     def update(self, inference: ClassificationInference) -> None:
         assert inference.labels is not None
@@ -73,11 +71,11 @@ class FBeta(ClassificationMetric):
             self._false_positive[i] += ((inference.labels != i) & (prediction == i).any(axis=1)).sum()
             self._false_negative[i] += ((inference.labels == i) & (prediction != i).all(axis=1)).sum()
 
-    def compute(self) -> dict[str, float]:
+    def compute(self) -> Dict[str, float]:
         if self._true_positive is None or self._false_positive is None or self._false_negative is None:
             return {"fbeta": 0.0, "precision": 0.0, "recall": 0.0}
 
-        metrics: dict[str, float] = {}
+        metrics: Dict[str, float] = {}
         if "macro" in self.average:
             precision = (self._true_positive / (self._true_positive + self._false_positive + 1e-13)).mean()
             recall = (self._true_positive / (self._true_positive + self._false_negative + 1e-13)).mean()

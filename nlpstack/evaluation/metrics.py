@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from typing import Generic, Mapping, Sequence, TypeVar
+from typing import Dict, Generic, Mapping, Sequence, Set, TypeVar
 
 Inference = TypeVar("Inference")
 
@@ -24,7 +22,7 @@ class MultiMetrics(Metric[Inference]):
         self.metrics = metrics
 
         # check metric name conflicts
-        names: set[str] = set()
+        names: Set[str] = set()
         for metric in metrics:
             names_ = set(metric.compute())
             if names_ & names:
@@ -36,7 +34,7 @@ class MultiMetrics(Metric[Inference]):
             metric.update(inference)
 
     def compute(self) -> Mapping[str, float]:
-        metrics: dict[str, float] = {}
+        metrics: Dict[str, float] = {}
         for metric in self.metrics:
             metrics.update(metric.compute())
         return metrics

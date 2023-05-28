@@ -1,11 +1,9 @@
-from __future__ import annotations
-
 import shutil
 import tempfile
 import typing
 from logging import Logger, getLogger
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping, Optional
 
 import torch
 
@@ -26,7 +24,7 @@ class Callback:
         self,
         trainer: "TorchTrainer",
         training_state: "TrainingState",
-        resources: dict[str, Any],
+        resources: Mapping[str, Any],
     ) -> None:
         pass
 
@@ -34,11 +32,11 @@ class Callback:
         self,
         trainer: "TorchTrainer",
         training_state: "TrainingState",
-        batch_inputs: dict[str, Any],
-        batch_outputs: dict[str, Any],
-        batch_metrics: dict[str, Any],
+        batch_inputs: Mapping[str, Any],
+        batch_outputs: Mapping[str, Any],
+        batch_metrics: Mapping[str, Any],
         is_training: bool,
-        resources: dict[str, Any],
+        resources: Mapping[str, Any],
     ) -> None:
         pass
 
@@ -46,8 +44,8 @@ class Callback:
         self,
         trainer: "TorchTrainer",
         training_state: "TrainingState",
-        metrics: dict[str, Any],
-        resources: dict[str, Any],
+        metrics: Mapping[str, Any],
+        resources: Mapping[str, Any],
     ) -> None:
         pass
 
@@ -55,7 +53,7 @@ class Callback:
         self,
         trainer: "TorchTrainer",
         training_state: "TrainingState",
-        resources: dict[str, Any],
+        resources: Mapping[str, Any],
     ) -> None:
         pass
 
@@ -74,7 +72,7 @@ class EarlyStopping(Callback):
         self.best_metric = -self.direction * float("inf")
         self.best_epoch = 0
         self.counter = 0
-        self._work_dir: Path | None = None
+        self._work_dir: Optional[Path] = None
 
     @property
     def work_dir(self) -> Path:
@@ -104,7 +102,7 @@ class EarlyStopping(Callback):
         self,
         trainer: "TorchTrainer",
         training_state: "TrainingState",
-        resources: dict[str, Any],
+        resources: Mapping[str, Any],
     ) -> None:
         del trainer, resources
         self.best_metric = -self.direction * float("inf")
@@ -117,8 +115,8 @@ class EarlyStopping(Callback):
         self,
         trainer: "TorchTrainer",
         training_state: "TrainingState",
-        metrics: dict[str, Any],
-        resources: dict[str, Any],
+        metrics: Mapping[str, Any],
+        resources: Mapping[str, Any],
     ) -> None:
         del trainer, resources
         if self.direction * metrics[self.metric] > self.direction * self.best_metric:
@@ -135,7 +133,7 @@ class EarlyStopping(Callback):
         self,
         trainer: "TorchTrainer",
         training_state: "TrainingState",
-        resources: dict[str, Any],
+        resources: Mapping[str, Any],
     ) -> None:
         del trainer, resources
         self.logger.info(f"Best metric {self.metric}={self.best_metric} at epoch {training_state.epoch}")
@@ -155,11 +153,11 @@ class MlflowCallback(Callback):
         self,
         trainer: "TorchTrainer",
         training_state: "TrainingState",
-        batch_inputs: dict[str, Any],
-        batch_outputs: dict[str, Any],
-        batch_metrics: dict[str, Any],
+        batch_inputs: Mapping[str, Any],
+        batch_outputs: Mapping[str, Any],
+        batch_metrics: Mapping[str, Any],
         is_training: bool,
-        resources: dict[str, Any],
+        resources: Mapping[str, Any],
     ) -> None:
         if is_training:
             self._mlflow.log_metric("epoch", training_state.epoch, step=training_state.step)
@@ -170,8 +168,8 @@ class MlflowCallback(Callback):
         self,
         trainer: "TorchTrainer",
         training_state: "TrainingState",
-        metrics: dict[str, Any],
-        resources: dict[str, Any],
+        metrics: Mapping[str, Any],
+        resources: Mapping[str, Any],
     ) -> None:
         for key, value in metrics.items():
             if key in ("train_loss",):

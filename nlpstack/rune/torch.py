@@ -1,8 +1,6 @@
-from __future__ import annotations
-
 from functools import cached_property
 from logging import getLogger
-from typing import Any, Callable, Generic, Iterable, Iterator, Mapping, Sequence, TypeVar
+from typing import Any, Callable, Generic, Iterable, Iterator, Mapping, Optional, Sequence, TypeVar, Union
 
 from nlpstack.data import Dataset, Instance
 from nlpstack.data.datamodule import DataModule
@@ -36,7 +34,7 @@ class RuneForTorch(
         datamodule: DataModule[Example, Inference, Prediction],
         model: TorchModel[Inference],
         trainer: TorchTrainer,
-        metric: Metric[Inference] | Sequence[Metric[Inference]] | None = None,
+        metric: Optional[Union[Metric[Inference], Sequence[Metric[Inference]]]] = None,
         predictor_factory: Callable[
             [DataModule[Example, Inference, Prediction], TorchModel[Inference]],
             TorchPredictor[Example, Inference, Prediction],
@@ -74,8 +72,8 @@ class RuneForTorch(
     def train(
         self: Self,
         train_dataset: Sequence[Example],
-        valid_dataset: Sequence[Example] | None = None,
-        resources: dict[str, Any] | None = None,
+        valid_dataset: Optional[Sequence[Example]] = None,
+        resources: Optional[Mapping[str, Any]] = None,
         **kwargs: Any,
     ) -> Self:
         logger.info("Setup datamodule...")
@@ -83,7 +81,7 @@ class RuneForTorch(
 
         logger.info("Reading training dataset...")
         train_instances = Dataset.from_iterable(self.datamodule.read_dataset(train_dataset, is_training=True))
-        valid_instances: Dataset[Instance] | None = None
+        valid_instances: Optional[Dataset[Instance]] = None
         if valid_dataset is not None:
             logger.info("Reading validation dataset...")
             valid_instances = Dataset.from_iterable(self.datamodule.read_dataset(valid_dataset))

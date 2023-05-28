@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from typing import Any, Mapping, TypeVar, cast
+from typing import Any, Mapping, TypeVar, Union, cast
 
 import numpy
 import torch
@@ -19,7 +17,7 @@ def get_mask_from_text(text: Mapping[str, Mapping[str, torch.Tensor]]) -> torch.
     raise ValueError("No mask found in text")
 
 
-def int_to_device(device: int | torch.device) -> torch.device:
+def int_to_device(device: Union[int, torch.device]) -> torch.device:
     if isinstance(device, torch.device):
         return device
     if device < 0:
@@ -27,7 +25,7 @@ def int_to_device(device: int | torch.device) -> torch.device:
     return torch.device(device)
 
 
-def move_to_device(obj: T, device: int | torch.device) -> T:
+def move_to_device(obj: T, device: Union[int, torch.device]) -> T:
     device = int_to_device(device)
 
     if isinstance(obj, numpy.ndarray):

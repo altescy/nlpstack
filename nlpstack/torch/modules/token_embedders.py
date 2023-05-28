@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from typing import Any, cast
+from typing import Any, Optional, cast
 
 import torch
 
@@ -30,7 +28,7 @@ class Embedding(TokenEmbedder):
     def __init__(
         self,
         embedding_dim: int,
-        max_norm: float | None = None,
+        max_norm: Optional[float] = None,
         norm_type: float = 2.0,
         scale_grad_by_freq: bool = False,
         sparse: bool = False,
@@ -71,7 +69,7 @@ class PretrainedTransformerEmbedder(TokenEmbedder):
 
         super().__init__()
         self._model = AutoModel.from_pretrained(pretrained_model_name)
-        self._scalaer_mix: ScalarMix | None = None
+        self._scalaer_mix: Optional[ScalarMix] = None
 
         self.eval_mode = eval_mode
         if eval_mode:
@@ -100,8 +98,8 @@ class PretrainedTransformerEmbedder(TokenEmbedder):
     def forward(
         self,
         token_ids: torch.Tensor,
-        mask: torch.BoolTensor | None = None,
-        type_ids: torch.LongTensor | None = None,
+        mask: Optional[torch.BoolTensor] = None,
+        type_ids: Optional[torch.LongTensor] = None,
         **kwargs: Any,
     ) -> torch.FloatTensor:
         if type_ids is not None:
