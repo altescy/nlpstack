@@ -8,7 +8,7 @@ def test_run_workflow_train_and_predict(tmp_path: Path) -> None:
     RuneWorkflow.run(
         [
             "train",
-            "tests/fixtures/configs/run_workflow.jsonnet",
+            "tests/fixtures/configs/rune_workflow.jsonnet",
             f"{archive_filename}",
         ]
     )
@@ -18,7 +18,7 @@ def test_run_workflow_train_and_predict(tmp_path: Path) -> None:
     RuneWorkflow.run(
         [
             "predict",
-            "tests/fixtures/configs/run_workflow.jsonnet",
+            "tests/fixtures/configs/rune_workflow.jsonnet",
             f"{archive_filename}",
             f"{output_filename}",
             "--dataset",

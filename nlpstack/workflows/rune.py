@@ -2,7 +2,7 @@ import dataclasses
 import json
 import pickle
 from logging import getLogger
-from typing import Callable, Generic, Iterable, Iterator, Optional, TypeVar
+from typing import Callable, Generic, Iterable, Iterator, Optional, Sequence, TypeVar
 
 import colt
 import minato
@@ -23,9 +23,12 @@ coltbuilder = colt.ColtBuilder(typekey="type")
 
 @dataclasses.dataclass
 class RuneConfig(Generic[Example, Prediction]):
-    rune: Rune[Example, Prediction]
+    rune: Optional[Rune[Example, Prediction]] = None
     reader: Optional[Callable[[str], Iterator[Example]]] = None
     writer: Optional[Callable[[str, Iterable[Prediction]], None]] = None
+    train_dataset_filename: Optional[str] = None
+    valid_dataset_filename: Optional[str] = None
+    test_dataset_filename: Optional[str] = None
 
     @classmethod
     def from_file(cls, filename: str) -> "RuneConfig":
@@ -43,12 +46,20 @@ class RuneWorkflow(Workflow):
         logger.info("Loading config from %s", config_filename)
         rune_config = RuneConfig.from_file(config_filename)
 
+        if rune_config.rune is None:
+            print("No rune given.")
+            exit(1)
         if rune_config.reader is None:
             print("No reader given.")
             exit(1)
+        if rune_config.train_dataset_filename is None:
+            print("No train dataset filename given.")
+            exit(1)
 
-        train_examples = Dataset.from_iterable(rune_config.reader("train"))
-        valid_examples = Dataset.from_iterable(rune_config.reader("valid")) or None
+        train_examples: Sequence = Dataset.from_iterable(rune_config.reader(rune_config.train_dataset_filename))
+        valid_examples: Optional[Sequence] = None
+        if rune_config.valid_dataset_filename is not None:
+            valid_examples = Dataset.from_iterable(rune_config.reader(rune_config.valid_dataset_filename))
 
         rune = rune_config.rune
         rune.train(train_examples, valid_examples)

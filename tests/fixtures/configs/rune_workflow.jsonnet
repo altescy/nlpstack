@@ -5,10 +5,11 @@
   },
   reader: {
     type: 'nlpstack.tasks.classification.io.JsonlReader',
-    train_filename: './tests/fixtures/data/classification.jsonl',
-    valid_filename: './tests/fixtures/data/classification.jsonl',
+
   },
   writer: {
     type: 'nlpstack.tasks.classification.io.JsonlWriter',
   },
+  train_dataset_filename: './tests/fixtures/data/classification.jsonl',
+  valid_dataset_filename: './tests/fixtures/data/classification.jsonl',
 }
