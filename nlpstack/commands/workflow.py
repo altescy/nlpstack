@@ -18,7 +18,7 @@ class WorkflowCommand(Subcommand):
         self.parser.add_argument(
             "workflow",
             nargs="?",
-            help="workflow name to run formatted as module:classname",
+            help="workflow name to run",
         )
         self.parser.add_argument(
             "args",
@@ -57,7 +57,12 @@ class WorkflowCommand(Subcommand):
                 if workflow is None:
                     raise AttributeError
             except (ImportError, AttributeError):
-                print(f"Could not find workflow {workflowname}")
+                print(f"Could not find workflow: {workflowname}")
+                print(f"Please choose from the following: {Workflow.available_names()}")
+                print(
+                    "If you want to use your own workflow, please set `--include-package`"
+                    " option or specify the module path as module:YourWorkflow"
+                )
                 exit(1)
 
         if not issubclass(workflow, Workflow):
