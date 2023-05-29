@@ -27,7 +27,7 @@ transformers = {version = ">=4.12.3", optional = true}
 [tool.poetry.extras]
 all = ["mlflow", "spacy", "transformers"]
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 python-language-server = "^0.36.2"
 pytest = "^7.3.1"
 pysen = "^0.10.4"
@@ -35,6 +35,9 @@ black = "^23.3.0"
 isort = "^5.12.0"
 flake8 = "^5.0.4"
 mypy = "^1.2.0"
+
+[tool.poetry.group.docs]
+optional = true
 
 [tool.poetry.group.docs.dependencies]
 sphinx = "^6.2.1"
