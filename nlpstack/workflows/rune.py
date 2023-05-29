@@ -43,6 +43,8 @@ class RuneWorkflow(Workflow):
         config_filename: str,
         archive_filename: str,
     ) -> None:
+        """train a model and save archive"""
+
         logger.info("Loading config from %s", config_filename)
         rune_config = RuneConfig.from_file(config_filename)
 
@@ -76,6 +78,8 @@ class RuneWorkflow(Workflow):
         input_filename: str,
         output_filename: str,
     ) -> None:
+        """predict with a model and output results into a file"""
+
         rune_config = RuneConfig.from_file(config_filename)
 
         if rune_config.reader is None:
@@ -103,6 +107,8 @@ class RuneWorkflow(Workflow):
         input_filename: str,
         output_filename: Optional[str] = None,
     ) -> None:
+        """evaluate a model and output metrics"""
+
         rune_config = RuneConfig.from_file(config_filename)
 
         if rune_config.reader is None:
