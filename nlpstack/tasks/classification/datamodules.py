@@ -84,10 +84,10 @@ class BasicClassificationDataModule(
         fields: Dict[str, Field] = {}
         fields["text"] = TextField(text, self.vocab, self._token_indexers)
 
-        if metadata is not None:
+        if metadata:
             fields["metadata"] = MetadataField(metadata)
 
-        if label is not None:
+        if label:
             fields["label"] = LabelField(label, vocab=self.vocab[self.label_namespace])
 
         return Instance(**fields)
