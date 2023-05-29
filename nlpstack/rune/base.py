@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from typing import Any, Generic, Iterable, Iterator, Mapping, Sequence, TypeVar
+from typing import Any, Generic, Iterable, Iterator, Mapping, Optional, Sequence, TypeVar
 
 Self = TypeVar("Self", bound="Rune")
 
@@ -12,8 +10,8 @@ class Rune(Generic[Example, Prediction]):
     def train(
         self: Self,
         train_dataset: Sequence[Example],
-        valid_dataset: Sequence[Example] | None = None,
-        resources: dict[str, Any] | None = None,
+        valid_dataset: Optional[Sequence[Example]] = None,
+        resources: Optional[Mapping[str, Any]] = None,
         **kwargs: Any,
     ) -> Self:
         raise NotImplementedError

@@ -1,7 +1,7 @@
 # This script is based on the AllenNLP implementation of ScalarMix:
 # https://github.com/allenai/allennlp/blob/v2.10.0/allennlp/modules/scalar_mix.py
 
-from __future__ import annotations
+from typing import List, Optional, Sequence
 
 import torch
 from torch.nn import Parameter, ParameterList
@@ -19,7 +19,7 @@ class ScalarMix(torch.nn.Module):
         self,
         mixture_size: int,
         do_layer_norm: bool = False,
-        initial_scalar_parameters: list[float] | None = None,
+        initial_scalar_parameters: Optional[Sequence[float]] = None,
         trainable: bool = True,
     ) -> None:
         super().__init__()
@@ -42,7 +42,7 @@ class ScalarMix(torch.nn.Module):
         )
         self.gamma = Parameter(torch.FloatTensor([1.0]), requires_grad=trainable)
 
-    def forward(self, tensors: list[torch.Tensor], mask: torch.BoolTensor | None = None) -> torch.Tensor:
+    def forward(self, tensors: Sequence[torch.Tensor], mask: Optional[torch.BoolTensor] = None) -> torch.Tensor:
         """
         Compute a weighted average of the `tensors`.  The input tensors an be any shape
         with at least two dimensions, but must all be the same shape.
@@ -73,11 +73,9 @@ class ScalarMix(torch.nn.Module):
             split_size_or_sections=1,
         )
 
-        pieces: list[torch.Tensor]
+        pieces: List[torch.Tensor]
         if not self.do_layer_norm:
-            pieces = []
-            for weight, tensor in zip(normed_weights, tensors):
-                pieces.append(weight * tensor)
+            pieces = [weight * tensor for weight, tensor in zip(normed_weights, tensors)]
             return self.gamma * sum(pieces)
 
         else:
@@ -86,7 +84,8 @@ class ScalarMix(torch.nn.Module):
             input_dim = tensors[0].size(-1)
             num_elements_not_masked = torch.sum(mask) * input_dim
 
-            pieces = []
-            for weight, tensor in zip(normed_weights, tensors):
-                pieces.append(weight * _do_layer_norm(tensor, broadcast_mask, num_elements_not_masked))
+            pieces = [
+                weight * _do_layer_norm(tensor, broadcast_mask, num_elements_not_masked)
+                for weight, tensor in zip(normed_weights, tensors)
+            ]
             return self.gamma * sum(pieces)

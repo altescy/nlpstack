@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 import typing
-from typing import Any, Generic, Protocol, TypeVar
+from typing import Any, Generic, Optional, Protocol, TypeVar
 
 import torch
 
@@ -17,7 +15,7 @@ class LazySetup(Protocol):
 @typing.runtime_checkable
 class TorchModelOutput(Protocol[Inference]):
     inference: Inference
-    loss: torch.FloatTensor | None
+    loss: Optional[torch.FloatTensor]
 
 
 class TorchModel(torch.nn.Module, Generic[Inference]):

@@ -1,12 +1,10 @@
-from __future__ import annotations
-
-from typing import Literal, cast
+from typing import Literal, Optional, cast
 
 import torch
 
 
 class Seq2VecEncoder(torch.nn.Module):
-    def forward(self, inputs: torch.FloatTensor, mask: torch.BoolTensor | None = None) -> torch.FloatTensor:
+    def forward(self, inputs: torch.FloatTensor, mask: Optional[torch.BoolTensor] = None) -> torch.FloatTensor:
         raise NotImplementedError
 
     def get_input_dim(self) -> int:
@@ -26,7 +24,7 @@ class BagOfEmbeddings(Seq2VecEncoder):
         self._input_dim = input_dim
         self._pooling = pooling
 
-    def forward(self, inputs: torch.FloatTensor, mask: torch.BoolTensor | None = None) -> torch.FloatTensor:
+    def forward(self, inputs: torch.FloatTensor, mask: Optional[torch.BoolTensor] = None) -> torch.FloatTensor:
         """
         :param inputs: (batch_size, seq_len, embedding_dim)
         :param mask: (batch_size, seq_len)
@@ -60,7 +58,7 @@ class TokenPooler(Seq2VecEncoder):
         self._input_dim = input_dim
         self._position = position
 
-    def forward(self, inputs: torch.FloatTensor, mask: torch.BoolTensor | None = None) -> torch.FloatTensor:
+    def forward(self, inputs: torch.FloatTensor, mask: Optional[torch.BoolTensor] = None) -> torch.FloatTensor:
         if mask is None:
             mask = cast(torch.BoolTensor, torch.ones_like(inputs[..., 0], dtype=torch.bool))
 

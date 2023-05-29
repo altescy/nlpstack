@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-from typing import Any, Iterable, Iterator, Sequence
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence
 
 import numpy
 
@@ -15,7 +13,7 @@ class TokenIndexer:
     def get_pad_index(self, vocab: Vocabulary) -> int:
         raise NotImplementedError
 
-    def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> dict[str, Any]:
+    def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> Dict[str, Any]:
         raise NotImplementedError
 
 
@@ -29,7 +27,7 @@ class SingleIdTokenIndexer(TokenIndexer):
         return feature
 
     def build_vocab(self, vocab: Vocabulary, documents: Iterable[Sequence[Token]]) -> None:
-        def document_iterator() -> Iterator[list[str]]:
+        def document_iterator() -> Iterator[List[str]]:
             for tokens in documents:
                 yield [self._get_token_feature(token) for token in tokens]
 
@@ -38,7 +36,7 @@ class SingleIdTokenIndexer(TokenIndexer):
     def get_pad_index(self, vocab: Vocabulary) -> int:
         return vocab.get_pad_index(self._namespace)
 
-    def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> dict[str, Any]:
+    def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> Dict[str, Any]:
         token_ids = [
             vocab.get_index_by_token(
                 self._namespace,
@@ -51,7 +49,7 @@ class SingleIdTokenIndexer(TokenIndexer):
 
 
 class TokenVectorIndexer(TokenIndexer):
-    def __init__(self, namespace: str | None = None) -> None:
+    def __init__(self, namespace: Optional[str] = None) -> None:
         self._namespace = namespace
 
     def build_vocab(self, vocab: Vocabulary, documents: Iterable[Sequence[Token]]) -> None:
@@ -61,7 +59,7 @@ class TokenVectorIndexer(TokenIndexer):
     def get_pad_index(self, vocab: Vocabulary) -> int:
         return 0
 
-    def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> dict[str, Any]:
+    def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> Dict[str, Any]:
         if not all(token.vector is not None for token in tokens):
             raise ValueError("TokenVectorIndexer requires all tokens to have vector.")
         return {
@@ -74,7 +72,7 @@ class PretrainedTransformerIndexer(TokenIndexer):
     def __init__(
         self,
         pretrained_model_name: str,
-        namespace: str | None = None,
+        namespace: Optional[str] = None,
     ) -> None:
         from transformers import AutoTokenizer
 
@@ -89,10 +87,10 @@ class PretrainedTransformerIndexer(TokenIndexer):
     def get_pad_index(self, vocab: Vocabulary) -> int:
         return int(self._tokenizer.pad_token_id)
 
-    def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> dict[str, Any]:
-        indices: list[int] = []
-        type_ids: list[int] = []
-        mask: list[bool] = []
+    def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> Dict[str, Any]:
+        indices: List[int] = []
+        type_ids: List[int] = []
+        mask: List[bool] = []
         for token in tokens:
             indices.append(self._tokenizer.convert_tokens_to_ids(token.surface))
             type_ids.append(0)

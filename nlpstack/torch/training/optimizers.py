@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Any, Type
 
 import torch
@@ -9,7 +7,7 @@ class OptimizerFactory:
     def __init__(
         self,
         optimizer_cls: Type[torch.optim.Optimizer],
-        **kwargs: dict[str, Any],
+        **kwargs: Any,
     ) -> None:
         self._optimizer_cls = optimizer_cls
         self._kwargs = kwargs
@@ -47,7 +45,7 @@ class LRSchedulerFactory:
     def __init__(
         self,
         scheduler_cls: Type[torch.optim.lr_scheduler.LRScheduler],
-        **kwargs: dict[str, Any],
+        **kwargs: Any,
     ) -> None:
         self._scheduler_cls = scheduler_cls
         self._kwargs = kwargs

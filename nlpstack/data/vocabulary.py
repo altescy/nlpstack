@@ -1,22 +1,20 @@
-from __future__ import annotations
-
 from collections import Counter, defaultdict
-from collections.abc import Iterable, Mapping, Sequence
+from typing import Dict, Iterable, Mapping, Sequence, Set, Union
 
 
 class Vocabulary:
     def __init__(
         self,
-        min_df: Mapping[str, int | float] = {},
-        max_df: Mapping[str, int | float] = {},
+        min_df: Mapping[str, Union[int, float]] = {},
+        max_df: Mapping[str, Union[int, float]] = {},
         min_count: Mapping[str, int] = {},
         max_count: Mapping[str, int] = {},
         pad_token: Mapping[str, str] = {},
         oov_token: Mapping[str, str] = {},
         bos_token: Mapping[str, str] = {},
         eos_token: Mapping[str, str] = {},
-        special_tokens: Mapping[str, set[str]] = {},
-        ignored_tokens: Mapping[str, set[str]] = {},
+        special_tokens: Mapping[str, Set[str]] = {},
+        ignored_tokens: Mapping[str, Set[str]] = {},
     ) -> None:
         for namespace, token in pad_token.items():
             if token not in special_tokens[namespace]:
@@ -41,9 +39,9 @@ class Vocabulary:
         self._eos_token = eos_token
         self._special_tokens = special_tokens
         self._ignored_tokens = ignored_tokens
-        self._token_to_index: dict[str, dict[str, int]] = {}
-        self._index_to_token: dict[str, dict[int, str]] = {}
-        self._token_to_count: dict[str, dict[str, int]] = {}
+        self._token_to_index: Dict[str, Dict[str, int]] = {}
+        self._index_to_token: Dict[str, Dict[int, str]] = {}
+        self._token_to_count: Dict[str, Dict[str, int]] = {}
 
     def __getitem__(self, namespace: str) -> Mapping[str, int]:
         if namespace not in self._token_to_index:
@@ -146,7 +144,7 @@ class Vocabulary:
             raise KeyError(f"Namespace {namespace} not found.")
         return self._index_to_token[namespace]
 
-    def get_special_tokens(self, namespace: str) -> set[str]:
+    def get_special_tokens(self, namespace: str) -> Set[str]:
         if namespace not in self._index_to_token:
             raise KeyError(f"Namespace {namespace} not found.")
         return {token for token in self._special_tokens.get(namespace, set())}
@@ -223,8 +221,8 @@ class Vocabulary:
             self._index_to_token[namespace][index] = token
 
         num_documents = 0
-        token_count: dict[str, int] = defaultdict(int)
-        document_frequency: dict[str, int] = defaultdict(int)
+        token_count: Dict[str, int] = defaultdict(int)
+        document_frequency: Dict[str, int] = defaultdict(int)
         for tokens in documents:
             num_documents += 1
             for token, count in Counter(tokens).items():

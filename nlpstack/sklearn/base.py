@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Any, Callable, Generic, Iterator, Mapping, Optional, TypeVar
 
 from sklearn.base import BaseEstimator
@@ -40,15 +38,15 @@ class SklearnEstimatorForRune(
     def fit(
         self: Self,
         X: InputsX,
-        y: InputsY | None = None,
+        y: Optional[InputsY] = None,
         *,
-        X_valid: InputsX | None = None,
-        y_valid: InputsY | None = None,
-        resources: dict[str, Any] | None = None,
+        X_valid: Optional[InputsX] = None,
+        y_valid: Optional[InputsY] = None,
+        resources: Optional[Mapping[str, Any]] = None,
         **kwargs: Any,
     ) -> Self:
         train_dataset = Dataset.from_iterable(self.input_builder(X, y))
-        valid_dataset: Dataset[Example] | None = None
+        valid_dataset: Optional[Dataset[Example]] = None
         if X_valid is not None and y_valid is not None:
             valid_dataset = Dataset.from_iterable(self.input_builder(X_valid, y_valid))
         self._rune.train(train_dataset, valid_dataset, resources, **kwargs)
@@ -57,7 +55,7 @@ class SklearnEstimatorForRune(
     def predict(self, X: InputsX, **kwargs: Any) -> Outputs:
         return self.output_builder(self.generate_predictions(X, **kwargs))
 
-    def score(self, X: InputsX, y: InputsY, *, metric: str | None = None, **kwargs: Any) -> float:
+    def score(self, X: InputsX, y: InputsY, *, metric: Optional[str] = None, **kwargs: Any) -> float:
         return self.compute_metrics(X, y, **kwargs)[metric or self.primary_metric]
 
     def generate_predictions(self, X: InputsX, **kwargs: Any) -> Iterator[Prediction]:

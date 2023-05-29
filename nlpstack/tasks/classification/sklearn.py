@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 import itertools
-from typing import Any, Iterator, Mapping, Sequence
+from typing import Any, Iterator, Mapping, Optional, Sequence, Union
 
 from nlpstack.data import Vocabulary
 from nlpstack.data.token_indexers import TokenIndexer
@@ -33,7 +31,7 @@ class SklearnBasicClassifier(
     primary_metric = "accuracy"
 
     @staticmethod
-    def input_builder(X: BasicInputsX, y: BasicInputsY | None) -> Iterator[ClassificationExample]:
+    def input_builder(X: BasicInputsX, y: Optional[BasicInputsY]) -> Iterator[ClassificationExample]:
         for text, label in itertools.zip_longest(X, y or []):
             yield ClassificationExample(text=text, label=label)
 
@@ -45,24 +43,24 @@ class SklearnBasicClassifier(
         self,
         *,
         # data configuration
-        min_df: int | float | Mapping[str, int | float] = 1,
-        max_df: int | float | Mapping[str, int | float] = 1.0,
-        pad_token: str | Mapping[str, str] = "@@PADDING@@",
-        oov_token: str | Mapping[str, str] = "@@UNKNOWN@@",
-        vocab: Vocabulary | None = None,
-        tokenizer: Tokenizer | None = None,
-        token_indexers: Mapping[str, TokenIndexer] | None = None,
-        datamodule: BasicClassificationDataModule | None = None,
+        min_df: Union[int, float, Mapping[str, Union[int, float]]] = 1,
+        max_df: Union[int, float, Mapping[str, Union[int, float]]] = 1.0,
+        pad_token: Union[str, Mapping[str, str]] = "@@PADDING@@",
+        oov_token: Union[str, Mapping[str, str]] = "@@UNKNOWN@@",
+        vocab: Optional[Vocabulary] = None,
+        tokenizer: Optional[Tokenizer] = None,
+        token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
+        datamodule: Optional[BasicClassificationDataModule] = None,
         # model configuration
-        classifier: TorchBasicClassifier | None = None,
+        classifier: Optional[TorchBasicClassifier] = None,
         # training configuration
         max_epochs: int = 4,
         batch_size: int = 32,
         learning_rate: float = 1e-3,
-        training_callbacks: Sequence[Callback] | None = None,
-        trainer: TorchTrainer | None = None,
+        training_callbacks: Optional[Sequence[Callback]] = None,
+        trainer: Optional[TorchTrainer] = None,
         # evaluation configuration
-        metric: ClassificationMetric | Sequence[ClassificationMetric] | None = None,
+        metric: Optional[Union[ClassificationMetric, Sequence[ClassificationMetric]]] = None,
         **kwargs: Any,
     ) -> None:
         rune = BasicClassifier(

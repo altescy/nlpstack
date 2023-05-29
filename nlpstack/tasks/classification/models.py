@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 import dataclasses
-from typing import Any, Mapping, cast
+from typing import Any, Mapping, Optional, Sequence, cast
 
 import torch
 
@@ -21,7 +19,7 @@ from .datamodules import BasicClassificationDataModule
 class BasicClassifierOutput:
     inference: ClassificationInference
     logits: torch.FloatTensor
-    loss: torch.FloatTensor | None = None
+    loss: Optional[torch.FloatTensor] = None
 
 
 class TorchBasicClassifier(TorchModel[ClassificationInference]):
@@ -29,9 +27,9 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
         self,
         embedder: TextEmbedder,
         encoder: Seq2VecEncoder,
-        contextualizer: Seq2SeqEncoder | None = None,
-        feedforward: FeedForward | None = None,
-        dropout: float | None = None,
+        contextualizer: Optional[Seq2SeqEncoder] = None,
+        feedforward: Optional[FeedForward] = None,
+        dropout: Optional[float] = None,
         label_namespace: str = "labels",
     ) -> None:
         super().__init__()
@@ -62,7 +60,8 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
     def forward(  # type: ignore[override]
         self,
         text: Mapping[str, Mapping[str, torch.Tensor]],
-        label: torch.LongTensor | None = None,
+        label: Optional[torch.LongTensor] = None,
+        metadata: Optional[Sequence[Any]] = None,
     ) -> BasicClassifierOutput:
         mask = get_mask_from_text(text)
 
@@ -82,7 +81,7 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
         logits = cast(torch.FloatTensor, self._classifier(encodings))
         probs = cast(torch.FloatTensor, torch.nn.functional.softmax(logits, dim=-1))
 
-        inference = ClassificationInference(probs=probs.detach().cpu().numpy())
+        inference = ClassificationInference(probs=probs.detach().cpu().numpy(), metadata=metadata)
         output = BasicClassifierOutput(inference=inference, logits=logits)
 
         if label is not None:

@@ -1,24 +1,22 @@
-from __future__ import annotations
-
-from typing import NamedTuple
+from typing import List, NamedTuple, Optional
 
 import numpy
 
 
 class Token(NamedTuple):
     surface: str
-    postag: str | None = None
-    lemma: str | None = None
-    vector: numpy.ndarray | None = None
+    postag: Optional[str] = None
+    lemma: Optional[str] = None
+    vector: Optional[numpy.ndarray] = None
 
 
 class Tokenizer:
-    def tokenize(self, text: str) -> list[Token]:
+    def tokenize(self, text: str) -> List[Token]:
         raise NotImplementedError
 
 
 class WhitespaceTokenizer(Tokenizer):
-    def tokenize(self, text: str) -> list[Token]:
+    def tokenize(self, text: str) -> List[Token]:
         return [Token(surface) for surface in text.split()]
 
 
@@ -28,7 +26,7 @@ class SpacyTokenizer(Tokenizer):
 
         self.nlp = spacy.load(lang)
 
-    def tokenize(self, text: str) -> list[Token]:
+    def tokenize(self, text: str) -> List[Token]:
         doc = self.nlp(text)
         return [
             Token(
@@ -47,6 +45,6 @@ class PretrainedTransformerTokenizer(Tokenizer):
 
         self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name)
 
-    def tokenize(self, text: str) -> list[Token]:
+    def tokenize(self, text: str) -> List[Token]:
         tokens = self.tokenizer.tokenize(text)
         return [Token(t) for t in tokens]

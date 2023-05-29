@@ -84,6 +84,7 @@ class ProgressBar(Generic[T]):
         truncate: bool = True,
         framerate: float = 16.0,
         template: str | None = None,
+        maxbarwidth: int | None = 40,
         sizeof_formatter: Callable[[int | float], str] = _default_sizeof_formatter,
         disable: bool = False,
     ) -> None:
@@ -102,6 +103,7 @@ class ProgressBar(Generic[T]):
         self._truncate = truncate
         self._framerate = framerate
         self._template = template
+        self._maxbarwidth = maxbarwidth
         self._sizeof_formatter = sizeof_formatter
         self._disable = disable or DISABLE_PROGRESSBAR
 
@@ -167,14 +169,18 @@ class ProgressBar(Generic[T]):
         return terminal_width
 
     def _get_bar(self, width: int, percentage: float) -> str:
-        ratio = percentage / 100
         width = max(1, width)
+        if self._maxbarwidth is not None:
+            width = min(width, self._maxbarwidth)
+        ratio = percentage / 100
         current_width = int(ratio * width)
-        remaining_width = width - current_width - 1
-        bar = f"\033[32m{'━' * current_width}"
-        if ratio < 1.0:
-            bar += f"╸\033[0m\033[31m{'━' * remaining_width}"
-        bar += "\033[0m"
+        remaining_width = width - current_width
+        if ratio < 1.0 and remaining_width > 0:
+            bar = f"\033[35m{'━' * current_width}╸\033[0m\033[30m{'━' * (remaining_width - 1)}\033[0m"
+        elif remaining_width == 0:
+            bar = f"\033[32m{'━' * width}\033[0m"
+        else:
+            bar = f"\033[31m!{'━' * (width - 1)}\033[0m"
         return bar
 
     def set_description(self, desc: str | None = None) -> None:
@@ -229,6 +235,9 @@ class ProgressBar(Generic[T]):
             percentage = int(100 * self._iterations / self._total)
             remaining_time = (self._total - self._iterations) * interval_ema
             postfix_template = " ".join(postfixes)
+
+            if percentage > 100:
+                remaining_time = 0.0
 
             if do_compose_template:
                 template = template + "{percentage:3d}%  {bar}  {elapsed_time}<{remaining_time}"

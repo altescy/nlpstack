@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Any, Generic, Iterable, Mapping, TypeVar
 
 from nlpstack.common import ProgressBar
