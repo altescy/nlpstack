@@ -14,9 +14,9 @@ def load_dataset(filename: Union[str, PathLike]) -> List[ClassificationExample]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--train-dataset", default="dataset/train.jsonl")
-    parser.add_argument("--valid-dataset", default="dataset/valid.jsonl")
-    parser.add_argument("--test-dataset", default="dataset/test.jsonl")
+    parser.add_argument("--train-dataset", default="data/train.jsonl")
+    parser.add_argument("--valid-dataset", default="data/valid.jsonl")
+    parser.add_argument("--test-dataset", default="data/test.jsonl")
     parser.add_argument("--max-epocs", type=int, default=10)
     args = parser.parse_args()
 
