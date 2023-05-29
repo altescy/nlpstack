@@ -22,6 +22,10 @@ class Workflow:
     def by_name(cls, name: str) -> Type["Workflow"]:
         return cls._registry[name]
 
+    @classmethod
+    def available_names(cls) -> Sequence[str]:
+        return list(cls._registry)
+
     @staticmethod
     def _setup_parser(parser: argparse.ArgumentParser, func: Callable) -> argparse.ArgumentParser:
         parser.set_defaults(__func=func)
