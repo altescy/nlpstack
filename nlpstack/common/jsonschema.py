@@ -46,6 +46,24 @@ def generate_json_schema(
         if not root:
             definitions[cls.__name__] = schema
             schema = {"$ref": f"#/definitions/{cls.__name__}"}
+    elif is_namedtuple(cls):
+        if not root and cls.__name__ in definitions:
+            return {"$ref": f"#/definitions/{cls.__name__}"}
+
+        properties = {}
+        required = []
+        for field_name, field_type in typing.get_type_hints(cls).items():
+            if is_optional(field_type) and field_name in cls._field_defaults:
+                properties[field_name] = generate_json_schema(field_type, root=False, definitions=definitions)
+            else:
+                if field_name not in cls._field_defaults:
+                    required.append(field_name)
+                properties[field_name] = generate_json_schema(field_type, root=False, definitions=definitions)
+
+        schema = {"type": "object", "properties": properties, "required": required}
+        if not root:
+            definitions[cls.__name__] = schema
+            schema = {"$ref": f"#/definitions/{cls.__name__}"}
     elif origin and args:  # for handling Optional, List, Dict, Literal and other special types
         if origin in (Union, UnionType):  # for Optional and UnionType
             types = [
@@ -88,6 +106,16 @@ def is_optional(python_type: Type) -> bool:
     if origin:
         return origin is Union and type(None) in args
     return False
+
+
+def is_namedtuple(python_type: Type) -> bool:
+    bases = getattr(python_type, "__bases__", [])
+    if len(bases) != 1 or bases[0] != tuple:
+        return False
+    f = getattr(python_type, "_fields", None)
+    if not isinstance(f, tuple):
+        return False
+    return all(type(n) == str for n in f)
 
 
 def _get_json_type(python_type: Union[Type, None]) -> JsonType:
