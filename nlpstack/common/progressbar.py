@@ -84,6 +84,7 @@ class ProgressBar(Generic[T]):
         truncate: bool = True,
         framerate: float = 16.0,
         template: str | None = None,
+        maxbarwidth: int | None = 40,
         sizeof_formatter: Callable[[int | float], str] = _default_sizeof_formatter,
         disable: bool = False,
     ) -> None:
@@ -102,6 +103,7 @@ class ProgressBar(Generic[T]):
         self._truncate = truncate
         self._framerate = framerate
         self._template = template
+        self._maxbarwidth = maxbarwidth
         self._sizeof_formatter = sizeof_formatter
         self._disable = disable or DISABLE_PROGRESSBAR
 
@@ -168,6 +170,8 @@ class ProgressBar(Generic[T]):
 
     def _get_bar(self, width: int, percentage: float) -> str:
         width = max(1, width)
+        if self._maxbarwidth is not None:
+            width = min(width, self._maxbarwidth)
         ratio = percentage / 100
         current_width = int(ratio * width)
         remaining_width = width - current_width
