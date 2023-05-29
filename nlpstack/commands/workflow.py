@@ -1,10 +1,15 @@
 import argparse
 import importlib
+from logging import getLogger
 from typing import Any
+
+from colt import import_modules
 
 from nlpstack.workflows import Workflow
 
 from .subcommand import Subcommand
+
+logger = getLogger(__name__)
 
 
 @Subcommand.register("workflow")
@@ -20,11 +25,21 @@ class WorkflowCommand(Subcommand):
             nargs=argparse.REMAINDER,
             help="arguments to pass to the workflow",
         )
+        self.parser.add_argument(
+            "--include-package",
+            action="append",
+            help="additional packages to include",
+            default=[],
+        )
 
     def run(self, args: argparse.Namespace) -> None:
         if not args.workflow:
             self.parser.print_help()
             exit(1)
+
+        if args.include_package:
+            logger.info("Importing packages: %s", args.include_package)
+            import_modules(args.include_package)
 
         workflow: Any
 
