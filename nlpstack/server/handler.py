@@ -4,7 +4,6 @@ import typing
 from http.server import SimpleHTTPRequestHandler
 from pathlib import Path
 from typing import Any, Generic, Tuple, Type, TypeVar
-from urllib.parse import urljoin
 
 import colt
 from colt.error import ConfigurationError
