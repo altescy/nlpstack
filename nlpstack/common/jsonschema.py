@@ -35,12 +35,9 @@ def generate_json_schema(
         properties = {}
         required = []
         for field in dataclasses.fields(cls):
-            if is_optional(field.type) and field.default is not dataclasses.MISSING:
-                properties[field.name] = generate_json_schema(field.type, root=False, definitions=definitions)
-            else:
-                if field.default is dataclasses.MISSING:
-                    required.append(field.name)
-                properties[field.name] = generate_json_schema(field.type, root=False, definitions=definitions)
+            if not is_optional(field.type) or field.default is dataclasses.MISSING:
+                required.append(field.name)
+            properties[field.name] = generate_json_schema(field.type, root=False, definitions=definitions)
 
         schema = {"type": "object", "properties": properties, "required": required}
         if not root:
@@ -53,12 +50,9 @@ def generate_json_schema(
         properties = {}
         required = []
         for field_name, field_type in typing.get_type_hints(cls).items():
-            if is_optional(field_type) and field_name in cls._field_defaults:
-                properties[field_name] = generate_json_schema(field_type, root=False, definitions=definitions)
-            else:
-                if field_name not in cls._field_defaults:
-                    required.append(field_name)
-                properties[field_name] = generate_json_schema(field_type, root=False, definitions=definitions)
+            if not is_optional(field_type) or field_name not in cls._field_defaults:
+                required.append(field_name)
+            properties[field_name] = generate_json_schema(field_type, root=False, definitions=definitions)
 
         schema = {"type": "object", "properties": properties, "required": required}
         if not root:
