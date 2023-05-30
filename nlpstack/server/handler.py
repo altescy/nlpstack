@@ -109,16 +109,19 @@ class RuneHandler(SimpleHTTPRequestHandler, Generic[Example, Prediction]):
             /<health_check> -> health check
         """
 
-        if self.path == "/":
-            self._serve_index()
-        elif self.path == "/schema/input":
-            self._serve_schema(self._input_schema)
-        elif self.path == "/schema/output":
-            self._serve_schema(self._output_schema)
-        elif self.path == self._health_check:
-            self._serve_health_check()
-        else:
-            self._handle_error_response(404, "Not Found")
+        try:
+            if self.path == "/":
+                self._serve_index()
+            elif self.path == "/schema/input":
+                self._serve_schema(self._input_schema)
+            elif self.path == "/schema/output":
+                self._serve_schema(self._output_schema)
+            elif self.path == self._health_check:
+                self._serve_health_check()
+            else:
+                self._handle_error_response(404, "Not Found")
+        except Exception:
+            self._handle_error_response(500, "Internal Server Error")
 
     def do_POST(self) -> None:
         """Serve a POST request.
@@ -127,18 +130,21 @@ class RuneHandler(SimpleHTTPRequestHandler, Generic[Example, Prediction]):
             <root>/predict -> process input
         """
 
-        if self.path == "/predict":
-            # check content type
-            if self.headers["Content-Type"] != "application/json":
-                self._handle_error_response(400, "Bad Request")
-                return
-            content_length = int(self.headers["Content-Length"])
-            try:
-                body = self.rfile.read(content_length)
-                example = colt.build(json.loads(body), self._input_class)
-            except (json.JSONDecodeError, ValueError, ConfigurationError):
-                self._handle_error_response(400, "Bad Request")
-                return
-            self._serve_prediction(example)
-        else:
-            self._handle_error_response(404, "Not Found")
+        try:
+            if self.path == "/predict":
+                # check content type
+                if self.headers["Content-Type"] != "application/json":
+                    self._handle_error_response(400, "Bad Request")
+                    return
+                content_length = int(self.headers["Content-Length"])
+                try:
+                    body = self.rfile.read(content_length)
+                    example = colt.build(json.loads(body), self._input_class)
+                except (json.JSONDecodeError, ValueError, ConfigurationError):
+                    self._handle_error_response(400, "Bad Request")
+                    return
+                self._serve_prediction(example)
+            else:
+                self._handle_error_response(404, "Not Found")
+        except Exception:
+            self._handle_error_response(500, "Internal Server Error")
