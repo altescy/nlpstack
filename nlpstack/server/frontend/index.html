@@ -2,7 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>📚 NLPSTACK Server</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NLPSTACK Server</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
   <style>
   * {
     box-sizing: border-box;
@@ -121,7 +123,7 @@
   </div>
   <script>
     function createInputElement(key, property, required) {
-      let input = document.createElement('input');
+      const input = document.createElement('input');
       input.name = key;
       if (required) {
         input.required = true;
@@ -131,8 +133,8 @@
         // Create a select box for enum
         input = document.createElement('select');
         input.name = key;
-        for (let i in property.enum) {
-          let option = document.createElement('option');
+        for (const i in property.enum) {
+          const option = document.createElement('option');
           option.value = property.enum[i];
           option.text = property.enum[i];
           input.appendChild(option);
@@ -154,6 +156,7 @@
             break;
         }
       }
+      input.placeholder = input.type;
       return input;
     }
 
@@ -209,6 +212,7 @@
           const itemContainer = document.createElement('div');
 
           const itemLabel = document.createElement('label');
+          itemLabel.style.display = 'inline-block';
           itemLabel.textContent = `${parentKey} ${index}`;
           itemContainer.appendChild(itemLabel);
 
@@ -227,7 +231,6 @@
             ...schema.items,
             definitions: schema.definitions,
           };
-          console.log(subschema);
           const newForm = generateInputs(subschema, key);
           itemContainer.appendChild(newForm);
 
@@ -263,12 +266,12 @@
     }
 
     function generateForm(schema, formId) {
-      let form = document.getElementById(formId);
+      const form = document.getElementById(formId);
 
       form.appendChild(generateInputs(schema));
 
       // Create and append submit button
-      let submit = document.createElement('input');
+      const submit = document.createElement('input');
       submit.type = 'submit';
       submit.value = 'Submit';
       form.appendChild(submit);
@@ -276,16 +279,13 @@
       form.onsubmit = function(event) {
         event.preventDefault();
 
-        let formData = new FormData(form);
+        const formData = new FormData(form);
         let object = {};
         formData.forEach(function(value, key){
           object[key] = value;
         });
 
         object = unflatten(object);
-
-        // Here you can handle the JSON data as needed
-        console.log(JSON.stringify(object, null, 2));
 
         const prediction_request = new Request("/predict", {
           method: 'POST',
@@ -297,7 +297,6 @@
         const response = fetch(prediction_request)
           .then(response => response.json())
           .then(data => {
-            console.log(data);
             const result = document.getElementById('result');
             result.innerHTML = JSON.stringify(data, null, 2);
           });
@@ -308,8 +307,8 @@
       const output = {};
 
       const recursiveAssign = (obj, path, value) => {
-        let key = path.shift();
-        let isIndex = /^\d+$/.test(key);
+        const key = path.shift();
+        const isIndex = /^\d+$/.test(key);
         if (path.length === 0) {
           // check if the key is a number, if it is an array is assumed.
           if (isIndex) {
@@ -332,7 +331,7 @@
         }
       }
 
-      for (let key in input) {
+      for (const key in input) {
         recursiveAssign(output, key.split('.'), input[key]);
       }
 
