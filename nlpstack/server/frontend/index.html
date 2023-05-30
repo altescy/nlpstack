@@ -25,34 +25,45 @@
   .container {
     display: flex;
     flex-direction: row;
+    object-fit: contain;
   }
   .left {
     flex: 1;
     border: 1px solid #ccc;
     border-radius: 0.25rem;
+    margin-right: 1rem;
   }
   .right {
     flex: 1;
     border: 1px solid #ccc;
     border-radius: 0.25rem;
   }
+  @media screen and (max-width: 600px) {
+    .container {
+      flex-direction: column;
+    }
+    .left {
+      margin-right: 0;
+      margin-bottom: 1rem;
+    }
+  }
   #input-form {
     padding: 1rem;
     margin: 0 auto;
     text-align: left;
   }
-  #result {
-    padding: 1rem;
-    margin: 0 auto;
-    text-align: left;
-    flex: 1;
+  pre {
     width: 100%;
     height: 100%;
-    resize: none;
-    border: none;
-    padding: 1rem;
-    font-family: 'Courier New', Courier, monospace;
+    text-align: left;
     background-color: #f4f4f4;
+    margin: 0;
+    padding: 1rem;
+  }
+  code {
+    white-space: pre;
+    margin: 0;
+    padding: 0;
   }
   label {
     display: block;
@@ -92,6 +103,9 @@
     margin: 0.1rem;
     border: none;
   }
+  .input-container {
+    margin-bottom: 0.5rem;
+  }
   </style>
 </head>
 <body>
@@ -102,7 +116,7 @@
       </form>
     </div>
     <div class="right">
-      <textarea id="result" readonly></textarea>
+      <pre><code id="result"></code></pre>
     </div>
   </div>
   <script>
@@ -143,135 +157,115 @@
       return input;
     }
 
-    function processSchema(schema, element, parentKey = '') {
-      for (let propertyName in schema.properties) {
-        let key = (parentKey) ? `${parentKey}.${propertyName}` : propertyName;
-        let property = schema.properties[propertyName];
-        let required = schema.required && schema.required.indexOf(propertyName) > -1;
+    function generateInputs(schema, parentKey = '', required = false) {
+      const container = document.createElement('div');
+      container.className = 'input-container';
+      if (parentKey.includes('.')) {
+        const level = parentKey.split('.').length;
+        container.style.marginLeft = `${level * 1}rem`;
+      }
 
-        // Process 'definitions'
-        if (property["$ref"]) {
-          let definitionKey = property["$ref"].replace("#/definitions/", "");
-          property = schema.definitions[definitionKey];
+      if (schema['$ref']) {
+        const definitionKey = schema['$ref'].replace('#/definitions/', '');
+        const definition = schema.definitions[definitionKey];
+        return generateInputs({...definition, definitions: schema.definitions}, parentKey);
+      }
+
+      // Handle anyOf
+      if (schema.anyOf) {
+        const select = document.createElement('select');
+        select.name = `${parentKey}.type`
+        const subschemas = new Map();
+        for (const acceptableSchema of schema.anyOf) {
+          const option = document.createElement('option');
+          option.value = acceptableSchema.type;
+          option.text = acceptableSchema.type;
+          select.appendChild(option);
+          const subschema = {
+            ...acceptableSchema,
+            definitions: schema.definitions,
+          };
+          subschemas.set(acceptableSchema.type, subschema);
         }
+        select.onchange = function(event) {
+          const selectedSchema = subschemas.get(event.target.value);
+          const newForm = generateInputs(selectedSchema, parentKey, required);
+          container.replaceChild(newForm, container.lastChild);
+        };
+        container.appendChild(select);
+        schema = schema.anyOf[0];
+      }
 
-        // Create and append label
-        let label = document.createElement('label');
-        label.textContent = key;
-        if (required) {
-          label.textContent += ' (required)';
-        }
-        element.appendChild(label);
+      if (schema.type === 'array') {
+        const arrayContainer = document.createElement('div');
 
-        // Process 'anyOf'
-        if (property["anyOf"]) {
-          // add a select box for anyOf
-          let input = document.createElement('select');
-          input.name = `${key}.type`;
-          for (let i in property.anyOf) {
-            let option = document.createElement('option');
-            option.value = property.anyOf[i].type;
-            option.text = property.anyOf[i].type;
-            input.appendChild(option);
-          }
-          element.appendChild(input);
-        }
+        const addButton = document.createElement('button');
+        addButton.textContent = '+ Add';
+        addButton.onclick = function(event) {
+          event.preventDefault();
+          const index = arrayContainer.children.length;
+          const key = (parentKey) ? `${parentKey}.${index}` : `${index}`;
 
-        // Check if property is an array
-        if (property.type === 'array') {
-          // Create a container for array elements
-          let arrayContainer = document.createElement('div');
-          arrayContainer.id = propertyName;
+          const itemContainer = document.createElement('div');
 
-          // Create an 'Add' button
-          const addButton = document.createElement('button');
-          addButton.textContent = 'Add';
-          addButton.onclick = function(e) {
-            e.preventDefault();
-            const index = arrayContainer.children.length;
-            const arrayItemContainer = document.createElement('div');
-            arrayItemContainer.className = propertyName;
+          const itemLabel = document.createElement('label');
+          itemLabel.textContent = `${parentKey} ${index}`;
+          itemContainer.appendChild(itemLabel);
 
-            const deleteButton = document.createElement('button');
-            deleteButton.textContent = 'Delete';
-            deleteButton.style = 'float: right; background-color: #f55; color: #fff;';
-            deleteButton.onclick = function(e) {
-              e.preventDefault();
-              arrayItemContainer.remove();
-            };
+          const deleteButton = document.createElement('button');
+          deleteButton.style.float = 'right';
+          deleteButton.style.color = '#eee';
+          deleteButton.style.backgroundColor = '#f55';
+          deleteButton.textContent = '× Delete';
+          deleteButton.onclick = function(event) {
+            event.preventDefault();
+            arrayContainer.removeChild(itemContainer);
+          };
+          itemContainer.appendChild(deleteButton);
 
-            arrayItemContainer.appendChild(deleteButton);
-            let subschema = {
-              properties: {[`${index}`]: property.items},
-              definitions: schema.definitions,
-            };
-            processSchema(subschema, arrayItemContainer, key);
-            arrayContainer.appendChild(arrayItemContainer);
+          const subschema = {
+            ...schema.items,
+            definitions: schema.definitions,
+          };
+          console.log(subschema);
+          const newForm = generateInputs(subschema, key);
+          itemContainer.appendChild(newForm);
+
+          arrayContainer.appendChild(itemContainer);
+        };
+        container.appendChild(addButton);
+        container.appendChild(arrayContainer);
+      } else if (schema.type === 'object') {
+        for (const propertyName in schema.properties) {
+          const key = parentKey ? `${parentKey}.${propertyName}` : propertyName;
+          const required = schema.required && schema.required.includes(propertyName);
+          const subschema = {
+            ...schema.properties[propertyName],
+            definitions: schema.definitions,
           };
 
-          element.appendChild(addButton);
-          element.appendChild(arrayContainer);
-        } else if (property.type === 'object') {
-          // Create a container for object properties
-          let objectContainer = document.createElement('div');
-          processSchema(property, objectContainer, key);
-
-          if (property.additionalProperties) {
-            // Create an 'Add' button
-            const addButton = document.createElement('button');
-            addButton.textContent = 'Add';
-            addButton.onclick = function(e) {
-              e.preventDefault();
-              const index = objectContainer.children.length;
-              const objectItemContainer = document.createElement('div');
-              objectItemContainer.className = propertyName;
-
-              const deleteButton = document.createElement('button');
-              deleteButton.textContent = 'Delete';
-              deleteButton.textContent = 'Delete';
-              deleteButton.style = 'float: right; background-color: #f55; color: #fff;';
-              deleteButton.onclick = function(e) {
-                e.preventDefault();
-                objectItemContainer.remove();
-              };
-              objectItemContainer.appendChild(deleteButton);
-
-              const  keyschema = {
-                properties: {['key']: {type: 'string'}},
-              };
-              processSchema(keyschema, objectItemContainer, `${key}.${index}`);
-
-              let valueschema = {
-                properties: {['value']: property.additionalProperties},
-                definitions: schema.definitions,
-              };
-              processSchema(valueschema, objectItemContainer, `${key}.${index}`);
-              objectContainer.appendChild(objectItemContainer);
-            };
-
-            element.appendChild(addButton);
+          const label = document.createElement('label');
+          label.textContent = propertyName;
+          if (required) {
+            label.textContent += ' *';
           }
+          container.appendChild(label);
 
-          element.appendChild(objectContainer)
-        } else {
-          // Create and append input element
-          let input = createInputElement(key, property, required);
-          element.appendChild(input);
+          const newForm = generateInputs(subschema, key, required);
+          container.appendChild(newForm);
         }
-        // Add a line break
-        element.appendChild(document.createElement('br'));
+      } else {
+        const input = createInputElement(parentKey, schema, required);
+        container.appendChild(input);
       }
-      if (parentKey) {
-        const level = parentKey.split('.').length;
-        if (level) {
-          element.style.marginLeft = `${level * 1}rem`;
-        }
-      }
+
+      return container;
     }
 
     function generateForm(schema, formId) {
       let form = document.getElementById(formId);
-      processSchema(schema, form);
+
+      form.appendChild(generateInputs(schema));
 
       // Create and append submit button
       let submit = document.createElement('input');
@@ -293,8 +287,7 @@
         // Here you can handle the JSON data as needed
         console.log(JSON.stringify(object, null, 2));
 
-        const prediction_url = "/predict";
-        const prediction_request = new Request(prediction_url, {
+        const prediction_request = new Request("/predict", {
           method: 'POST',
           body: JSON.stringify(object),
           headers: {
@@ -348,8 +341,7 @@
 
     window.onload = function() {
       // fetch JSON schema
-      const input_schema_url = '/schema/input'
-      const schema = fetch(input_schema_url)
+      const schema = fetch('/schema/input')
         .then(response => response.json())
         .then(data => {
           const schema = data;
