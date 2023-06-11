@@ -2,6 +2,7 @@ import dataclasses
 import json
 import typing
 from http.server import SimpleHTTPRequestHandler
+from logging import getLogger
 from pathlib import Path
 from typing import Any, Generic, Tuple, Type, TypeVar
 
@@ -10,6 +11,8 @@ from colt.error import ConfigurationError
 
 from nlpstack.common import generate_json_schema
 from nlpstack.rune import Rune
+
+logger = getLogger(__name__)
 
 Example = TypeVar("Example")
 Prediction = TypeVar("Prediction")
@@ -120,7 +123,8 @@ class RuneHandler(SimpleHTTPRequestHandler, Generic[Example, Prediction]):
                 self._serve_health_check()
             else:
                 self._handle_error_response(404, "Not Found")
-        except Exception:
+        except Exception as e:
+            logger.exception(e)
             self._handle_error_response(500, "Internal Server Error")
 
     def do_POST(self) -> None:
@@ -146,5 +150,6 @@ class RuneHandler(SimpleHTTPRequestHandler, Generic[Example, Prediction]):
                 self._serve_prediction(example)
             else:
                 self._handle_error_response(404, "Not Found")
-        except Exception:
+        except Exception as e:
+            logger.exception(e)
             self._handle_error_response(500, "Internal Server Error")
