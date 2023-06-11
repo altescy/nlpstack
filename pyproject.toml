@@ -14,7 +14,7 @@ nlpstack = "nlpstack.__main__:run"
 [tool.poetry.dependencies]
 python = ">=3.8,<4.0"
 collatable = ">=0.3.2"
-colt = "^0.9.3"
+colt = "^0.10.2"
 minato = "^0.11.1"
 numpy = "*"
 rjsonnet = "^0.5.2"
