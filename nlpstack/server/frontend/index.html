@@ -20,9 +20,10 @@
   }
   h1 {
     font-size: 2rem;
-    font-weight: 400;
+    font-weight: bold;
     line-height: 1.2;
-    margin: 0 0 1rem 0;
+    margin: 0.5rem 0 1.5rem 0;
+    user-select: none;
   }
   .container {
     display: flex;
@@ -256,6 +257,9 @@
 
           const newForm = generateInputs(subschema, key, required);
           container.appendChild(newForm);
+        }
+        if (schema.additionalProperties) {
+          // TODO: Handle additionalProperties
         }
       } else {
         const input = createInputElement(parentKey, schema, required);
