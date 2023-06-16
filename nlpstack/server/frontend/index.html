@@ -144,20 +144,22 @@
         switch (property.type) {
           case 'string':
             input.type = 'text';
+            input.placeholder = 'text';
             break;
           case 'integer':
           case 'number':
             input.type = 'number';
+            input.placeholder = 'number';
             break;
           case 'boolean':
             input.type = 'checkbox';
             break;
           default:
             input.type = 'text';
+            input.placeholder = 'text';
             break;
         }
       }
-      input.placeholder = input.type;
       return input;
     }
 
