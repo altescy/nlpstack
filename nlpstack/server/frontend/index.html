@@ -31,13 +31,13 @@
     object-fit: contain;
   }
   .left {
-    flex: 1;
+    width: 50%;
     border: 1px solid #ccc;
     border-radius: 0.25rem;
     margin-right: 1rem;
   }
   .right {
-    flex: 1;
+    width: 50%;
     border: 1px solid #ccc;
     border-radius: 0.25rem;
   }
@@ -46,8 +46,12 @@
       flex-direction: column;
     }
     .left {
+      width: 100%;
       margin-right: 0;
       margin-bottom: 1rem;
+    }
+    .right {
+      width: 100%;
     }
   }
   #input-form {
@@ -62,9 +66,10 @@
     background-color: #f4f4f4;
     margin: 0;
     padding: 1rem;
+    overflow: auto;
   }
   code {
-    white-space: pre;
+    white-space: pre-wrap;
     margin: 0;
     padding: 0;
   }
@@ -271,6 +276,16 @@
       return container;
     }
 
+    function parseFormValue(value, type) {
+      if (type === 'number') {
+        return parseInt(value);
+      } else if (type === 'checkbox') {
+        return value === 'on';
+      } else {
+        return value;
+      }
+    }
+
     function generateForm(schema, formId) {
       const form = document.getElementById(formId);
 
@@ -285,11 +300,18 @@
       form.onsubmit = function(event) {
         event.preventDefault();
 
-        const formData = new FormData(form);
-        let object = {};
-        formData.forEach(function(value, key){
-          object[key] = value;
-        });
+        const elements = this.elements;
+        let object ={};
+        for(var i = 0 ; i < elements.length ; i++){
+          var item = elements.item(i);
+          if (item.name){
+            if (item.required && item.value) {
+              object[item.name] = parseFormValue(item.value, item.type);
+            } else if (!item.required && item.value !== "") {
+              object[item.name] = parseFormValue(item.value, item.type);
+            }
+          }
+        }
 
         object = unflatten(object);
 
@@ -304,7 +326,7 @@
           .then(response => response.json())
           .then(data => {
             const result = document.getElementById('result');
-            result.innerHTML = JSON.stringify(data, null, 2);
+            result.innerHTML = JSON.stringify(data);
           });
       }
     }
