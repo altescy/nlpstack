@@ -326,7 +326,7 @@
           .then(response => response.json())
           .then(data => {
             const result = document.getElementById('result');
-            result.innerHTML = JSON.stringify(data);
+            result.innerHTML = JSON.stringify(data, null, 2);
           });
       }
     }
