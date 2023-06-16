@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NLPSTACK Server</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
+  <style>
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+    color: #333;
+    margin: 0;
+    padding: 1rem;
+    text-align:center;
+  }
+  h1 {
+    font-size: 2rem;
+    font-weight: bold;
+    line-height: 1.2;
+    margin: 0.5rem 0 1.5rem 0;
+    user-select: none;
+  }
+  .container {
+    display: flex;
+    flex-direction: row;
+    object-fit: contain;
+  }
+  .left {
+    width: 50%;
+    border: 1px solid #ccc;
+    border-radius: 0.25rem;
+    margin-right: 1rem;
+  }
+  .right {
+    width: 50%;
+    border: 1px solid #ccc;
+    border-radius: 0.25rem;
+  }
+  @media screen and (max-width: 600px) {
+    .container {
+      flex-direction: column;
+    }
+    .left {
+      width: 100%;
+      margin-right: 0;
+      margin-bottom: 1rem;
+    }
+    .right {
+      width: 100%;
+    }
+  }
+  #input-form {
+    padding: 1rem;
+    margin: 0 auto;
+    text-align: left;
+  }
+  pre {
+    width: 100%;
+    height: 100%;
+    text-align: left;
+    background-color: #f4f4f4;
+    margin: 0;
+    padding: 1rem;
+    overflow: auto;
+  }
+  code {
+    white-space: pre-wrap;
+    margin: 0;
+    padding: 0;
+  }
+  label {
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+  input, select {
+    display: block;
+    width: 100%;
+    padding: 0.5rem;
+    font-size: 1rem;
+    line-height: 1.25;
+    color: #555;
+    background-color: #fff;
+    background-image: none;
+    border: 1px solid #ccc;
+    border-radius: 0.25rem;
+    transition: border-color ease-in-out 0.15s, box-shadow ease-in-out 0.15s;
+  }
+  input[type="submit"] {
+    width: auto;
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    line-height: 1.25;
+    color: #fff;
+    background-color: #007bff;
+    border-color: #007bff;
+    border-radius: 0.25rem;
+    cursor: pointer;
+  }
+  button {
+    cursor: pointer;
+    font-size: 1rem;
+    background-color: #ddd;
+    color: #333;
+    padding: 0.2rem 0.5rem;
+    border-radius: 0.25rem;
+    margin: 0.1rem;
+    border: none;
+  }
+  .input-container {
+    margin-bottom: 0.5rem;
+  }
+  </style>
+</head>
+<body>
+  <h1>📚 NLPSTACK Server</h1>
+  <div class="container">
+    <div class="left">
+      <form id="input-form">
+      </form>
+    </div>
+    <div class="right">
+      <pre><code id="result"></code></pre>
+    </div>
+  </div>
+  <script>
+    function createInputElement(key, property, required) {
+      const input = document.createElement('input');
+      input.name = key;
+      if (required) {
+        input.required = true;
+      }
+
+      if (property.enum) {
+        // Create a select box for enum
+        input = document.createElement('select');
+        input.name = key;
+        for (const i in property.enum) {
+          const option = document.createElement('option');
+          option.value = property.enum[i];
+          option.text = property.enum[i];
+          input.appendChild(option);
+        }
+      } else {
+        switch (property.type) {
+          case 'string':
+            input.type = 'text';
+            input.placeholder = 'text';
+            break;
+          case 'integer':
+          case 'number':
+            input.type = 'number';
+            input.placeholder = 'number';
+            break;
+          case 'boolean':
+            input.type = 'checkbox';
+            break;
+          default:
+            input.type = 'text';
+            input.placeholder = 'text';
+            break;
+        }
+      }
+      return input;
+    }
+
+    function generateInputs(schema, parentKey = '', required = false) {
+      const container = document.createElement('div');
+      container.className = 'input-container';
+      if (parentKey.includes('.')) {
+        const level = parentKey.split('.').length;
+        container.style.marginLeft = `${level * 1}rem`;
+      }
+
+      if (schema['$ref']) {
+        const definitionKey = schema['$ref'].replace('#/definitions/', '');
+        const definition = schema.definitions[definitionKey];
+        return generateInputs({...definition, definitions: schema.definitions}, parentKey);
+      }
+
+      // Handle anyOf
+      if (schema.anyOf) {
+        const select = document.createElement('select');
+        select.name = `${parentKey}.type`
+        const subschemas = new Map();
+        for (const acceptableSchema of schema.anyOf) {
+          const option = document.createElement('option');
+          option.value = acceptableSchema.type;
+          option.text = acceptableSchema.type;
+          select.appendChild(option);
+          const subschema = {
+            ...acceptableSchema,
+            definitions: schema.definitions,
+          };
+          subschemas.set(acceptableSchema.type, subschema);
+        }
+        select.onchange = function(event) {
+          const selectedSchema = subschemas.get(event.target.value);
+          const newForm = generateInputs(selectedSchema, parentKey, required);
+          container.replaceChild(newForm, container.lastChild);
+        };
+        container.appendChild(select);
+        schema = schema.anyOf[0];
+      }
+
+      if (schema.type === 'array') {
+        const arrayContainer = document.createElement('div');
+
+        const addButton = document.createElement('button');
+        addButton.textContent = '+ Add';
+        addButton.onclick = function(event) {
+          event.preventDefault();
+          const index = arrayContainer.children.length;
+          const key = (parentKey) ? `${parentKey}.${index}` : `${index}`;
+
+          const itemContainer = document.createElement('div');
+
+          const itemLabel = document.createElement('label');
+          itemLabel.style.display = 'inline-block';
+          itemLabel.textContent = `${parentKey} ${index}`;
+          itemContainer.appendChild(itemLabel);
+
+          const deleteButton = document.createElement('button');
+          deleteButton.style.float = 'right';
+          deleteButton.style.color = '#eee';
+          deleteButton.style.backgroundColor = '#f55';
+          deleteButton.textContent = '× Delete';
+          deleteButton.onclick = function(event) {
+            event.preventDefault();
+            arrayContainer.removeChild(itemContainer);
+          };
+          itemContainer.appendChild(deleteButton);
+
+          const subschema = {
+            ...schema.items,
+            definitions: schema.definitions,
+          };
+          const newForm = generateInputs(subschema, key);
+          itemContainer.appendChild(newForm);
+
+          arrayContainer.appendChild(itemContainer);
+        };
+        container.appendChild(addButton);
+        container.appendChild(arrayContainer);
+      } else if (schema.type === 'object') {
+        for (const propertyName in schema.properties) {
+          const key = parentKey ? `${parentKey}.${propertyName}` : propertyName;
+          const required = schema.required && schema.required.includes(propertyName);
+          const subschema = {
+            ...schema.properties[propertyName],
+            definitions: schema.definitions,
+          };
+
+          const label = document.createElement('label');
+          label.textContent = propertyName;
+          if (required) {
+            label.textContent += ' *';
+          }
+          container.appendChild(label);
+
+          const newForm = generateInputs(subschema, key, required);
+          container.appendChild(newForm);
+        }
+        if (schema.additionalProperties) {
+          // TODO: Handle additionalProperties
+        }
+      } else {
+        const input = createInputElement(parentKey, schema, required);
+        container.appendChild(input);
+      }
+
+      return container;
+    }
+
+    function parseFormValue(value, type) {
+      if (type === 'number') {
+        return parseInt(value);
+      } else if (type === 'checkbox') {
+        return value === 'on';
+      } else {
+        return value;
+      }
+    }
+
+    function generateForm(schema, formId) {
+      const form = document.getElementById(formId);
+
+      form.appendChild(generateInputs(schema));
+
+      // Create and append submit button
+      const submit = document.createElement('input');
+      submit.type = 'submit';
+      submit.value = 'Submit';
+      form.appendChild(submit);
+
+      form.onsubmit = function(event) {
+        event.preventDefault();
+
+        const elements = this.elements;
+        let object ={};
+        for(var i = 0 ; i < elements.length ; i++){
+          var item = elements.item(i);
+          if (item.name){
+            if (item.required && item.value) {
+              object[item.name] = parseFormValue(item.value, item.type);
+            } else if (!item.required && item.value !== "") {
+              object[item.name] = parseFormValue(item.value, item.type);
+            }
+          }
+        }
+
+        object = unflatten(object);
+
+        const prediction_request = new Request("/predict", {
+          method: 'POST',
+          body: JSON.stringify(object),
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        const response = fetch(prediction_request)
+          .then(response => response.json())
+          .then(data => {
+            const result = document.getElementById('result');
+            result.innerHTML = JSON.stringify(data, null, 2);
+          });
+      }
+    }
+
+    function unflatten(input) {
+      const output = {};
+
+      const recursiveAssign = (obj, path, value) => {
+        const key = path.shift();
+        const isIndex = /^\d+$/.test(key);
+        if (path.length === 0) {
+          // check if the key is a number, if it is an array is assumed.
+          if (isIndex) {
+            obj.push(value);
+          } else {
+            obj[key] = value;
+          }
+        } else {
+          // check if the next key in the path is a number, if it is an array is assumed.
+          if (/^\d+$/.test(path[0])) {
+            if (!Array.isArray(obj[key])) {
+              obj[key] = [];
+            }
+          } else {
+            if (!obj[key]) {
+              obj[key] = {};
+            }
+          }
+          recursiveAssign(obj[key], path, value);
+        }
+      }
+
+      for (const key in input) {
+        recursiveAssign(output, key.split('.'), input[key]);
+      }
+
+      return output;
+    }
+
+    window.onload = function() {
+      // fetch JSON schema
+      const schema = fetch('/schema/input')
+        .then(response => response.json())
+        .then(data => {
+          const schema = data;
+          generateForm(schema, 'input-form');
+        });
+    };
+  </script>
+</body>
+</html>

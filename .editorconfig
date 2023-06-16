@@ -11,6 +11,17 @@ trim_trailing_whitespace = true
 [*.{json,jsonnet,libsonnet,yml,yaml}]
 indent_size = 2
 
+[*.{html,xml}]
+indent_size = 2
+
+[*.{js,jsx,ts,tsx}]
+indent_size = 2
+
+[*.{css,scss}]
+indent_size = 2
+
+[*.{md,markdown}]
+
 [*.tsv]
 indent_style = tab
 
