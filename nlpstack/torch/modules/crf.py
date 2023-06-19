@@ -352,28 +352,28 @@ class ConditionalRandomField(torch.nn.Module):
     def forward(
         self,
         inputs: torch.Tensor,
-        tags: torch.Tensor,
+        labels: torch.Tensor,
         mask: Optional[torch.BoolTensor] = None,
     ) -> torch.Tensor:
         """Computes the log likelihood for the given batch of input sequences $(x,y)$
 
         Args:
-            inputs (torch.Tensor): (batch_size, sequence_length, num_labels) tensor of logits for the inputs $x$
-            tags (torch.Tensor): (batch_size, sequence_length) tensor of tags $y$
-            mask (torch.BoolTensor, optional): (batch_size, sequence_length) tensor of masking flags.
+            inputs: (batch_size, sequence_length, num_labels) tensor of logits for the inputs $x$
+            labels: (batch_size, sequence_length) tensor of labels $y$
+            mask: (batch_size, sequence_length) tensor of masking flags.
                 Defaults to None.
 
         Returns:
-            torch.Tensor: (batch_size,) log likelihoods $log P(y|x)$ for each input
+            log likelihoods $log P(y|x)$
         """
         if mask is None:
-            mask = cast(torch.BoolTensor, torch.ones(*tags.size(), dtype=torch.bool, device=inputs.device))
+            mask = cast(torch.BoolTensor, torch.ones(*labels.size(), dtype=torch.bool, device=inputs.device))
         else:
             # The code below fails in weird ways if this isn't a bool tensor, so we make sure.
             mask = cast(torch.BoolTensor, mask.to(torch.bool))
 
         log_denominator = self._input_likelihood(inputs, self.transitions, mask)
-        log_numerator = self._joint_likelihood(inputs, self.transitions, tags, mask)
+        log_numerator = self._joint_likelihood(inputs, self.transitions, labels, mask)
 
         return torch.sum(log_numerator - log_denominator)
 
@@ -391,9 +391,6 @@ class ConditionalRandomField(torch.nn.Module):
         Returns a list of results, of the same size as the batch (one result per batch member)
         Each result is a List of length top_k, containing the top K viterbi decodings
         Each decoding is a tuple  (tag_sequence, viterbi_score)
-
-        For backwards compatibility, if top_k is None, then instead returns a flat list of
-        tag sequences (the top tag sequence for each batch item).
         """
         if mask is None:
             mask = cast(torch.BoolTensor, torch.ones(*logits.shape[:2], dtype=torch.bool, device=logits.device))
@@ -516,6 +513,14 @@ class CrfDecoder(torch.nn.Module):
             constraint = cast(ConstraintType, self.constraint)
             labels = vocab.get_index_to_token(self.label_namespace)
             self.crf.constraint = allowed_transitions(constraint, labels)
+
+    def forward(
+        self,
+        inputs: torch.Tensor,
+        labels: torch.Tensor,
+        mask: Optional[torch.BoolTensor] = None,
+    ) -> torch.Tensor:
+        return cast(torch.Tensor, self.crf(inputs, labels, mask))
 
     def viterbi_decode(
         self,
