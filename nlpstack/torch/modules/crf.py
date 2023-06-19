@@ -3,33 +3,32 @@ This script is based on the original implementation of AllenNLP:
 https://github.com/allenai/allennlp/blob/v2.10.1/allennlp/modules/conditional_random_field/conditional_random_field.py
 """
 
-from typing import Dict, List, Optional, Sequence, Tuple, Union, cast, overload
+from typing import Any, List, Literal, Mapping, Optional, Sequence, Tuple, Union, cast
 
 import torch
 
 import nlpstack.torch.util as util
+from nlpstack.data.vocabulary import Vocabulary
 
-VITERBI_DECODING = Tuple[List[int], float]  # a list of tags, and a viterbi score
+ViterbiDecoding = Tuple[List[int], float]  # a list of tags, and a viterbi score
+ConstraintType = Literal["BIO", "IOB1", "BIOUL", "BMES"]
 
 
-def allowed_transitions(constraint_type: str, labels: Dict[int, str]) -> List[Tuple[int, int]]:
+def allowed_transitions(constraint_type: ConstraintType, labels: Mapping[int, str]) -> List[Tuple[int, int]]:
     """
     Given labels and a constraint type, returns the allowed transitions. It will
     additionally include transitions for the start and end states, which are used
     by the conditional random field.
 
-    # Parameters
+    Args:
+        constraint_type:
+            Indicates which constraint to apply. Current choices are
+            "BIO", "IOB1", "BIOUL", and "BMES".
+        labels:
+            A mapping {label_id -> label}. Most commonly this would be the value from
+            Vocabulary.get_index_to_token_vocabulary()
 
-    constraint_type : `str`, required
-        Indicates which constraint to apply. Current choices are
-        "BIO", "IOB1", "BIOUL", and "BMES".
-    labels : `Dict[int, str]`, required
-        A mapping {label_id -> label}. Most commonly this would be the value from
-        Vocabulary.get_index_to_token_vocabulary()
-
-    # Returns
-
-    `List[Tuple[int, int]]`
+    Returns:
         The allowed transitions (from_label_id, to_label_id).
     """
     num_labels = len(labels)
@@ -37,7 +36,7 @@ def allowed_transitions(constraint_type: str, labels: Dict[int, str]) -> List[Tu
     end_tag = num_labels + 1
     labels_with_boundaries = list(labels.items()) + [(start_tag, "START"), (end_tag, "END")]
 
-    allowed = []
+    allowed: List[Tuple[int, int]] = []
     for from_label_index, from_label in labels_with_boundaries:
         if from_label in ("START", "END"):
             from_tag = from_label
@@ -58,7 +57,7 @@ def allowed_transitions(constraint_type: str, labels: Dict[int, str]) -> List[Tu
 
 
 def is_transition_allowed(
-    constraint_type: str,
+    constraint_type: ConstraintType,
     from_tag: str,
     from_entity: str,
     to_tag: str,
@@ -69,27 +68,24 @@ def is_transition_allowed(
     represent the origin and destination of the transition, return whether
     the transition is allowed under the given constraint type.
 
-    # Parameters
+    Args:
+        constraint_type:
+            Indicates which constraint to apply. Current choices are
+            "BIO", "IOB1", "BIOUL", and "BMES".
+        from_tag:
+            The tag that the transition originates from. For example, if the
+            label is `I-PER`, the `from_tag` is `I`.
+        from_entity:
+            The entity corresponding to the `from_tag`. For example, if the
+            label is `I-PER`, the `from_entity` is `PER`.
+        to_tag:
+            The tag that the transition leads to. For example, if the
+            label is `I-PER`, the `to_tag` is `I`.
+        to_entity:
+            The entity corresponding to the `to_tag`. For example, if the
+            label is `I-PER`, the `to_entity` is `PER`.
 
-    constraint_type : `str`, required
-        Indicates which constraint to apply. Current choices are
-        "BIO", "IOB1", "BIOUL", and "BMES".
-    from_tag : `str`, required
-        The tag that the transition originates from. For example, if the
-        label is `I-PER`, the `from_tag` is `I`.
-    from_entity : `str`, required
-        The entity corresponding to the `from_tag`. For example, if the
-        label is `I-PER`, the `from_entity` is `PER`.
-    to_tag : `str`, required
-        The tag that the transition leads to. For example, if the
-        label is `I-PER`, the `to_tag` is `I`.
-    to_entity : `str`, required
-        The entity corresponding to the `to_tag`. For example, if the
-        label is `I-PER`, the `to_entity` is `PER`.
-
-    # Returns
-
-    `bool`
+    Returns:
         Whether the transition is allowed under the given `constraint_type`.
     """
 
@@ -168,56 +164,60 @@ class ConditionalRandomField(torch.nn.Module):
 
     See, e.g. http://www.cs.columbia.edu/~mcollins/fb.pdf
 
-    # Parameters
-
-    num_tags : `int`, required
-        The number of tags.
-    constraints : `List[Tuple[int, int]]`, optional (default = `None`)
-        An optional list of allowed transitions (from_tag_id, to_tag_id).
-        These are applied to `viterbi_tags()` but do not affect `forward()`.
-        These should be derived from `allowed_transitions` so that the
-        start and end transitions are handled correctly for your tag type.
-    include_start_end_transitions : `bool`, optional (default = `True`)
-        Whether to include the start and end transition parameters.
+    Args:
+        num_labels:
+            The number of labels.
+        constraint:
+            An optional list of allowed transitions (from_tag_id, to_tag_id).
+            These are applied to `viterbi_tags()` but do not affect `forward()`.
+            These should be derived from `allowed_transitions` so that the
+            start and end transitions are handled correctly for your tag type.
+        include_start_end_transitions:
+            Whether to include the start and end transition parameters.
     """
 
     def __init__(
         self,
-        num_tags: int,
-        constraints: Optional[Sequence[Tuple[int, int]]] = None,
+        num_labels: int,
+        constraint: Optional[Sequence[Tuple[int, int]]] = None,
         include_start_end_transitions: bool = True,
     ) -> None:
         super().__init__()
-        self.num_tags = num_tags
+
+        self.num_labels = num_labels
+        self.constraint = constraint
+        self.include_start_end_transitions = include_start_end_transitions
 
         # transitions[i, j] is the logit for transitioning from state i to state j.
-        self.transitions = torch.nn.Parameter(torch.empty(num_tags, num_tags))
+        self.transitions = torch.nn.Parameter(torch.empty(num_labels, num_labels))
 
         # _constraint_mask indicates valid transitions (based on supplied constraints).
-        # Include special start of sequence (num_tags + 1) and end of sequence tags (num_tags + 2)
-        if constraints is None:
-            # All transitions are valid.
-            constraint_mask = torch.full((num_tags + 2, num_tags + 2), 1.0)
-        else:
-            constraint_mask = torch.full((num_tags + 2, num_tags + 2), 0.0)
-            for i, j in constraints:
-                constraint_mask[i, j] = 1.0
-
-        self._constraint_mask = torch.nn.Parameter(constraint_mask, requires_grad=False)
+        self.constraint_mask = torch.nn.Parameter(
+            torch.full((num_labels + 2, num_labels + 2), 1.0), requires_grad=False
+        )
 
         # Also need logits for transitioning from "start" state and to "end" state.
-        self.include_start_end_transitions = include_start_end_transitions
+        self.start_transitions: Optional[torch.nn.Parameter] = None
+        self.end_transitions: Optional[torch.nn.Parameter] = None
         if include_start_end_transitions:
-            self.start_transitions = torch.nn.Parameter(torch.Tensor(num_tags))
-            self.end_transitions = torch.nn.Parameter(torch.Tensor(num_tags))
+            self.start_transitions = torch.nn.Parameter(torch.Tensor(num_labels))
+            self.end_transitions = torch.nn.Parameter(torch.Tensor(num_labels))
 
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
         torch.nn.init.xavier_normal_(self.transitions)
-        if self.include_start_end_transitions:
+        if (
+            self.include_start_end_transitions
+            and self.start_transitions is not None
+            and self.end_transitions is not None
+        ):
             torch.nn.init.normal_(self.start_transitions)
             torch.nn.init.normal_(self.end_transitions)
+        if self.constraint is not None:
+            self.constraint_mask.fill_(0.0)
+            for i, j in self.constraint:
+                self.constraint_mask[i, j] = 1.0
 
     def _input_likelihood(
         self,
@@ -230,37 +230,38 @@ class ConditionalRandomField(torch.nn.Module):
         This is the sum of the likelihoods across all possible state sequences.
 
         Args:
-            logits (torch.Tensor): a (batch_size, sequence_length num_tags) tensor of
+            logits (torch.Tensor): a (batch_size, sequence_length num_labels) tensor of
                 unnormalized log-probabilities
-            transitions (torch.Tensor): a (batch_size, num_tags, num_tags) tensor of transition scores
+            transitions (torch.Tensor): a (batch_size, num_labels, num_labels) tensor of transition scores
             mask (torch.BoolTensor): a (batch_size, sequence_length) tensor of masking flags
 
         Returns:
             torch.Tensor: (batch_size,) denominator term $Z(x)$, per example, for the log-likelihood
         """
-        batch_size, sequence_length, num_tags = logits.size()
+        batch_size, sequence_length, num_labels = logits.size()
 
         # Transpose batch size and sequence dimensions
         mask = cast(torch.BoolTensor, mask.transpose(0, 1).contiguous())
         logits = logits.transpose(0, 1).contiguous()
 
-        # Initial alpha is the (batch_size, num_tags) tensor of likelihoods combining the
+        # Initial alpha is the (batch_size, num_labels) tensor of likelihoods combining the
         # transitions to the initial states and the logits for the first timestep.
         if self.include_start_end_transitions:
-            alpha = self.start_transitions.view(1, num_tags) + logits[0]
+            assert self.start_transitions is not None
+            alpha = self.start_transitions.view(1, num_labels) + logits[0]
         else:
             alpha = logits[0]
 
         # For each i we compute logits for the transitions from timestep i-1 to timestep i.
-        # We do so in a (batch_size, num_tags, num_tags) tensor where the axes are
+        # We do so in a (batch_size, num_labels, num_labels) tensor where the axes are
         # (instance, current_tag, next_tag)
         for i in range(1, sequence_length):
             # The emit scores are for time i ("next_tag") so we broadcast along the current_tag axis.
-            emit_scores = logits[i].view(batch_size, 1, num_tags)
+            emit_scores = logits[i].view(batch_size, 1, num_labels)
             # Transition scores are (current_tag, next_tag) so we broadcast along the instance axis.
-            transition_scores = transitions.view(1, num_tags, num_tags)
+            transition_scores = transitions.view(1, num_labels, num_labels)
             # Alpha is for the current_tag, so we broadcast along the next_tag axis.
-            broadcast_alpha = alpha.view(batch_size, num_tags, 1)
+            broadcast_alpha = alpha.view(batch_size, num_labels, 1)
 
             # Add all the scores together and logexp over the current_tag axis.
             inner = broadcast_alpha + emit_scores + transition_scores
@@ -271,11 +272,12 @@ class ConditionalRandomField(torch.nn.Module):
 
         # Every sequence needs to end with a transition to the stop_tag.
         if self.include_start_end_transitions:
-            stops = alpha + self.end_transitions.view(1, num_tags)
+            assert self.end_transitions is not None
+            stops = alpha + self.end_transitions.view(1, num_labels)
         else:
             stops = alpha
 
-        # Finally we log_sum_exp along the num_tags dim, result is (batch_size,)
+        # Finally we log_sum_exp along the num_labels dim, result is (batch_size,)
         return util.logsumexp(stops)
 
     def _joint_likelihood(
@@ -288,9 +290,9 @@ class ConditionalRandomField(torch.nn.Module):
         """Computes the numerator term for the log-likelihood, which is just score(inputs, tags)
 
         Args:
-            logits (torch.Tensor): a (batch_size, sequence_length num_tags) tensor of unnormalized
+            logits (torch.Tensor): a (batch_size, sequence_length num_labels) tensor of unnormalized
                 log-probabilities
-            transitions (torch.Tensor): a (batch_size, num_tags, num_tags) tensor of transition scores
+            transitions (torch.Tensor): a (batch_size, num_labels, num_labels) tensor of transition scores
             tags (torch.Tensor): output tag sequences (batch_size, sequence_length) $y$ for each input sequence
             mask (torch.BoolTensor): a (batch_size, sequence_length) tensor of masking flags
 
@@ -306,6 +308,7 @@ class ConditionalRandomField(torch.nn.Module):
 
         # Start with the transition scores from start_tag to the first tag in each input
         if self.include_start_end_transitions:
+            assert self.start_transitions is not None
             score = self.start_transitions.index_select(0, tags[0])
         else:
             score = 0.0  # type: ignore[assignment]
@@ -332,12 +335,13 @@ class ConditionalRandomField(torch.nn.Module):
 
         # Compute score of transitioning to `stop_tag` from each "last tag".
         if self.include_start_end_transitions:
+            assert self.end_transitions is not None
             last_transition_score = self.end_transitions.index_select(0, last_tags)
         else:
             last_transition_score = 0.0  # type: ignore[assignment]
 
         # Add the last input if it's not masked.
-        last_inputs = logits[-1]  # (batch_size, num_tags)
+        last_inputs = logits[-1]  # (batch_size, num_labels)
         last_input_score = last_inputs.gather(1, last_tags.view(-1, 1))  # (batch_size, 1)
         last_input_score = last_input_score.squeeze()  # (batch_size,)
 
@@ -354,7 +358,7 @@ class ConditionalRandomField(torch.nn.Module):
         """Computes the log likelihood for the given batch of input sequences $(x,y)$
 
         Args:
-            inputs (torch.Tensor): (batch_size, sequence_length, num_tags) tensor of logits for the inputs $x$
+            inputs (torch.Tensor): (batch_size, sequence_length, num_labels) tensor of logits for the inputs $x$
             tags (torch.Tensor): (batch_size, sequence_length) tensor of tags $y$
             mask (torch.BoolTensor, optional): (batch_size, sequence_length) tensor of masking flags.
                 Defaults to None.
@@ -373,33 +377,13 @@ class ConditionalRandomField(torch.nn.Module):
 
         return torch.sum(log_numerator - log_denominator)
 
-    @overload
-    def viterbi_tags(
-        self,
-        logits: torch.Tensor,
-        mask: Optional[torch.BoolTensor] = ...,
-        *,
-        top_k: int,
-    ) -> List[VITERBI_DECODING]:
-        ...
-
-    @overload
-    def viterbi_tags(
-        self,
-        logits: torch.Tensor,
-        mask: Optional[torch.BoolTensor] = ...,
-        *,
-        top_k: None = ...,
-    ) -> List[List[VITERBI_DECODING]]:
-        ...
-
-    def viterbi_tags(
+    def viterbi_decode(
         self,
         logits: torch.Tensor,
         mask: Optional[torch.BoolTensor] = None,
         *,
-        top_k: Optional[int] = None,
-    ) -> Union[List[VITERBI_DECODING], List[List[VITERBI_DECODING]]]:
+        top_k: int = 1,
+    ) -> List[List[ViterbiDecoding]]:
         """
         Uses viterbi algorithm to find most likely tags for the given inputs.
         If constraints are applied, disallows all other transitions.
@@ -414,42 +398,37 @@ class ConditionalRandomField(torch.nn.Module):
         if mask is None:
             mask = cast(torch.BoolTensor, torch.ones(*logits.shape[:2], dtype=torch.bool, device=logits.device))
 
-        if top_k is None:
-            top_k = 1
-            flatten_output = True
-        else:
-            flatten_output = False
-
-        _, max_seq_length, num_tags = logits.size()
+        _, max_seq_length, num_labels = logits.size()
 
         # Get the tensors out of the variables
         logits, mask = logits.data, mask.data  # type: ignore[assignment]
 
         # Augment transitions matrix with start and end transitions
-        start_tag = num_tags
-        end_tag = num_tags + 1
-        transitions = torch.full((num_tags + 2, num_tags + 2), -10000.0, device=logits.device)
+        start_tag = num_labels
+        end_tag = num_labels + 1
+        transitions = torch.full((num_labels + 2, num_labels + 2), -10000.0, device=logits.device)
 
         # Apply transition constraints
-        constrained_transitions = self.transitions * self._constraint_mask[:num_tags, :num_tags] + -10000.0 * (
-            1 - self._constraint_mask[:num_tags, :num_tags]
+        constrained_transitions = self.transitions * self.constraint_mask[:num_labels, :num_labels] + -10000.0 * (
+            1 - self.constraint_mask[:num_labels, :num_labels]
         )
-        transitions[:num_tags, :num_tags] = constrained_transitions.data
+        transitions[:num_labels, :num_labels] = constrained_transitions.data
 
         if self.include_start_end_transitions:
-            transitions[start_tag, :num_tags] = self.start_transitions.detach() * self._constraint_mask[
-                start_tag, :num_tags
-            ].data + -10000.0 * (1 - self._constraint_mask[start_tag, :num_tags].detach())
-            transitions[:num_tags, end_tag] = self.end_transitions.detach() * self._constraint_mask[
-                :num_tags, end_tag
-            ].data + -10000.0 * (1 - self._constraint_mask[:num_tags, end_tag].detach())
+            assert self.start_transitions is not None and self.end_transitions is not None
+            transitions[start_tag, :num_labels] = self.start_transitions.detach() * self.constraint_mask[
+                start_tag, :num_labels
+            ].data + -10000.0 * (1 - self.constraint_mask[start_tag, :num_labels].detach())
+            transitions[:num_labels, end_tag] = self.end_transitions.detach() * self.constraint_mask[
+                :num_labels, end_tag
+            ].data + -10000.0 * (1 - self.constraint_mask[:num_labels, end_tag].detach())
         else:
-            transitions[start_tag, :num_tags] = -10000.0 * (1 - self._constraint_mask[start_tag, :num_tags].detach())
-            transitions[:num_tags, end_tag] = -10000.0 * (1 - self._constraint_mask[:num_tags, end_tag].detach())
+            transitions[start_tag, :num_labels] = -10000.0 * (1 - self.constraint_mask[start_tag, :num_labels].detach())
+            transitions[:num_labels, end_tag] = -10000.0 * (1 - self.constraint_mask[:num_labels, end_tag].detach())
 
-        best_paths: List[List[VITERBI_DECODING]] = []
+        best_paths: List[List[ViterbiDecoding]] = []
         # Pad the max sequence length by 2 to account for start_tag + end_tag.
-        tag_sequence = torch.empty(max_seq_length + 2, num_tags + 2, device=logits.device)
+        tag_sequence = torch.empty(max_seq_length + 2, num_labels + 2, device=logits.device)
 
         for prediction, prediction_mask in zip(logits, mask):
             mask_indices = prediction_mask.nonzero(as_tuple=False).squeeze()
@@ -461,7 +440,7 @@ class ConditionalRandomField(torch.nn.Module):
             # At timestep 0 we must have the START_TAG
             tag_sequence[0, start_tag] = 0.0
             # At steps 1, ..., sequence_length we just use the incoming prediction
-            tag_sequence[1 : (sequence_length + 1), :num_tags] = masked_prediction
+            tag_sequence[1 : (sequence_length + 1), :num_labels] = masked_prediction
             # And at the last timestep we must have the END_TAG
             tag_sequence[sequence_length + 1, end_tag] = 0.0
 
@@ -478,7 +457,71 @@ class ConditionalRandomField(torch.nn.Module):
                 top_k_paths.append((viterbi_path, viterbi_score.item()))
             best_paths.append(top_k_paths)
 
-        if flatten_output:
-            return [top_k_paths[0] for top_k_paths in best_paths]
-
         return best_paths
+
+
+class LazyConditionalRandomField(torch.nn.modules.lazy.LazyModuleMixin, ConditionalRandomField):
+    cls_to_become = ConditionalRandomField  # type: ignore[assignment]
+    transitions: torch.nn.UninitializedParameter  # type: ignore[assignment]
+    start_transitions: Optional[torch.nn.UninitializedParameter]  # type: ignore[assignment]
+    end_transitions: Optional[torch.nn.UninitializedParameter]  # type: ignore[assignment]
+    constraint_mask: torch.nn.UninitializedParameter  # type: ignore[assignment]
+
+    def __init__(
+        self,
+        constraint: Optional[Sequence[Tuple[int, int]]] = None,
+        include_start_end_transitions: bool = True,
+    ) -> None:
+        super().__init__(0, constraint, include_start_end_transitions)
+
+        self.transitions = torch.nn.UninitializedParameter()
+        self.constraint_mask = torch.nn.UninitializedParameter(requires_grad=False)
+        if include_start_end_transitions:
+            self.start_transitions = torch.nn.UninitializedParameter()
+            self.end_transitions = torch.nn.UninitializedParameter()
+
+    def initialize_parameters(
+        self,
+        inputs: torch.Tensor,
+        tags: torch.Tensor,
+        mask: Optional[torch.BoolTensor] = None,
+    ) -> None:
+        if self.has_uninitialized_params():
+            num_labels = inputs.size(-1)
+            self.num_labels = num_labels
+            self.transitions.materialize((num_labels, num_labels))
+            if self.start_transitions is not None:
+                self.start_transitions.materialize((num_labels,))
+            if self.end_transitions is not None:
+                self.end_transitions.materialize((num_labels,))
+            self.constraint_mask.materialize((num_labels + 2, num_labels + 2))
+            self.reset_parameters()
+
+
+class CrfDecoder(torch.nn.Module):
+    def __init__(
+        self,
+        constraint: Optional[Union[ConstraintType, Sequence[Tuple[int, int]]]] = None,
+        include_start_end_transitions: bool = True,
+        label_namespace: str = "labels",
+    ) -> None:
+        super().__init__()
+
+        self.constraint = constraint
+        self.crf = LazyConditionalRandomField(None, include_start_end_transitions)
+        self.label_namespace = label_namespace
+
+    def setup(self, *args: Any, vocab: Vocabulary, **kwargs: Any) -> None:
+        if isinstance(self.constraint, str):
+            constraint = cast(ConstraintType, self.constraint)
+            labels = vocab.get_index_to_token(self.label_namespace)
+            self.crf.constraint = allowed_transitions(constraint, labels)
+
+    def viterbi_decode(
+        self,
+        logits: torch.Tensor,
+        mask: Optional[torch.BoolTensor] = None,
+        *,
+        top_k: int = 1,
+    ) -> List[List[ViterbiDecoding]]:
+        return self.crf.viterbi_decode(logits, mask, top_k=top_k)
