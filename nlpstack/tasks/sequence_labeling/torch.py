@@ -21,7 +21,7 @@ class SequenceLabelerOutput:
     loss: Optional[torch.FloatTensor] = None
 
 
-class TorchSequenceLabeler(TorchModel):
+class TorchSequenceLabeler(TorchModel[SequenceLabelingInference]):
     def __init__(
         self,
         embedder: TextEmbedder,
