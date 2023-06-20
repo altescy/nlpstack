@@ -1,8 +1,9 @@
 from logging import getLogger
-from typing import Dict, Iterable, Iterator, Mapping, Optional, Sequence
+from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
 import numpy
 
+from nlpstack.common import ProgressBar
 from nlpstack.data import DataModule, Dataset, Instance, Vocabulary
 from nlpstack.data.fields import Field, LabelField, ListField, MetadataField, TextField
 from nlpstack.data.token_indexers import SingleIdTokenIndexer, Token, TokenIndexer
@@ -117,3 +118,18 @@ class SequenceLabelingDataModule(
             ]
             metadata = inference.metadata[batch_index] if inference.metadata is not None else None
             yield SequenceLabelingPrediction(top_labels=top_labels, metadata=metadata)
+
+    def read_dataset(
+        self,
+        dataset: Iterable[SequenceLabelingExample],
+        is_training: bool = False,
+        **kwargs: Any,
+    ) -> Iterator[Instance]:
+        if is_training:
+            logger.info("Tokenizing dataset and building vocabulary...")
+            dataset = self._tokenize(ProgressBar(dataset, desc="Tokenizing dataset"))
+            self._build_vocab(dataset)
+
+        logger.info("Building instances...")
+        for example in ProgressBar(dataset, desc="Building instances"):
+            yield self.build_instance(example)
