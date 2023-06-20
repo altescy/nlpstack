@@ -41,7 +41,7 @@ class TorchSequenceLabeler(TorchModel):
         self._classifier = LazyLinearOutput(encoder.get_output_dim())
         self._dropout = torch.nn.Dropout(dropout) if dropout else None
         self._top_k = top_k
-        self._loss = torch.nn.CrossEntropyLoss()
+        self._loss = torch.nn.CrossEntropyLoss(reduction="sum")
         self._label_namespace = label_namespace
 
     def setup(
@@ -50,6 +50,7 @@ class TorchSequenceLabeler(TorchModel):
         datamodule: SequenceLabelingDataModule,
         **kwargs: Any,
     ) -> None:
+        super().setup(*args, datamodule=datamodule, vocab=datamodule.vocab, **kwargs)
         num_labels = datamodule.vocab.get_vocab_size(self._label_namespace)
         self._classifier.initialize_parameters(out_features=num_labels)
         if self._decoder is not None:
@@ -83,10 +84,13 @@ class TorchSequenceLabeler(TorchModel):
             output.inference.decodings = self._decoder.viterbi_decode(logits, mask, top_k=self._top_k)
 
         if labels is not None:
+            inference.labels = labels.detach().cpu().numpy()
             if self._decoder is not None:
                 log_likelihood = self._decoder(logits, labels, mask)
                 output.loss = -log_likelihood
             else:
-                output.loss = self._loss(logits, labels.long())
+                flattened_logits = logits.view(-1, logits.size(-1))
+                flattened_labels = labels.masked_fill(~mask, -100).long().view(-1)
+                output.loss = self._loss(flattened_logits, flattened_labels) / logits.size(0)
 
         return output

@@ -20,6 +20,7 @@ class SequenceLabelingInference:
     probs: numpy.ndarray
     mask: Optional[numpy.ndarray] = None
     decodings: Optional[Sequence[Sequence[Decoding]]] = None
+    labels: Optional[numpy.ndarray] = None
     metadata: Optional[Sequence[Mapping[str, Any]]] = None
 
 
