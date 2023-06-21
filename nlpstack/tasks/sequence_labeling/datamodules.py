@@ -93,12 +93,13 @@ class SequenceLabelingDataModule(
                 padding_value=-1,
             )
 
-        if metadata is not None:
-            fields["metadata"] = MetadataField(metadata)
+        fields["metadata"] = MetadataField({"metadata": metadata, "raw_tokens": [token.surface for token in text]})
 
         return Instance(**fields)
 
     def build_predictions(self, inference: SequenceLabelingInference) -> Iterator[SequenceLabelingPrediction]:
+        assert inference.metadata is not None, "Inference must have metadata."
+
         top_label_indices: Sequence[Sequence[Sequence[int]]]
         if inference.decodings is None:
             mask = inference.mask if inference.mask is not None else numpy.ones(inference.probs.shape[:-1], dtype=bool)
@@ -116,8 +117,9 @@ class SequenceLabelingDataModule(
                 [self._vocab.get_token_by_index(self._label_namespace, label_index) for label_index in label_indices]
                 for label_indices in top_label_indices[batch_index]
             ]
-            metadata = inference.metadata[batch_index] if inference.metadata is not None else None
-            yield SequenceLabelingPrediction(top_labels=top_labels, metadata=metadata)
+            metadata = inference.metadata[batch_index]["metadata"]
+            tokens = inference.metadata[batch_index]["raw_tokens"]
+            yield SequenceLabelingPrediction(tokens=tokens, top_labels=top_labels, metadata=metadata)
 
     def read_dataset(
         self,

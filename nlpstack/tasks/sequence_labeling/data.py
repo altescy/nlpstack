@@ -26,6 +26,7 @@ class SequenceLabelingInference:
 
 @dataclasses.dataclass
 class SequenceLabelingPrediction:
+    tokens: Sequence[str]
     top_labels: Sequence[Sequence[str]]
     metadata: Optional[Mapping[str, Any]] = None
 
