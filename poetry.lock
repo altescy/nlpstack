@@ -1311,13 +1311,13 @@ files = [
 
 [[package]]
 name = "minato"
-version = "0.11.1"
+version = "0.11.2"
 description = "A Unified File I/O Library for Python"
 optional = false
 python-versions = ">=3.8,<4.0"
 files = [
-    {file = "minato-0.11.1-py3-none-any.whl", hash = "sha256:2864d6f0eebd9a068d213c97e9498cd3564b7fdd80cda53e7e4d77bf47e9c287"},
-    {file = "minato-0.11.1.tar.gz", hash = "sha256:03c2961744e2e28a3f83e945ddfb05cf877596c945c7c03e8ecec55e9fbb03db"},
+    {file = "minato-0.11.2-py3-none-any.whl", hash = "sha256:34b7469ae6eba36e47a01ca29fcf71ef2675f05160427d013af40b0acf64b128"},
+    {file = "minato-0.11.2.tar.gz", hash = "sha256:9c35480dc659b63faf671fa66f7325c1dc051b5316a1d1933789919e0d99b99f"},
 ]
 
 [package.extras]
@@ -3789,4 +3789,4 @@ all = ["mlflow", "spacy", "transformers"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8,<4.0"
-content-hash = "727fa27c38b91013fcdb5c853777c8785b013cf8d07ce84c8fe14e6741bf7c68"
+content-hash = "65aa0a7fe923dd801bb3ecaac42051eafab70d9f14a3c3410c8a54f5ca99f482"
