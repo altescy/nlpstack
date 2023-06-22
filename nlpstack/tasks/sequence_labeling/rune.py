@@ -91,7 +91,7 @@ class BasicSequenceLabeler(
             )
 
         if sequence_labeler is None:
-            classifier = TorchSequenceLabeler(
+            sequence_labeler = TorchSequenceLabeler(
                 embedder=TextEmbedder({"tokens": Embedding(64)}),
                 encoder=LstmSeq2SeqEncoder(64, 32, bidirectional=True),
             )
@@ -116,7 +116,7 @@ class BasicSequenceLabeler(
 
         super().__init__(
             datamodule=datamodule,
-            model=classifier,
+            model=sequence_labeler,
             trainer=trainer,
             metric=metric,
             **kwargs,

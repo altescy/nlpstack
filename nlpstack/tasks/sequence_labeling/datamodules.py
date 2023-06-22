@@ -90,7 +90,6 @@ class SequenceLabelingDataModule(
                 raise ValueError(f"Length of labels must be equal to length of text: {example}")
             fields["labels"] = ListField(
                 [LabelField(label, vocab=self._vocab[self._label_namespace]) for label in labels],
-                padding_value=-1,
             )
 
         fields["metadata"] = MetadataField({"metadata": metadata, "raw_tokens": [token.surface for token in text]})

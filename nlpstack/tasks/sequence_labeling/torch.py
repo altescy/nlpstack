@@ -33,6 +33,8 @@ class TorchSequenceLabeler(TorchModel[SequenceLabelingInference]):
     ) -> None:
         if decoder is None and top_k is not None:
             raise ValueError("top_k is only supported when decoder is given.")
+        if decoder is not None and top_k is None:
+            top_k = 1
 
         super().__init__()
         self._embedder = embedder
@@ -80,9 +82,6 @@ class TorchSequenceLabeler(TorchModel[SequenceLabelingInference]):
         )
         output = SequenceLabelerOutput(inference, logits)
 
-        if self._decoder is not None and self._top_k is not None:
-            output.inference.decodings = self._decoder.viterbi_decode(logits, mask, top_k=self._top_k)
-
         if labels is not None:
             inference.labels = labels.detach().cpu().numpy()
             if self._decoder is not None:
@@ -92,5 +91,8 @@ class TorchSequenceLabeler(TorchModel[SequenceLabelingInference]):
                 flattened_logits = logits.view(-1, logits.size(-1))
                 flattened_labels = labels.masked_fill(~mask, -100).long().view(-1)
                 output.loss = self._loss(flattened_logits, flattened_labels) / logits.size(0)
+
+        if self._decoder is not None and self._top_k is not None:
+            output.inference.decodings = self._decoder.viterbi_decode(logits, mask, top_k=self._top_k)
 
         return output

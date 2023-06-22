@@ -322,7 +322,7 @@ class ConditionalRandomField(torch.nn.Module):
             transition_score = transitions[current_tag.view(-1), next_tag.view(-1)]
 
             # The score for using current_tag
-            emit_score = logits[i].gather(1, current_tag.view(batch_size, 1)).squeeze(1)
+            emit_score = logits[i].gather(1, current_tag.view(batch_size, 1).long()).squeeze(1)
 
             # Include transition score if next element is unmasked,
             # input_score if this element is unmasked.
@@ -331,7 +331,7 @@ class ConditionalRandomField(torch.nn.Module):
         # Transition from last state to "stop" state. To start with, we need to find the last tag
         # for each instance.
         last_tag_index = mask.sum(0).long() - 1
-        last_tags = tags.gather(0, last_tag_index.view(1, batch_size)).squeeze(0)
+        last_tags = tags.gather(0, last_tag_index.view(1, batch_size).long()).squeeze(0)
 
         # Compute score of transitioning to `stop_tag` from each "last tag".
         if self.include_start_end_transitions:
@@ -342,7 +342,7 @@ class ConditionalRandomField(torch.nn.Module):
 
         # Add the last input if it's not masked.
         last_inputs = logits[-1]  # (batch_size, num_labels)
-        last_input_score = last_inputs.gather(1, last_tags.view(-1, 1))  # (batch_size, 1)
+        last_input_score = last_inputs.gather(1, last_tags.view(-1, 1).long())  # (batch_size, 1)
         last_input_score = last_input_score.squeeze()  # (batch_size,)
 
         score = score + last_transition_score + last_input_score * mask[-1]

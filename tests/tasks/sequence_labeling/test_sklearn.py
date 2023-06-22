@@ -1,4 +1,9 @@
 from nlpstack.tasks.sequence_labeling.sklearn import SklearnBasicSequenceLabeler
+from nlpstack.tasks.sequence_labeling.torch import TorchSequenceLabeler
+from nlpstack.torch.modules.crf import CrfDecoder
+from nlpstack.torch.modules.seq2seq_encoders import LstmSeq2SeqEncoder
+from nlpstack.torch.modules.text_embedders import TextEmbedder
+from nlpstack.torch.modules.token_embedders import Embedding
 
 
 def test_basic_sequence_labeler() -> None:
@@ -11,7 +16,15 @@ def test_basic_sequence_labeler() -> None:
         ["B-LOC", "I-LOC", "O", "O", "O", "O", "O", "B-LOC", "I-LOC", "O"],
     ]
 
-    sequence_labeler = SklearnBasicSequenceLabeler(max_epochs=16, learning_rate=1e-2)
+    sequence_labeler = SklearnBasicSequenceLabeler(
+        max_epochs=30,
+        learning_rate=1e-2,
+        sequence_labeler=TorchSequenceLabeler(
+            embedder=TextEmbedder({"tokens": Embedding(32)}),
+            encoder=LstmSeq2SeqEncoder(32, 16, 1, bidirectional=True),
+            decoder=CrfDecoder("BIO"),
+        ),
+    )
     sequence_labeler.fit(X, y)
 
     predictions = sequence_labeler.predict(X)

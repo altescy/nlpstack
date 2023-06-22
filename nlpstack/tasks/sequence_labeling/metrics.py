@@ -27,7 +27,8 @@ class TokenBasedAccuracy(SequenceLabelingMetric):
         if inference.decodings is None:
             pred = inference.probs.argmax(axis=-1)[mask]
         else:
-            pred = numpy.array([label_index for decodings in inference.decodings for label_index in decodings[0]])
+            print([label_index for decodings in inference.decodings for label_index in decodings[0]])
+            pred = numpy.array([label_index for decodings in inference.decodings for label_index in decodings[0][0]])
 
         gold = inference.labels[mask]
 
