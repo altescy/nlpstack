@@ -1,3 +1,4 @@
+from nlpstack.tasks.sequence_labeling.metrics import SpanBasedF1, TokenBasedAccuracy
 from nlpstack.tasks.sequence_labeling.sklearn import SklearnBasicSequenceLabeler
 from nlpstack.tasks.sequence_labeling.torch import TorchSequenceLabeler
 from nlpstack.torch.modules.crf import CrfDecoder
@@ -24,6 +25,7 @@ def test_basic_sequence_labeler() -> None:
             encoder=LstmSeq2SeqEncoder(32, 16, 1, bidirectional=True),
             decoder=CrfDecoder("BIO"),
         ),
+        metric=[SpanBasedF1(), TokenBasedAccuracy()],
     )
     sequence_labeler.fit(X, y)
 
@@ -32,3 +34,18 @@ def test_basic_sequence_labeler() -> None:
 
     score = sequence_labeler.score(X, y)
     assert score == 1.0
+
+    metrics = sequence_labeler.compute_metrics(X, y)
+    assert set(metrics.keys()) == {
+        "token_accuracy",
+        "precision_overall",
+        "recall_overall",
+        "f1_overall",
+        "precision_PER",
+        "recall_PER",
+        "f1_PER",
+        "precision_LOC",
+        "recall_LOC",
+        "f1_LOC",
+    }
+    assert all(abs(value - 1.0) < 1e-5 for value in metrics.values()), metrics

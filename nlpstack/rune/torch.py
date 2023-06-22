@@ -88,6 +88,7 @@ class RuneForTorch(
 
         logger.info("Setup model...")
         self.model.setup(datamodule=self.datamodule, **self.kwargs, **kwargs)
+        self.metric.setup(datamodule=self.datamodule, **self.kwargs, **kwargs)
 
         logger.info("Start training...")
         self.trainer.train(
