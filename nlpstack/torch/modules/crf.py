@@ -469,7 +469,7 @@ class LazyConditionalRandomField(torch.nn.modules.lazy.LazyModuleMixin, Conditio
         constraint: Optional[Sequence[Tuple[int, int]]] = None,
         include_start_end_transitions: bool = True,
     ) -> None:
-        super().__init__(0, constraint, include_start_end_transitions)
+        super().__init__(1, constraint, include_start_end_transitions)
 
         self.transitions = torch.nn.UninitializedParameter()
         self.constraint_mask = torch.nn.UninitializedParameter(requires_grad=False)
