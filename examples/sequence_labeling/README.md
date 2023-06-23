@@ -1,6 +1,6 @@
 # Sequence Labeling Example
 
-```python
+```shell
 export TRAIN_DATASET_FILENAME=path/to/conll2003/train.txt
 export VALID_DATASET_FILENAME=path/to/conll2003/valid.txt
 
