@@ -102,7 +102,6 @@ class SpanBasedF1(SequenceLabelingMetric):
             raise ValueError(f"Unexpected label encoding scheme '{self._label_encoding}'")
 
         for pred, gold in zip(preds, golds):
-            print(pred, gold)
             pred_spans = tags_to_spans_function(pred, self._ignore_classes)
             gold_spans = tags_to_spans_function(gold, self._ignore_classes)
 
