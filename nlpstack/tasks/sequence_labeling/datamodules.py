@@ -92,7 +92,15 @@ class SequenceLabelingDataModule(
                 [LabelField(label, vocab=self._vocab[self._label_namespace]) for label in labels],
             )
 
-        fields["metadata"] = MetadataField({"metadata": metadata, "raw_tokens": [token.surface for token in text]})
+        fields["metadata"] = MetadataField(
+            {
+                **(metadata or {}),
+                "__nlpstack_metadata__": {
+                    "metadata_is_none": metadata is None,
+                    "raw_tokens": [token.surface for token in text],
+                },
+            }
+        )
 
         return Instance(**fields)
 
@@ -116,8 +124,10 @@ class SequenceLabelingDataModule(
                 [self._vocab.get_token_by_index(self._label_namespace, label_index) for label_index in label_indices]
                 for label_indices in top_label_indices[batch_index]
             ]
-            metadata = inference.metadata[batch_index]["metadata"]
-            tokens = inference.metadata[batch_index]["raw_tokens"]
+            _metadata = dict(inference.metadata[batch_index])
+            _nlpstack_metadata = _metadata.pop("__nlpstack_metadata__")
+            tokens = _nlpstack_metadata["raw_tokens"]
+            metadata = None if _nlpstack_metadata["metadata_is_none"] else _metadata
             yield SequenceLabelingPrediction(tokens=tokens, top_labels=top_labels, metadata=metadata)
 
     def read_dataset(
