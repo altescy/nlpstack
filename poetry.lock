@@ -1311,18 +1311,19 @@ files = [
 
 [[package]]
 name = "minato"
-version = "0.11.2"
+version = "0.12.0"
 description = "A Unified File I/O Library for Python"
 optional = false
 python-versions = ">=3.8,<4.0"
 files = [
-    {file = "minato-0.11.2-py3-none-any.whl", hash = "sha256:34b7469ae6eba36e47a01ca29fcf71ef2675f05160427d013af40b0acf64b128"},
-    {file = "minato-0.11.2.tar.gz", hash = "sha256:9c35480dc659b63faf671fa66f7325c1dc051b5316a1d1933789919e0d99b99f"},
+    {file = "minato-0.12.0-py3-none-any.whl", hash = "sha256:a405b0a75047105827a2759bce87e8f305a47b6bba28f9589b992d1c61142455"},
+    {file = "minato-0.12.0.tar.gz", hash = "sha256:9a4536f0321f0026d7b3dfb9d8d67b50eabc854c819d920e2788c74972651907"},
 ]
 
 [package.extras]
-all = ["boto3 (>=1.9.201,<2.0)", "google-cloud-storage (>=2.4,<3.0)"]
+all = ["boto3 (>=1.9.201,<2.0)", "google-cloud-storage (>=2.4,<3.0)", "huggingface-hub (>=0.8.1,<0.16.0)"]
 gcs = ["google-cloud-storage (>=2.4,<3.0)"]
+huggingface = ["huggingface-hub (>=0.8.1,<0.16.0)"]
 s3 = ["boto3 (>=1.9.201,<2.0)"]
 
 [[package]]
@@ -3789,4 +3790,4 @@ all = ["mlflow", "spacy", "transformers"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8,<4.0"
-content-hash = "65aa0a7fe923dd801bb3ecaac42051eafab70d9f14a3c3410c8a54f5ca99f482"
+content-hash = "42eefc4e9ca7b5a01f7dc893389e74544888258166e1a57c24f31617899292a4"
