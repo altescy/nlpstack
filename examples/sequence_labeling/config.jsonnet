@@ -21,7 +21,7 @@ local label_encoding = 'BIOUL';
         bidirectional: true,
       },
       decoder: {
-        constraint: 'BIOUL',
+        constraint: label_encoding,
       },
       dropout: 0.3,
     },
