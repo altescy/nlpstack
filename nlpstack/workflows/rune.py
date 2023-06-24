@@ -6,8 +6,8 @@ from typing import Callable, Generic, Iterable, Iterator, Optional, Sequence, Ty
 
 import colt
 import minato
-from rjsonnet import evaluate_file
 
+from nlpstack.common import load_jsonnet
 from nlpstack.data import Dataset
 from nlpstack.rune import Rune
 
@@ -32,7 +32,7 @@ class RuneConfig(Generic[Example, Prediction]):
 
     @classmethod
     def from_file(cls, filename: str) -> "RuneConfig":
-        config = json.loads(evaluate_file(filename))
+        config = load_jsonnet(minato.cached_path(filename))
         return coltbuilder(config, RuneConfig)
 
 

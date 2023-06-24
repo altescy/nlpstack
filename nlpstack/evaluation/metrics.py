@@ -1,9 +1,12 @@
-from typing import Dict, Generic, Mapping, Sequence, Set, TypeVar
+from typing import Any, Dict, Generic, Mapping, Sequence, Set, TypeVar
 
 Inference = TypeVar("Inference")
 
 
 class Metric(Generic[Inference]):
+    def setup(self, *args: Any, **kwargs: Any) -> None:
+        pass
+
     def update(self, inference: Inference) -> None:
         raise NotImplementedError
 
@@ -28,6 +31,10 @@ class MultiMetrics(Metric[Inference]):
             if names_ & names:
                 raise ValueError(f"metric name conflict: {names_ & names}")
             names |= names_
+
+    def setup(self, *args: Any, **kwargs: Any) -> None:
+        for metric in self.metrics:
+            metric.setup(*args, **kwargs)
 
     def update(self, inference: Inference) -> None:
         for metric in self.metrics:
