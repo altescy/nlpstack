@@ -1,7 +1,9 @@
 import dataclasses
 import json
-import pickle
+import shutil
+import tempfile
 from logging import getLogger
+from pathlib import Path
 from typing import Callable, Generic, Iterable, Iterator, Optional, Sequence, TypeVar
 
 import colt
@@ -9,7 +11,7 @@ import minato
 
 from nlpstack.common import load_jsonnet
 from nlpstack.data import Dataset
-from nlpstack.rune import Rune
+from nlpstack.rune import Rune, RuneArchive
 
 from .workflow import Workflow
 
@@ -30,11 +32,6 @@ class RuneConfig(Generic[Example, Prediction]):
     valid_dataset_filename: Optional[str] = None
     test_dataset_filename: Optional[str] = None
 
-    @classmethod
-    def from_file(cls, filename: str) -> "RuneConfig":
-        config = load_jsonnet(minato.cached_path(filename))
-        return coltbuilder(config, RuneConfig)
-
 
 @Workflow.register("rune")
 class RuneWorkflow(Workflow):
@@ -46,7 +43,8 @@ class RuneWorkflow(Workflow):
         """train a model and save archive"""
 
         logger.info("Loading config from %s", config_filename)
-        rune_config = RuneConfig.from_file(config_filename)
+        config = load_jsonnet(minato.cached_path(config_filename))
+        rune_config = coltbuilder(config, RuneConfig)
 
         if rune_config.model is None:
             print("No model given.")
@@ -67,8 +65,13 @@ class RuneWorkflow(Workflow):
         model.train(train_examples, valid_examples)
 
         logger.info("Saving archive to %s", archive_filename)
-        with minato.open(archive_filename, "wb") as pklfile:
-            pickle.dump(model, pklfile)
+        archive = RuneArchive(model, metadata={"config": config})
+        with tempfile.TemporaryDirectory() as _tmpdir:
+            tmpdir = Path(_tmpdir)
+            _archive_filename = tmpdir / "archive.tar.gz"
+            archive.save(_archive_filename)
+            with minato.open(archive_filename, "wb") as pklfile, _archive_filename.open("rb") as acvfile:
+                shutil.copyfileobj(acvfile, pklfile)  # type: ignore[misc]
 
     def predict(
         self,
@@ -80,7 +83,8 @@ class RuneWorkflow(Workflow):
     ) -> None:
         """predict with a model and output results into a file"""
 
-        rune_config = RuneConfig.from_file(config_filename)
+        config = load_jsonnet(minato.cached_path(config_filename))
+        rune_config = coltbuilder(config, RuneConfig)
 
         if rune_config.reader is None:
             print("No reader given.")
@@ -89,8 +93,8 @@ class RuneWorkflow(Workflow):
             print("No writer given.")
             exit(1)
 
-        with minato.open(archive_filename, "rb") as pklfile:
-            model = pickle.load(pklfile)
+        archive = RuneArchive.load(minato.cached_path(archive_filename))  # type: ignore[var-annotated]
+        model = archive.rune
 
         if not isinstance(model, Rune):
             print("Given model is not a Rune.")
@@ -109,17 +113,19 @@ class RuneWorkflow(Workflow):
     ) -> None:
         """evaluate a model and output metrics"""
 
-        rune_config = RuneConfig.from_file(config_filename)
+        config = load_jsonnet(minato.cached_path(config_filename))
+        rune_config = coltbuilder(config, RuneConfig)
 
         if rune_config.reader is None:
             print("No reader given.")
             exit(1)
 
-        with minato.open(archive_filename, "rb") as pklfile:
-            model = pickle.load(pklfile)
+        archive = RuneArchive.load(minato.cached_path(archive_filename))  # type: ignore[var-annotated]
+        model = archive.rune
 
         if not isinstance(model, Rune):
-            print("Given model is not a Rune.")
+            print(f"Given model is not a Rune: {type(model)}")
+            print(archive)
             exit(1)
 
         metrics = model.evaluate(rune_config.reader(input_filename))

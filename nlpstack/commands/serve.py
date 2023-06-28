@@ -1,12 +1,11 @@
 import argparse
 import functools
-import pickle
 from http.server import HTTPServer
 from logging import getLogger
 
 import minato
 
-from nlpstack.rune import Rune
+from nlpstack.rune import Rune, RuneArchive
 from nlpstack.server.handler import RuneHandler
 
 from .subcommand import Subcommand
@@ -36,11 +35,11 @@ class ServeCommand(Subcommand):
         )
 
     def run(self, args: argparse.Namespace) -> None:
-        with minato.open(args.archive_filename, "rb") as fp:
-            rune = pickle.load(fp)
+        archive = RuneArchive.load(minato.cached_path(args.archive_filename))  # type: ignore[var-annotated]
+        rune = archive.rune
 
         if not isinstance(rune, Rune):
-            print("Given archive file is not a rune archive")
+            print("Given file is not a rune archive")
             exit(1)
 
         server = HTTPServer(
