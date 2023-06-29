@@ -1,24 +1,35 @@
 local label_encoding = 'BIOUL';
+local pretrained_model_name = 'bert-base-cased';
 
 {
   model: {
     type: 'nlpstack.tasks.sequence_labeling.rune.BasicSequenceLabeler',
+    token_indexers: {
+      tokens: {
+        type: 'nlpstack.data.token_indexers.PretrainedTransformerIndexer',
+        pretrained_model_name: pretrained_model_name,
+        tokenize_subwords: true,
+      },
+    },
     sequence_labeler: {
       type: 'nlpstack.tasks.sequence_labeling.torch.TorchSequenceLabeler',
       embedder: {
         token_embedders: {
           tokens: {
-            type: 'nlpstack.torch.modules.token_embedders.Embedding',
-            embedding_dim: 64,
+            type: 'nlpstack.torch.modules.token_embedders.AggregativeTokenEmbedder',
+            embedder: {
+              type: 'nlpstack.torch.modules.token_embedders.PretrainedTransformerEmbedder',
+              pretrained_model_name: pretrained_model_name,
+              train_parameters: false,
+              last_layer_only: false,
+            },
+            dropout: 0.1,
           },
         },
       },
       encoder: {
-        type: 'nlpstack.torch.modules.seq2seq_encoders.LstmSeq2SeqEncoder',
-        input_dim: 64,
-        hidden_dim: 32,
-        num_layers: 1,
-        bidirectional: true,
+        type: 'nlpstack.torch.modules.seq2seq_encoders.PassThroughSeq2SeqEncoder',
+        input_dim: 768,
       },
       decoder: {
         constraint: label_encoding,
@@ -32,11 +43,11 @@ local label_encoding = 'BIOUL';
       },
     ],
     trainer: {
-      max_epochs: 10,
+      max_epochs: 80,
       batch_size: 32,
       optimizer_factory: {
         type: 'nlpstack.torch.training.optimizers.AdamFactory',
-        lr: 0.001,
+        lr: 0.01,
       },
       callbacks: [
         {
