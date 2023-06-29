@@ -20,7 +20,7 @@ local pretrained_model_name = 'bert-base-cased';
             embedder: {
               type: 'nlpstack.torch.modules.token_embedders.PretrainedTransformerEmbedder',
               pretrained_model_name: pretrained_model_name,
-              train_parameters: true,
+              train_parameters: false,
               last_layer_only: false,
             },
             dropout: 0.1,
