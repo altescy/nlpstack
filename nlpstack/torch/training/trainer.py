@@ -1,7 +1,7 @@
 import dataclasses
 import warnings
 from logging import getLogger
-from typing import Any, Dict, Mapping, Optional, Sequence, TypeVar
+from typing import Any, Dict, Mapping, Optional, Sequence, TypeVar, Union
 
 import torch
 
@@ -91,7 +91,7 @@ class TorchTrainer:
         optimizer_factory: Optional[OptimizerFactory] = None,
         lrscheduler_factory: Optional[LRSchedulerFactory] = None,
         callbacks: Optional[Sequence[Callback]] = None,
-        devices: Optional[Sequence[int]] = None,
+        devices: Optional[Union[int, str, Sequence[Union[int, str]]]] = None,
     ) -> None:
         """Initializes a new Trainer instance.
 
@@ -107,12 +107,13 @@ class TorchTrainer:
             warnings.warn("batch_size is ignored when valid_dataloader is provided")
         if learning_rate is not None and optimizer_factory is not None:
             warnings.warn("learning_rate is ignored when optimizer_factory is provided")
-        if devices is not None and not isinstance(devices, int) and len(devices) > 1:
+        if devices is not None and not isinstance(devices, (int, str)) and len(devices) > 1:
             raise ValueError("Currently, only a single device is supported")
 
         learning_rate = learning_rate or 1e-3
         available_dataloader = train_dataloader or valid_dataloader
         batch_size = batch_size or (available_dataloader._batch_size if available_dataloader else 32)
+        devices = [devices] if isinstance(devices, (int, str)) else devices
 
         self._train_dataloader = train_dataloader or DataLoader(batch_size=batch_size, shuffle=True)
         self._valid_dataloader = valid_dataloader or DataLoader(batch_size=batch_size, shuffle=False)
@@ -120,7 +121,7 @@ class TorchTrainer:
         self._lrscheduler_factory = lrscheduler_factory
         self._max_epochs = max_epochs
         self._callbacks = callbacks or []
-        self._devices = devices
+        self._devices = [torch.device(device) for device in devices] if devices else [torch.device("cpu")]
 
     def _get_metrics(
         self,
