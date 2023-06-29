@@ -130,12 +130,21 @@ class PretrainedTransformerEmbedder(TokenEmbedder):
         eval_mode: bool = False,
         train_parameters: bool = True,
         last_layer_only: bool = True,
+        submodule: Optional[str] = None,
+        gradient_checkpointing: Optional[bool] = None,
     ) -> None:
         from transformers import AutoModel
 
         super().__init__()
         self._model = AutoModel.from_pretrained(pretrained_model_name)
         self._scalaer_mix: Optional[ScalarMix] = None
+
+        if gradient_checkpointing is not None:
+            self._model.config.update({"gradient_checkpointing": gradient_checkpointing})
+
+        if submodule is not None:
+            assert hasattr(self._model, submodule)
+            self._model = getattr(self._model, submodule)
 
         self.eval_mode = eval_mode
         if eval_mode:
