@@ -34,7 +34,7 @@ local pretrained_model_name = 'bert-base-cased';
       decoder: {
         constraint: label_encoding,
       },
-      dropout: 0.5,
+      dropout: 0.3,
     },
     metric: [
       {
