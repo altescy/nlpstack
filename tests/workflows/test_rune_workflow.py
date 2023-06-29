@@ -4,7 +4,7 @@ from nlpstack.workflows import RuneWorkflow
 
 
 def test_run_workflow_train_and_predict(tmp_path: Path) -> None:
-    archive_filename = tmp_path / "archive.pkl"
+    archive_filename = tmp_path / "archive.tar.gz"
     RuneWorkflow.run(
         [
             "train",
@@ -21,7 +21,7 @@ def test_run_workflow_predict(tmp_path: Path) -> None:
         [
             "predict",
             "tests/fixtures/configs/rune_workflow.jsonnet",
-            "tests/fixtures/archives/classifier.pkl",
+            "tests/fixtures/archives/classifier.tar.gz",
             "--input-filename",
             "./tests/fixtures/data/classification.jsonl",
             "--output-filename",
@@ -37,7 +37,7 @@ def test_run_workflow_evaluate(tmp_path: Path) -> None:
         [
             "evaluate",
             "tests/fixtures/configs/rune_workflow.jsonnet",
-            "tests/fixtures/archives/classifier.pkl",
+            "tests/fixtures/archives/classifier.tar.gz",
             "--input-filename",
             "tests/fixtures/data/classification.jsonl",
             "--output-filename",

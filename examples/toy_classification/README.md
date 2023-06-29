@@ -27,14 +27,14 @@ The workflow interface allows you to run tasks in command line.
 
 ```shell
 # train model
-nlpstack workflow rune train config.jsonnet output/archive.pkl
+nlpstack workflow rune train config.jsonnet output/archive.tar.gz
 
 # evaluate model
-nlpstack workflow rune evaluate config.jsonnet output/archive.pkl \
+nlpstack workflow rune evaluate config.jsonnet output/archive.tar.gz \
   --input-filename data/test.jsonl
 
 # predict
-nlpstack workflow rune predict config.jsonnet output/archive.pkl \
+nlpstack workflow rune predict config.jsonnet output/archive.tar.gz \
   --input-filename data/test.jsonl \
   --output-filename output/predictions.jsonl
 ```
