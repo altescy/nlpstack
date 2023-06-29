@@ -5,9 +5,15 @@ import torch
 from nlpstack.data import Vocabulary
 from nlpstack.torch.modules.lazy import LazyEmbedding
 from nlpstack.torch.modules.scalarmix import ScalarMix
+from nlpstack.torch.modules.seq2vec_encoders import BagOfEmbeddings, Seq2VecEncoder
+from nlpstack.torch.modules.time_distributed import TimeDistributed
+from nlpstack.torch.util import batched_span_select
 
 
 class TokenEmbedder(torch.nn.Module):
+    def setup(self, *args: Any, **kwargs: Any) -> None:
+        pass
+
     def get_output_dim(self) -> int:
         raise NotImplementedError
 
@@ -55,6 +61,66 @@ class Embedding(TokenEmbedder):
 
     def get_output_dim(self) -> int:
         return self._embedding.embedding_dim
+
+
+class TokenSubwordsEmbedder(TokenEmbedder):
+    def __init__(
+        self,
+        embedder: TokenEmbedder,
+        encoder: Optional[Seq2VecEncoder] = None,
+        dropout: float = 0.0,
+    ) -> None:
+        super().__init__()
+        self._embedder = TimeDistributed(embedder)
+        self._encoder = TimeDistributed(encoder or BagOfEmbeddings(embedder.get_output_dim()))
+        self._dropout = torch.nn.Dropout(dropout) if dropout > 0 else None
+
+    def setup(self, *args: Any, **kwargs: Any) -> None:
+        self._embedder.module.setup(*args, **kwargs)
+
+    def forward(
+        self,
+        *args: Any,
+        mask: Optional[torch.BoolTensor] = None,
+        subword_mask: Optional[torch.BoolTensor] = None,
+        **kwargs: Any,
+    ) -> torch.FloatTensor:
+        embeddings = self._embedder(*args, mask=subword_mask, **kwargs)
+        encodings = self._encoder(embeddings, mask=subword_mask)
+        if self._dropout is not None:
+            encodings = self._dropout(encodings)
+        return cast(torch.FloatTensor, encodings)
+
+    def get_output_dim(self) -> int:
+        return self._encoder.module.get_output_dim()
+
+
+class AggregativeTokenEmbedder(TokenEmbedder):
+    def __init__(
+        self,
+        embedder: TokenEmbedder,
+        encoder: Optional[Seq2VecEncoder] = None,
+        dropout: float = 0.0,
+    ) -> None:
+        super().__init__()
+        self._embedder = embedder
+        self._encoder = TimeDistributed(encoder or BagOfEmbeddings(embedder.get_output_dim()))
+        self._dropout = torch.nn.Dropout(dropout) if dropout > 0 else None
+
+    def forward(
+        self,
+        *args: Any,
+        offsets: torch.LongTensor,
+        mask: Optional[torch.BoolTensor] = None,
+        subword_mask: Optional[torch.BoolTensor] = None,
+        **kwargs: Any,
+    ) -> torch.FloatTensor:
+        embeddings = self._embedder(*args, mask=subword_mask, **kwargs).contiguous()
+        span_embeddings, span_mask = batched_span_select(embeddings, offsets)
+        encodings = self._encoder(span_embeddings, mask=span_mask)
+        if self._dropout is not None:
+            encodings = self._dropout(encodings)
+        return cast(torch.FloatTensor, encodings)
 
 
 class PretrainedTransformerEmbedder(TokenEmbedder):

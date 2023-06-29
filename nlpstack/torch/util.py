@@ -8,6 +8,7 @@ import torch
 logger = getLogger(__name__)
 
 T = TypeVar("T")
+TensorType = TypeVar("TensorType", bound=torch.Tensor)
 
 
 def get_mask_from_text(text: Mapping[str, Mapping[str, torch.Tensor]]) -> torch.BoolTensor:
@@ -77,6 +78,128 @@ def logsumexp(tensor: torch.Tensor, dim: int = -1, keepdim: bool = False) -> tor
     else:
         stable_vec = tensor - max_score.unsqueeze(dim)
     return cast(torch.Tensor, max_score + (stable_vec.exp().sum(dim, keepdim=keepdim)).log())
+
+
+def get_device_of(tensor: torch.Tensor) -> int:
+    """
+    Returns the device of the tensor.
+    """
+    if not tensor.is_cuda:
+        return -1
+    return tensor.get_device()
+
+
+def get_range_vector(size: int, device: int) -> torch.Tensor:
+    """
+    Returns a range vector with the desired size, starting at 0. The CUDA implementation
+    is meant to avoid copy data from CPU to GPU.
+    """
+    if device > -1:
+        return cast(torch.Tensor, torch.cuda.LongTensor(size, device=device).fill_(1).cumsum(0) - 1)  # type: ignore[attr-defined]
+    return torch.arange(0, size, dtype=torch.long)
+
+
+def flatten_and_batch_shift_indices(indices: TensorType, sequence_length: int) -> TensorType:
+    # Shape: (batch_size)
+    if torch.max(indices) >= sequence_length or torch.min(indices) < 0:
+        raise ValueError(f"All elements in indices should be in range (0, {sequence_length - 1})")
+    offsets = get_range_vector(indices.size(0), get_device_of(indices)) * sequence_length
+    for _ in range(len(indices.size()) - 1):
+        offsets = offsets.unsqueeze(1)
+
+    # Shape: (batch_size, d_1, ..., d_n)
+    offset_indices = indices + offsets
+
+    # Shape: (batch_size * d_1 * ... * d_n)
+    offset_indices = offset_indices.view(-1)
+    return cast(TensorType, offset_indices)
+
+
+def batched_index_select(
+    target: TensorType,
+    indices: torch.LongTensor,
+    flattened_indices: Optional[torch.LongTensor] = None,
+) -> TensorType:
+    if flattened_indices is None:
+        # Shape: (batch_size * d_1 * ... * d_n)
+        flattened_indices = flatten_and_batch_shift_indices(indices, target.size(1))
+
+    # Shape: (batch_size * sequence_length, embedding_size)
+    flattened_target = target.view(-1, target.size(-1))
+
+    # Shape: (batch_size * d_1 * ... * d_n, embedding_size)
+    flattened_selected = flattened_target.index_select(0, flattened_indices)
+    selected_shape = list(indices.size()) + [target.size(-1)]
+    # Shape: (batch_size, d_1, ..., d_n, embedding_size)
+    selected_targets = flattened_selected.view(*selected_shape)
+    return cast(TensorType, selected_targets)
+
+
+def batched_span_select(target: TensorType, spans: torch.LongTensor) -> Tuple[TensorType, torch.BoolTensor]:
+    # Shape: (batch_size, num_spans, 1)
+    # Shape: (batch_size, num_spans, 1)
+    span_starts, span_ends = spans.split(1, dim=-1)  # type: ignore[no-untyped-call]
+
+    # Shape: (batch_size, num_spans, 1)
+    span_widths = span_ends - span_starts
+
+    max_batch_span_width = span_widths.max().item() + 1
+
+    # Shape: (1, 1, max_batch_span_width)
+    max_span_range_indices = get_range_vector(max_batch_span_width, get_device_of(target)).view(1, 1, -1)
+    # Shape: (batch_size, num_spans, max_batch_span_width)
+    span_mask = max_span_range_indices <= span_widths
+    raw_span_indices = span_starts + max_span_range_indices
+    span_mask = span_mask & (raw_span_indices < target.size(1)) & (0 <= raw_span_indices)
+    span_indices = raw_span_indices * span_mask
+
+    # Shape: (batch_size, num_spans, max_batch_span_width, embedding_dim)
+    span_embeddings = batched_index_select(target, span_indices)
+
+    return span_embeddings, span_mask
+
+
+def info_value_of_dtype(dtype: torch.dtype) -> Union[torch.finfo, torch.iinfo]:
+    """
+    Returns the `finfo` or `iinfo` object of a given PyTorch data type. Does not allow torch.bool.
+    """
+    if dtype == torch.bool:
+        raise TypeError("Does not support torch.bool")
+    elif dtype.is_floating_point:
+        return torch.finfo(dtype)
+    else:
+        return torch.iinfo(dtype)
+
+
+def min_value_of_dtype(dtype: torch.dtype) -> Union[float, int]:
+    """
+    Returns the minimum value of a given PyTorch data type. Does not allow torch.bool.
+    """
+    return info_value_of_dtype(dtype).min
+
+
+def max_value_of_dtype(dtype: torch.dtype) -> Union[float, int]:
+    """
+    Returns the maximum value of a given PyTorch data type. Does not allow torch.bool.
+    """
+    return info_value_of_dtype(dtype).max
+
+
+def tiny_value_of_dtype(dtype: torch.dtype) -> Union[float, int]:
+    """
+    Returns a moderately tiny value for a given PyTorch data type that is used to avoid numerical
+    issues such as division by zero.
+    This is different from `info_value_of_dtype(dtype).tiny` because it causes some NaN bugs.
+    Only supports floating point dtypes.
+    """
+    if not dtype.is_floating_point:
+        raise TypeError("Only supports floating point dtypes.")
+    if dtype in (torch.float, torch.double):
+        return 1e-13
+    elif dtype == torch.half:
+        return 1e-4
+    else:
+        raise TypeError("Does not support dtype " + str(dtype))
 
 
 @overload
