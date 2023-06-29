@@ -1,9 +1,10 @@
-from typing import Any, Generic, Iterable, Iterator, Mapping, Optional, Sequence, TypeVar
+from typing import Any, Generic, Iterable, Iterator, Literal, Mapping, Optional, Sequence, TypeVar
 
 Self = TypeVar("Self", bound="Rune")
 
 Example = TypeVar("Example")
 Prediction = TypeVar("Prediction")
+SetupMode = Literal["training", "prediction", "evaluation"]
 
 
 class Rune(Generic[Example, Prediction]):
@@ -15,6 +16,9 @@ class Rune(Generic[Example, Prediction]):
         **kwargs: Any,
     ) -> Self:
         raise NotImplementedError
+
+    def setup(self, mode: SetupMode, **kwargs: Any) -> None:
+        pass
 
     def predict(self, dataset: Iterable[Example], **kwargs: Any) -> Iterator[Prediction]:
         raise NotImplementedError

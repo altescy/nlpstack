@@ -10,7 +10,7 @@ from nlpstack.torch.picklable import TorchPicklable
 from nlpstack.torch.predictor import TorchPredictor
 from nlpstack.torch.training import TorchTrainer
 
-from .base import Rune
+from .base import Rune, SetupMode
 
 logger = getLogger(__name__)
 
@@ -69,6 +69,10 @@ class RuneForTorch(
     def evaluator(self) -> Evaluator[Inference]:
         return self._evaluator_factory(self.metric)
 
+    def setup(self, mode: SetupMode, **kwargs: Any) -> None:
+        if mode in ("prediction", "evaluation"):
+            self.predictor.setup(**kwargs)
+
     def train(
         self: Self,
         train_dataset: Sequence[Example],
@@ -104,18 +108,17 @@ class RuneForTorch(
     def predict(
         self,
         dataset: Iterable[Example],
-        *,
-        batch_size: int = 32,
         **kwargs: Any,
     ) -> Iterator[Prediction]:
-        yield from self.predictor.predict(dataset, batch_size=batch_size, **kwargs)
+        yield from self.predictor.predict(dataset, **kwargs)
 
     def evaluate(
         self,
         dataset: Iterable[Example],
-        *,
-        batch_size: int = 32,
         **kwargs: Any,
     ) -> Mapping[str, float]:
-        inferences = self.predictor.infer(dataset, batch_size=batch_size, **kwargs)
-        return self.evaluator.evaluate(inferences, batch_size=batch_size, **kwargs)
+        inferences = self.predictor.infer(dataset, **kwargs)
+        return self.evaluator.evaluate(inferences, **kwargs)
+
+    def setup_for_prediction(self, *args: Any, **kwargs: Any) -> None:
+        self.predictor.setup(*args, **kwargs)

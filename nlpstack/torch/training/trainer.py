@@ -77,6 +77,7 @@ class TorchTrainer:
             ignored. Defaults to `AdamFactory(lr=learning_rate)`.
         lrscheduler_factory: The learning rate scheduler factory to use for training. Defaults to None.
         callbacks: The callbacks to use for training. Defaults to None.
+        devices: The devices to use for training. Defaults to None.
     """
 
     def __init__(
@@ -90,6 +91,7 @@ class TorchTrainer:
         optimizer_factory: Optional[OptimizerFactory] = None,
         lrscheduler_factory: Optional[LRSchedulerFactory] = None,
         callbacks: Optional[Sequence[Callback]] = None,
+        devices: Optional[Sequence[int]] = None,
     ) -> None:
         """Initializes a new Trainer instance.
 
@@ -105,6 +107,8 @@ class TorchTrainer:
             warnings.warn("batch_size is ignored when valid_dataloader is provided")
         if learning_rate is not None and optimizer_factory is not None:
             warnings.warn("learning_rate is ignored when optimizer_factory is provided")
+        if devices is not None and not isinstance(devices, int) and len(devices) > 1:
+            raise ValueError("Currently, only a single device is supported")
 
         learning_rate = learning_rate or 1e-3
         available_dataloader = train_dataloader or valid_dataloader
@@ -116,6 +120,7 @@ class TorchTrainer:
         self._lrscheduler_factory = lrscheduler_factory
         self._max_epochs = max_epochs
         self._callbacks = callbacks or []
+        self._devices = devices
 
     def _get_metrics(
         self,
@@ -159,6 +164,11 @@ class TorchTrainer:
         Returns:
             :obj:`TrainingState`: The final training state.
         """
+
+        if self._devices is not None:
+            if len(self._devices) > 1:
+                raise ValueError("Currently, only a single device is supported")
+            model = model.to(device=self._devices[0])
 
         if valid is not None and self._valid_dataloader is None:
             raise ValueError("valid_dataloader is required when valid is not None")

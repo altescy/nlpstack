@@ -24,10 +24,7 @@ class TorchPicklable:  # type: ignore[misc]
         with tempfile.SpooledTemporaryFile() as f:
             f.write(state.pop("__cuda_dependent_attributes__"))
             f.seek(0)
-            if not torch.cuda.is_available():
-                cuda_attrs = torch.load(f, map_location=torch.device("cpu"))
-            else:
-                cuda_attrs = torch.load(f)
+            cuda_attrs = torch.load(f, map_location=torch.device("cpu"))
 
         state.update(cuda_attrs)
         self.__dict__.update(state)

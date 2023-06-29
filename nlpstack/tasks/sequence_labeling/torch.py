@@ -63,7 +63,11 @@ class TorchSequenceLabeler(TorchModel[SequenceLabelingInference]):
         tokens: Mapping[str, Mapping[str, torch.Tensor]],
         labels: Optional[torch.LongTensor] = None,
         metadata: Optional[Sequence[Any]] = None,
+        *,
+        top_k: Optional[int] = None,
+        **kwargs: Any,
     ) -> SequenceLabelerOutput:
+        top_k = top_k or self._top_k
         mask = get_mask_from_text(tokens)
 
         embeddings = self._embedder(tokens)
@@ -92,7 +96,7 @@ class TorchSequenceLabeler(TorchModel[SequenceLabelingInference]):
                 flattened_labels = labels.masked_fill(~mask, -100).long().view(-1)
                 output.loss = self._loss(flattened_logits, flattened_labels) / logits.size(0)
 
-        if self._decoder is not None and self._top_k is not None:
-            output.inference.decodings = self._decoder.viterbi_decode(logits, mask, top_k=self._top_k)
+        if self._decoder is not None and top_k is not None:
+            output.inference.decodings = self._decoder.viterbi_decode(logits, mask, top_k=top_k)
 
         return output
