@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Optional
 
 from nlpstack.evaluation import Metric
 
@@ -10,7 +10,7 @@ class MultilabelClassificationMetric(Metric[MultilabelClassificationInference]):
 
 
 class MultilabelAccuracy(MultilabelClassificationMetric):
-    def __init__(self, threshold: float = 0.5) -> None:
+    def __init__(self, threshold: Optional[float] = None) -> None:
         self._threshold = threshold
         self._correct = 0
         self._total = 0
@@ -19,7 +19,9 @@ class MultilabelAccuracy(MultilabelClassificationMetric):
         assert inference.labels is not None
         assert inference.probs.shape == inference.labels.shape
 
-        pred = inference.probs >= self._threshold
+        threshold = self._threshold or inference.threshold
+
+        pred = inference.probs >= threshold
         gold = inference.labels.astype(bool)
 
         self._correct += (pred == gold).all(axis=1).sum()
