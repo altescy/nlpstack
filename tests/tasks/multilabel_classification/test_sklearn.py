@@ -1,4 +1,10 @@
-from nlpstack.tasks.multilabel_classification.metrics import AverageAccuracy, MultilabelAccuracy, OverallAccuracy
+from nlpstack.tasks.multilabel_classification.metrics import (
+    AverageAccuracy,
+    MacroMultilabelFBeta,
+    MicroMultilabelFbeta,
+    MultilabelAccuracy,
+    OverallAccuracy,
+)
 from nlpstack.tasks.multilabel_classification.sklearn import SklearnMultilabelClassifier
 
 
@@ -32,7 +38,13 @@ def test_multilabel_classifier() -> None:
         class_weight="balanced",
         max_epochs=32,
         learning_rate=1e-2,
-        metric=[MultilabelAccuracy(), AverageAccuracy(), OverallAccuracy()],
+        metric=[
+            MultilabelAccuracy(),
+            AverageAccuracy(),
+            OverallAccuracy(),
+            MacroMultilabelFBeta(),
+            MicroMultilabelFbeta(),
+        ],
     )
     classifier.fit(X, y)
 
@@ -44,5 +56,15 @@ def test_multilabel_classifier() -> None:
     assert abs(score - 1.0) < 1e-6
 
     metrics = classifier.compute_metrics(X, y)
-    assert set(metrics) == {"accuracy", "average_accuracy", "overall_accuracy"}
+    assert set(metrics) == {
+        "accuracy",
+        "average_accuracy",
+        "overall_accuracy",
+        "macro_fbeta",
+        "macro_precision",
+        "macro_recall",
+        "micro_fbeta",
+        "micro_precision",
+        "micro_recall",
+    }
     assert all(abs(value - 1.0) < 1e-6 for value in metrics.values())

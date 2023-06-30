@@ -92,3 +92,103 @@ class AverageAccuracy(MultilabelClassificationMetric):
     def reset(self) -> None:
         self._correct = None
         self._total = 0
+
+
+class MicroMultilabelFbeta(MultilabelClassificationMetric):
+    def __init__(
+        self,
+        beta: float = 1.0,
+        threshold: Optional[float] = None,
+    ) -> None:
+        self._beta = beta
+        self._threshold = threshold
+        self._tp = 0.0
+        self._fp = 0.0
+        self._fn = 0.0
+
+    def update(self, inference: MultilabelClassificationInference) -> None:
+        assert inference.labels is not None
+        assert inference.probs.shape == inference.labels.shape
+
+        threshold = self._threshold or inference.threshold
+
+        pred = inference.probs >= threshold
+        gold = inference.labels.astype(bool)
+
+        self._tp += (pred & gold).sum()
+        self._fp += (pred & ~gold).sum()
+        self._fn += (~pred & gold).sum()
+
+    def compute(self) -> Dict[str, float]:
+        precision = self._tp / (self._tp + self._fp) if self._tp + self._fp > 0 else 0.0
+        recall = self._tp / (self._tp + self._fn) if self._tp + self._fn > 0 else 0.0
+        fbeta = (
+            (1 + self._beta**2) * precision * recall / (self._beta**2 * precision + recall + 1e-13)
+            if precision + recall > 0
+            else 0.0
+        )
+        return {
+            "micro_fbeta": fbeta,
+            "micro_precision": precision,
+            "micro_recall": recall,
+        }
+
+    def reset(self) -> None:
+        self._tp = 0.0
+        self._fp = 0.0
+        self._fn = 0.0
+
+
+class MacroMultilabelFBeta(MultilabelClassificationMetric):
+    def __init__(
+        self,
+        beta: float = 1.0,
+        threshold: Optional[float] = None,
+    ) -> None:
+        self._beta = beta
+        self._threshold = threshold
+
+        self._tp: Optional[numpy.ndarray] = None
+        self._fp: Optional[numpy.ndarray] = None
+        self._fn: Optional[numpy.ndarray] = None
+
+    def update(self, inference: MultilabelClassificationInference) -> None:
+        assert inference.labels is not None
+        assert inference.probs.shape == inference.labels.shape
+
+        threshold = self._threshold or inference.threshold
+
+        pred = inference.probs >= threshold
+        gold = inference.labels.astype(bool)
+
+        if self._tp is None:
+            self._tp = numpy.zeros(gold.shape[1], dtype=float)
+        if self._fp is None:
+            self._fp = numpy.zeros(gold.shape[1], dtype=float)
+        if self._fn is None:
+            self._fn = numpy.zeros(gold.shape[1], dtype=float)
+
+        self._tp += (pred & gold).sum(axis=0).astype(float)
+        self._fp += (pred & ~gold).sum(axis=0).astype(float)
+        self._fn += (~pred & gold).sum(axis=0).astype(float)
+
+    def compute(self) -> Dict[str, float]:
+        if self._tp is None or self._fp is None or self._fn is None:
+            return {"macro_fbeta": 0.0, "macro_precision": 0.0, "macro_recall": 0.0}
+        precision = float((self._tp / (self._tp + self._fp + 1e-13)).mean())
+        recall = float((self._tp / (self._tp + self._fn + 1e-13)).mean())
+        fbeta = (
+            (1 + self._beta**2) * precision * recall / (self._beta**2 * precision + recall)
+            if precision + recall > 0
+            else 0.0
+        )
+        return {
+            "macro_fbeta": fbeta,
+            "macro_precision": precision,
+            "macro_recall": recall,
+        }
+
+    def reset(self) -> None:
+        self._tp = None
+        self._fp = None
+        self._fn = None
