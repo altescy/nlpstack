@@ -104,10 +104,10 @@ class MultilabelClassificationDataModule(
     ) -> Iterator[MultilabelClassificationPrediction]:
         sorted_indices = inference.probs.argsort(axis=1)[:, ::-1]
         sorted_probs = numpy.take_along_axis(inference.probs, sorted_indices, axis=1)
-        for i, (top_indices, top_probs) in enumerate(zip(sorted_indices, sorted_probs)):
+        for i, (top_indices, top_probs) in enumerate(zip(sorted_indices.tolist(), sorted_probs.tolist())):
             num_labels_to_return = sum(p >= inference.threshold for p in top_probs)
-            top_probs = top_probs[:num_labels_to_return].tolist()
-            top_indices = top_indices[:num_labels_to_return].tolist()
+            top_probs = top_probs[:num_labels_to_return]
+            top_indices = top_indices[:num_labels_to_return]
             yield MultilabelClassificationPrediction(
                 top_probs=top_probs,
                 top_labels=[self.vocab.get_token_by_index(self.label_namespace, index) for index in top_indices],

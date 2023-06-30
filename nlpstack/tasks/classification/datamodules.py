@@ -1,6 +1,8 @@
 from logging import getLogger
 from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence
 
+import numpy
+
 from nlpstack.common import ProgressBar
 from nlpstack.data import DataModule, Dataset, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, LabelField, MetadataField, TextField
@@ -93,9 +95,9 @@ class BasicClassificationDataModule(
         return Instance(**fields)
 
     def build_predictions(self, inference: ClassificationInference) -> Iterator[ClassificationPrediction]:
-        sorted_indices = inference.probs.argsort(axis=1)[:, ::-1].tolist()
-        sorted_probs = inference.probs.take(sorted_indices).tolist()
-        for i, (top_indices, top_probs) in enumerate(zip(sorted_indices, sorted_probs)):
+        sorted_indices = inference.probs.argsort(axis=1)[:, ::-1]
+        sorted_probs = numpy.take_along_axis(inference.probs, sorted_indices, axis=1)
+        for i, (top_indices, top_probs) in enumerate(zip(sorted_indices.tolist(), sorted_probs.tolist())):
             yield ClassificationPrediction(
                 top_probs=top_probs,
                 top_labels=[self.vocab.get_token_by_index(self.label_namespace, index) for index in top_indices],

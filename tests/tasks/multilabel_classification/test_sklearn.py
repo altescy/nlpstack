@@ -27,7 +27,7 @@ def test_multilabel_classifier() -> None:
         ["Sports"],
     ]
 
-    classifier = SklearnMultilabelClassifier(class_weight="balanced", max_epochs=16, learning_rate=1e-2)
+    classifier = SklearnMultilabelClassifier(class_weight="balanced", max_epochs=32, learning_rate=1e-2)
     classifier.fit(X, y)
 
     predictions = classifier.predict(X)
