@@ -6,11 +6,11 @@ def test_fasttext_classifier() -> None:
     dataset = [
         ClassificationExample("this is a positive example", "positive"),
         ClassificationExample("this is a negative example", "negative"),
-        ClassificationExample("this is a another positive example", "positive"),
-        ClassificationExample("this is a another negative example", "negative"),
+        ClassificationExample("this is another positive example", "positive"),
+        ClassificationExample("this is another negative example", "negative"),
     ]
 
-    classifier = FastTextClassifier(epoch=32, lr=0.5, bucket=16, seed=1)
+    classifier = FastTextClassifier(epoch=32, lr=1.0, bucket=32, min_count=1, seed=1)
     classifier.train(dataset)
 
     predictions = classifier.predict(dataset)
