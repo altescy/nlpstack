@@ -1,3 +1,4 @@
+from nlpstack.tasks.multilabel_classification.metrics import AverageAccuracy, MultilabelAccuracy, OverallAccuracy
 from nlpstack.tasks.multilabel_classification.sklearn import SklearnMultilabelClassifier
 
 
@@ -27,7 +28,12 @@ def test_multilabel_classifier() -> None:
         ["Sports"],
     ]
 
-    classifier = SklearnMultilabelClassifier(class_weight="balanced", max_epochs=32, learning_rate=1e-2)
+    classifier = SklearnMultilabelClassifier(
+        class_weight="balanced",
+        max_epochs=32,
+        learning_rate=1e-2,
+        metric=[MultilabelAccuracy(), AverageAccuracy(), OverallAccuracy()],
+    )
     classifier.fit(X, y)
 
     predictions = classifier.predict(X)
@@ -36,3 +42,7 @@ def test_multilabel_classifier() -> None:
 
     score = classifier.score(X, y)
     assert abs(score - 1.0) < 1e-6
+
+    metrics = classifier.compute_metrics(X, y)
+    assert set(metrics) == {"accuracy", "average_accuracy", "overall_accuracy"}
+    assert all(abs(value - 1.0) < 1e-6 for value in metrics.values())
