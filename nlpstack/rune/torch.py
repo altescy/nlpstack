@@ -119,6 +119,3 @@ class RuneForTorch(
     ) -> Mapping[str, float]:
         inferences = self.predictor.infer(dataset, **kwargs)
         return self.evaluator.evaluate(inferences, **kwargs)
-
-    def setup_for_prediction(self, *args: Any, **kwargs: Any) -> None:
-        self.predictor.setup(*args, **kwargs)
