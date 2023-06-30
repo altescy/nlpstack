@@ -106,6 +106,8 @@ class MultilabelClassificationDataModule(
         sorted_probs = numpy.take_along_axis(inference.probs, sorted_indices, axis=1)
         for i, (top_indices, top_probs) in enumerate(zip(sorted_indices.tolist(), sorted_probs.tolist())):
             num_labels_to_return = sum(p >= inference.threshold for p in top_probs)
+            if inference.top_k is not None:
+                num_labels_to_return = min(num_labels_to_return, inference.top_k)
             top_probs = top_probs[:num_labels_to_return]
             top_indices = top_indices[:num_labels_to_return]
             yield MultilabelClassificationPrediction(

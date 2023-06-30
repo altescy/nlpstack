@@ -17,6 +17,7 @@ class MultilabelClassificationExample:
 class MultilabelClassificationInference:
     probs: numpy.ndarray
     threshold: float
+    top_k: Optional[int] = None
     labels: Optional[numpy.ndarray] = None
     metadata: Optional[Sequence[Mapping[str, Any]]] = None
 

@@ -81,6 +81,7 @@ class TorchMultilabelClassifier(TorchModel[MultilabelClassificationInference]):
         labels: Optional[torch.Tensor] = None,
         metadata: Optional[Sequence[Any]] = None,
         *,
+        top_k: Optional[int] = None,
         threshold: Optional[float] = None,
         **kwargs: Any,
     ) -> MultilabelClassifierOutput:
