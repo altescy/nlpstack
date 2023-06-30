@@ -1,4 +1,4 @@
-from typing import Any, Generic, Iterable, Iterator, TypeVar
+from typing import Any, Generic, Iterable, Iterator, Optional, Sequence, TypeVar, Union
 
 import torch
 
@@ -20,28 +20,45 @@ class TorchPredictor(Generic[Example, Inference, Prediction]):
     ):
         self.datamodule = datamodule
         self.model = model
+        self._batch_size = 64
+        self._devices = [torch.device("cpu")]
+
+    def setup(
+        self,
+        batch_size: Optional[int] = None,
+        devices: Optional[Union[int, str, Sequence[Union[int, str]]]] = None,
+        **kwargs: Any,
+    ) -> None:
+        if batch_size is not None:
+            self._batch_size = batch_size
+        if devices is not None:
+            if isinstance(devices, (int, str)):
+                devices = [devices]
+            if len(devices) > 1:
+                raise ValueError("Currently only single GPU is supported.")
+            self._devices = [torch.device(device) for device in devices]
 
     def infer(
         self,
         examples: Iterable[Example],
-        *,
-        batch_size: int = 64,
         **kwargs: Any,
     ) -> Iterator[Inference]:
+        if len(self._devices) > 1:
+            raise ValueError("Currently only single GPU is supported.")
+        device = self._devices[0]
         collator = Collator()
         self.model.eval()
-        with torch.no_grad():
-            for batched_examples in batched(examples, batch_size):
+        self.model.to(device)
+        with torch.inference_mode():
+            for batched_examples in batched(examples, self._batch_size):
                 instances = [self.datamodule.build_instance(example) for example in batched_examples]
-                batch = move_to_device(collator(instances), self.model.get_device())
-                yield self.model.infer(**batch)
+                batch = move_to_device(collator(instances), device)
+                yield self.model.infer(**batch, **kwargs)
 
     def predict(
         self,
         examples: Iterable[Example],
-        *,
-        batch_size: int = 64,
         **kwargs: Any,
     ) -> Iterator[Prediction]:
-        for inference in self.infer(examples, batch_size=batch_size):
+        for inference in self.infer(examples, **kwargs):
             yield from self.datamodule.build_predictions(inference)

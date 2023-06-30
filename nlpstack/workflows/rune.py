@@ -1,10 +1,11 @@
 import dataclasses
+import functools
 import json
 import shutil
 import tempfile
 from logging import getLogger
 from pathlib import Path
-from typing import Callable, Generic, Iterable, Iterator, Optional, Sequence, TypeVar
+from typing import Any, Callable, Generic, Iterable, Iterator, Mapping, Optional, Sequence, TypeVar
 
 import colt
 import minato
@@ -28,6 +29,8 @@ class RuneConfig(Generic[Example, Prediction]):
     model: Optional[Rune[Example, Prediction]] = None
     reader: Optional[Callable[[str], Iterator[Example]]] = None
     writer: Optional[Callable[[str, Iterable[Prediction]], None]] = None
+    predictor: Optional[Mapping[str, Any]] = None
+    evaluator: Optional[Mapping[str, Any]] = None
     train_dataset_filename: Optional[str] = None
     valid_dataset_filename: Optional[str] = None
     test_dataset_filename: Optional[str] = None
@@ -100,6 +103,8 @@ class RuneWorkflow(Workflow):
             print("Given model is not a Rune.")
             exit(1)
 
+        model.setup("prediction", **coltbuilder(rune_config.predictor or {}))
+
         predictions = model.predict(rune_config.reader(input_filename))
         rune_config.writer(output_filename, predictions)
 
@@ -128,6 +133,8 @@ class RuneWorkflow(Workflow):
             print(archive)
             exit(1)
 
+        model.setup("evaluation", **coltbuilder(rune_config.evaluator or {}))
+
         metrics = model.evaluate(rune_config.reader(input_filename))
 
         if output_filename is None:
@@ -135,3 +142,39 @@ class RuneWorkflow(Workflow):
         else:
             with minato.open(output_filename, "w") as jsonfile:
                 json.dump(metrics, jsonfile, ensure_ascii=False)
+
+    def serve(
+        self,
+        archive_filename: str,
+        *,
+        host: str = "localhost",
+        port: int = 8080,
+        config_filename: Optional[str] = None,
+    ) -> None:
+        from http.server import HTTPServer
+
+        from nlpstack.server.handler import RuneHandler
+
+        archive = RuneArchive.load(minato.cached_path(archive_filename))  # type: ignore[var-annotated]
+        model = archive.rune
+
+        if not isinstance(model, Rune):
+            print("Given file is not a rune archive")
+            exit(1)
+
+        if config_filename is not None:
+            config = load_jsonnet(minato.cached_path(config_filename))
+            rune_config = coltbuilder(config, RuneConfig)
+            model.setup("prediction", **coltbuilder(rune_config.predictor or {}))
+
+        server = HTTPServer(
+            (host, port),
+            functools.partial(RuneHandler, rune=model),
+        )
+        logger.info("Listening on %s:%d", host, port)
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            logger.info("Shutting down...")
+            server.shutdown()
+            logger.info("Done")
