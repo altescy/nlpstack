@@ -1,9 +1,17 @@
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
+from functools import cached_property
+from os import PathLike
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, Union
 
+import minato
 import numpy
 
 from nlpstack.data.tokenizers import Token
 from nlpstack.data.vocabulary import Vocabulary
+
+try:
+    import fasttext
+except ModuleNotFoundError:
+    fasttext = None
 
 
 class TokenIndexer:
@@ -119,6 +127,42 @@ class TokenVectorIndexer(TokenIndexer):
             raise ValueError("TokenVectorIndexer requires all tokens to have vector.")
         return {
             "embeddings": numpy.array([token.vector for token in tokens], dtype=float),
+            "mask": numpy.array([True] * len(tokens), dtype=bool),
+        }
+
+
+class PretrainedFasttextIndexer(TokenIndexer):
+    def __init__(
+        self,
+        pretraind_filename: Union[str, PathLike],
+        feature_name: str = "surface",
+        namespace: Optional[str] = None,
+    ) -> None:
+        self._pretraind_filename = pretraind_filename
+        self._feature_name = feature_name
+        self._namespace = namespace
+
+    @cached_property
+    def fasttext(self) -> "fasttext.FastText":
+        if fasttext is None:
+            raise ModuleNotFoundError("Please install fasttext.")
+        pretrained_filename = minato.cached_path(self._pretraind_filename)
+        return fasttext.load_model(str(pretrained_filename))
+
+    def _get_token_feature(self, token: Token) -> str:
+        feature = str(getattr(token, self._feature_name))
+        return feature
+
+    def build_vocab(self, vocab: Vocabulary, documents: Iterable[Sequence[Token]]) -> None:
+        if self._namespace is not None:
+            raise ValueError("Currently, TokenVectorIndexer does not support building vocabulary.")
+
+    def get_pad_index(self, vocab: Vocabulary) -> int:
+        return 0
+
+    def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> Dict[str, Any]:
+        return {
+            "embeddings": numpy.array([self.fasttext[self._get_token_feature(token)] for token in tokens]),
             "mask": numpy.array([True] * len(tokens), dtype=bool),
         }
 
