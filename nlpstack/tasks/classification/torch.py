@@ -32,6 +32,7 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
         feedforward: Optional[FeedForward] = None,
         dropout: Optional[float] = None,
         class_weights: Optional[Union[Literal["balanced"], Mapping[str, float]]] = None,
+        threshold: Optional[float] = None,
         label_namespace: str = "labels",
     ) -> None:
         super().__init__()
@@ -50,6 +51,7 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
 
         self._loss = torch.nn.CrossEntropyLoss()
 
+        self._threshold = threshold
         self._label_namespace = label_namespace
 
     def setup(
@@ -80,6 +82,9 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
         text: Mapping[str, Mapping[str, torch.Tensor]],
         label: Optional[torch.LongTensor] = None,
         metadata: Optional[Sequence[Any]] = None,
+        *,
+        top_k: Optional[int] = None,
+        threshold: Optional[float] = None,
     ) -> BasicClassifierOutput:
         mask = get_mask_from_text(text)
 
@@ -99,7 +104,12 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
         logits = cast(torch.FloatTensor, self._classifier(encodings))
         probs = cast(torch.FloatTensor, torch.nn.functional.softmax(logits, dim=-1))
 
-        inference = ClassificationInference(probs=probs.detach().cpu().numpy(), metadata=metadata)
+        inference = ClassificationInference(
+            probs=probs.detach().cpu().numpy(),
+            metadata=metadata,
+            top_k=top_k,
+            threshold=self._threshold if threshold is None else threshold,
+        )
         output = BasicClassifierOutput(inference=inference, logits=logits)
 
         if label is not None:

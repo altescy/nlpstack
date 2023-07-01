@@ -32,7 +32,7 @@ class TorchMultilabelClassifier(TorchModel[MultilabelClassificationInference]):
         feedforward: Optional[FeedForward] = None,
         dropout: Optional[float] = None,
         class_weights: Optional[Union[Literal["balanced"], Mapping[str, float]]] = None,
-        threshold: float = 0.5,
+        threshold: Optional[float] = 0.5,
         label_namespace: str = "labels",
     ) -> None:
         super().__init__()
