@@ -1,7 +1,8 @@
 import dataclasses
-from typing import Any, Mapping, Optional, Sequence, cast
+from typing import Any, Literal, Mapping, Optional, Sequence, Union, cast
 
 import torch
+import torch.nn.functional as F
 
 from nlpstack.torch.model import TorchModel
 from nlpstack.torch.modules.feedforward import FeedForward
@@ -30,6 +31,7 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
         contextualizer: Optional[Seq2SeqEncoder] = None,
         feedforward: Optional[FeedForward] = None,
         dropout: Optional[float] = None,
+        class_weights: Optional[Union[Literal["balanced"], Mapping[str, float]]] = None,
         label_namespace: str = "labels",
     ) -> None:
         super().__init__()
@@ -43,6 +45,9 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
         self._feedforward = feedforward
         self._dropout = torch.nn.Dropout(dropout) if dropout is not None else None
 
+        self._class_weights = class_weights
+        self._loss_weight = None if class_weights is None else torch.nn.UninitializedParameter(requires_grad=False)
+
         self._loss = torch.nn.CrossEntropyLoss()
 
         self._label_namespace = label_namespace
@@ -54,8 +59,21 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
         **kwargs: Any,
     ) -> None:
         super().setup(*args, datamodule=datamodule, vocab=datamodule.vocab, **kwargs)
-        num_labels = datamodule.vocab.get_vocab_size(self._label_namespace)
+        vocab = datamodule.vocab
+        num_labels = vocab.get_vocab_size(self._label_namespace)
         self._classifier.initialize_parameters(out_features=num_labels)
+        if self._class_weights is not None and self._loss_weight is not None:
+            self._loss_weight.materialize((num_labels,))
+            if self._class_weights == "balanced":
+                label_counts = vocab.get_token_to_count(self._label_namespace)
+                total_label_count = sum(label_counts.values())
+                for label_index, label in vocab.get_index_to_token(self._label_namespace).items():
+                    self._loss_weight[label_index] = total_label_count / label_counts[label]
+            else:
+                torch.nn.init.constant(self._loss_weight, 1.0)
+                for label, weight in self._class_weights.items():
+                    label_index = vocab.get_index_by_token(self._label_namespace, label)
+                    self._loss_weight[label_index] = weight
 
     def forward(  # type: ignore[override]
         self,
@@ -86,6 +104,6 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
 
         if label is not None:
             inference.labels = label.detach().cpu().numpy()
-            output.loss = self._loss(logits, label.long())
+            output.loss = cast(torch.FloatTensor, F.cross_entropy(logits, label.long(), weight=self._loss_weight))
 
         return output

@@ -47,6 +47,8 @@ class BasicClassifier(
         token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
         datamodule: Optional[BasicClassificationDataModule] = None,
         # model configuration
+        dropout: Optional[float] = None,
+        class_weights: Optional[Union[Literal["balanced"], Mapping[str, float]]] = None,
         classifier: Optional[TorchBasicClassifier] = None,
         # training configuration
         max_epochs: int = 4,
@@ -100,7 +102,15 @@ class BasicClassifier(
             classifier = TorchBasicClassifier(
                 embedder=TextEmbedder({"tokens": Embedding(64)}),
                 encoder=BagOfEmbeddings(64),
+                dropout=dropout,
+                class_weights=class_weights,
             )
+        else:
+            if (dropout, class_weights) != (None, None):
+                warnings.warn(
+                    "Ignoring dropout and class_weights because classifier is given.",
+                    UserWarning,
+                )
 
         if trainer is None:
             trainer = TorchTrainer(

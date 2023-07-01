@@ -1,5 +1,5 @@
 import itertools
-from typing import Any, Iterator, Mapping, Optional, Sequence, Union
+from typing import Any, Iterator, Literal, Mapping, Optional, Sequence, Union
 
 from nlpstack.data import Vocabulary
 from nlpstack.data.indexers import TokenIndexer
@@ -52,6 +52,8 @@ class SklearnBasicClassifier(
         token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
         datamodule: Optional[BasicClassificationDataModule] = None,
         # model configuration
+        dropout: Optional[float] = None,
+        class_weights: Optional[Union[Literal["balanced"], Mapping[str, float]]] = None,
         classifier: Optional[TorchBasicClassifier] = None,
         # training configuration
         max_epochs: int = 4,
@@ -71,6 +73,8 @@ class SklearnBasicClassifier(
             vocab=vocab,
             tokenizer=tokenizer,
             token_indexers=token_indexers,
+            dropout=dropout,
+            class_weights=class_weights,
             classifier=classifier,
             max_epochs=max_epochs,
             batch_size=batch_size,
