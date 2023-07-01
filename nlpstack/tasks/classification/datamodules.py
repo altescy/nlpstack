@@ -9,7 +9,7 @@ from nlpstack.data.fields import Field, LabelField, MetadataField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 
-from .data import ClassificationExample, ClassificationInference, ClassificationPrediction
+from .types import ClassificationExample, ClassificationInference, ClassificationPrediction
 
 logger = getLogger(__name__)
 

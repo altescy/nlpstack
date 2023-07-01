@@ -10,8 +10,8 @@ from nlpstack.torch.modules.seq2seq_encoders import Seq2SeqEncoder
 from nlpstack.torch.modules.text_embedders import TextEmbedder
 from nlpstack.torch.util import get_mask_from_text
 
-from .data import SequenceLabelingInference
 from .datamodules import SequenceLabelingDataModule
+from .types import SequenceLabelingInference
 
 
 @dataclasses.dataclass

@@ -13,10 +13,10 @@ from nlpstack.torch.training import TorchTrainer
 from nlpstack.torch.training.callbacks import Callback
 from nlpstack.torch.training.optimizers import AdamFactory
 
-from .data import SequenceLabelingExample, SequenceLabelingInference, SequenceLabelingPrediction
 from .datamodules import SequenceLabelingDataModule
 from .metrics import SequenceLabelingMetric, TokenBasedAccuracy
 from .torch import TorchSequenceLabeler
+from .types import SequenceLabelingExample, SequenceLabelingInference, SequenceLabelingPrediction
 
 logger = getLogger(__name__)
 

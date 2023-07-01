@@ -8,11 +8,11 @@ from nlpstack.sklearn.rune import SklearnEstimatorForRune
 from nlpstack.torch.training import TorchTrainer
 from nlpstack.torch.training.callbacks import Callback
 
-from .data import SequenceLabelingExample, SequenceLabelingPrediction
 from .datamodules import SequenceLabelingDataModule
 from .metrics import SequenceLabelingMetric
 from .rune import BasicSequenceLabeler
 from .torch import TorchSequenceLabeler
+from .types import SequenceLabelingExample, SequenceLabelingPrediction
 
 BasicInputsX = Sequence[Sequence[str]]
 BasicInputsY = Sequence[Sequence[str]]

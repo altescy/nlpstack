@@ -8,11 +8,11 @@ from nlpstack.sklearn.rune import SklearnEstimatorForRune
 from nlpstack.torch.training import TorchTrainer
 from nlpstack.torch.training.callbacks import Callback
 
-from .data import MultilabelClassificationExample, MultilabelClassificationPrediction
 from .datamodules import MultilabelClassificationDataModule
 from .metrics import MultilabelClassificationMetric
 from .rune import MultilabelClassifier
 from .torch import TorchMultilabelClassifier
+from .types import MultilabelClassificationExample, MultilabelClassificationPrediction
 
 BasicInputsX = Sequence[str]
 BasicInputsY = Sequence[Sequence[str]]

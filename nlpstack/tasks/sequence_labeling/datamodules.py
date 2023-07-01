@@ -9,7 +9,7 @@ from nlpstack.data.fields import Field, MetadataField, SequenceLabelField, TextF
 from nlpstack.data.indexers import SingleIdTokenIndexer, Token, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 
-from .data import SequenceLabelingExample, SequenceLabelingInference, SequenceLabelingPrediction
+from .types import SequenceLabelingExample, SequenceLabelingInference, SequenceLabelingPrediction
 
 logger = getLogger(__name__)
 

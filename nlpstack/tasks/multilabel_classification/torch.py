@@ -12,8 +12,8 @@ from nlpstack.torch.modules.seq2vec_encoders import Seq2VecEncoder
 from nlpstack.torch.modules.text_embedders import TextEmbedder
 from nlpstack.torch.util import get_mask_from_text
 
-from .data import MultilabelClassificationInference
 from .datamodules import MultilabelClassificationDataModule
+from .types import MultilabelClassificationInference
 
 
 @dataclasses.dataclass

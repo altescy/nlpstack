@@ -4,7 +4,7 @@ import numpy
 
 from nlpstack.evaluation import Metric
 
-from .data import MultilabelClassificationInference
+from .types import MultilabelClassificationInference
 
 
 class MultilabelClassificationMetric(Metric[MultilabelClassificationInference]):

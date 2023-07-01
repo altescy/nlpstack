@@ -19,10 +19,10 @@ from nlpstack.torch.training import TorchTrainer
 from nlpstack.torch.training.callbacks import Callback
 from nlpstack.torch.training.optimizers import AdamFactory
 
-from .data import ClassificationExample, ClassificationInference, ClassificationPrediction
 from .datamodules import BasicClassificationDataModule
 from .metrics import Accuracy, ClassificationMetric
 from .torch import TorchBasicClassifier
+from .types import ClassificationExample, ClassificationInference, ClassificationPrediction
 
 logger = getLogger(__name__)
 

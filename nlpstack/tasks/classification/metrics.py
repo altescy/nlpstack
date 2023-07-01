@@ -4,7 +4,7 @@ import numpy
 
 from nlpstack.evaluation import Metric
 
-from .data import ClassificationInference
+from .types import ClassificationInference
 
 
 class ClassificationMetric(Metric[ClassificationInference]):

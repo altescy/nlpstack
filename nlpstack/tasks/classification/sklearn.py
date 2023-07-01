@@ -8,11 +8,11 @@ from nlpstack.sklearn.rune import SklearnEstimatorForRune
 from nlpstack.torch.training import TorchTrainer
 from nlpstack.torch.training.callbacks import Callback
 
-from .data import ClassificationExample, ClassificationPrediction
 from .datamodules import BasicClassificationDataModule
 from .metrics import ClassificationMetric
 from .rune import BasicClassifier as BasicClassifier
 from .torch import TorchBasicClassifier
+from .types import ClassificationExample, ClassificationPrediction
 
 BasicInputsX = Sequence[str]
 BasicInputsY = Sequence[str]

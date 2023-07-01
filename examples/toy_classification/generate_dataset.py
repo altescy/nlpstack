@@ -6,7 +6,7 @@ from os import PathLike
 from pathlib import Path
 from typing import Iterator, Union
 
-from nlpstack.tasks.classification.data import ClassificationExample
+from nlpstack.tasks.classification.types import ClassificationExample
 
 
 def generate_dataset(size: int) -> Iterator[ClassificationExample]:

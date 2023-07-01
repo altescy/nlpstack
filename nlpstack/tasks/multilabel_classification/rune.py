@@ -13,10 +13,14 @@ from nlpstack.torch.training import TorchTrainer
 from nlpstack.torch.training.callbacks import Callback
 from nlpstack.torch.training.optimizers import AdamFactory
 
-from .data import MultilabelClassificationExample, MultilabelClassificationInference, MultilabelClassificationPrediction
 from .datamodules import MultilabelClassificationDataModule
 from .metrics import MultilabelAccuracy, MultilabelClassificationMetric
 from .torch import TorchMultilabelClassifier
+from .types import (
+    MultilabelClassificationExample,
+    MultilabelClassificationInference,
+    MultilabelClassificationPrediction,
+)
 
 logger = getLogger(__name__)
 
