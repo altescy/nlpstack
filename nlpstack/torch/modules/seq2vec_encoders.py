@@ -1,4 +1,4 @@
-from typing import Callable, Literal, Optional, Sequence, cast
+from typing import Callable, List, Literal, Optional, Sequence, Union, cast
 
 import torch
 
@@ -27,11 +27,6 @@ class BagOfEmbeddings(Seq2VecEncoder):
         self._pooling = pooling
 
     def forward(self, inputs: torch.FloatTensor, mask: Optional[torch.BoolTensor] = None) -> torch.FloatTensor:
-        """
-        :param inputs: (batch_size, seq_len, embedding_dim)
-        :param mask: (batch_size, seq_len)
-        :return: (batch_size, embedding_dim)
-        """
         if mask is None:
             mask = cast(torch.BoolTensor, torch.ones_like(inputs[..., 0], dtype=torch.bool))
 
@@ -55,24 +50,46 @@ class BagOfEmbeddings(Seq2VecEncoder):
 
 
 class TokenPooler(Seq2VecEncoder):
-    def __init__(self, input_dim: int, position: int = 0) -> None:
+    def __init__(
+        self,
+        input_dim: int,
+        positions: Union[int, Sequence[int]] = 0,
+        output_dim: Optional[int] = None,
+    ) -> None:
+        if isinstance(positions, int):
+            positions = [positions]
+
         super().__init__()
         self._input_dim = input_dim
-        self._position = position
+        self._positions = positions
+        self._output_dim = output_dim
+        self._projection: Optional[torch.nn.Linear] = None
+        if output_dim is not None:
+            self._projection = torch.nn.Linear(len(positions) * input_dim, output_dim)
 
     def forward(self, inputs: torch.FloatTensor, mask: Optional[torch.BoolTensor] = None) -> torch.FloatTensor:
         if mask is None:
             mask = cast(torch.BoolTensor, torch.ones_like(inputs[..., 0], dtype=torch.bool))
 
         lengths = mask.sum(dim=1).long()
-        positions = torch.full_like(lengths, self._position) if self._position >= 0 else lengths + self._position
-        return cast(torch.FloatTensor, inputs[torch.arange(inputs.size(0)), positions])
+        embeddings: List[torch.Tensor] = []
+        for position in self._positions:
+            positions = torch.full_like(lengths, position) if position >= 0 else lengths + position
+            embeddings.append(inputs[torch.arange(inputs.size(0)), positions])
+
+        output = cast(torch.FloatTensor, torch.cat(embeddings, dim=-1))
+        if self._projection is not None:
+            output = self._projection(output)
+
+        return output
 
     def get_input_dim(self) -> int:
         return self._input_dim
 
     def get_output_dim(self) -> int:
-        return self._input_dim
+        if self._output_dim is not None:
+            return self._output_dim
+        return len(self._positions) * self._input_dim
 
 
 class CnnEncoder(Seq2VecEncoder):
@@ -119,30 +136,30 @@ class CnnEncoder(Seq2VecEncoder):
 
     def forward(
         self,
-        tokens: torch.Tensor,
+        inputs: torch.Tensor,
         mask: Optional[torch.BoolTensor] = None,
     ) -> torch.FloatTensor:
         if mask is not None:
-            tokens = tokens * mask.unsqueeze(-1)
+            inputs = inputs * mask.unsqueeze(-1)
         else:
-            mask = cast(torch.BoolTensor, torch.ones(tokens.shape[0], tokens.shape[1], device=tokens.device).bool())
+            mask = cast(torch.BoolTensor, torch.ones(inputs.shape[0], inputs.shape[1], device=inputs.device).bool())
 
-        tokens = torch.transpose(tokens, 1, 2)
+        inputs = torch.transpose(inputs, 1, 2)
 
         filter_outputs = []
-        batch_size = tokens.shape[0]
-        last_unmasked_tokens = mask.sum(dim=1).unsqueeze(dim=-1)  # Shape: (batch_size, 1)
+        batch_size = inputs.shape[0]
+        last_unmasked_inputs = mask.sum(dim=1).unsqueeze(dim=-1)  # Shape: (batch_size, 1)
         for i in range(len(self._convolution_layers)):
             convolution_layer = getattr(self, "conv_layer_{}".format(i))
-            pool_length = tokens.shape[2] - convolution_layer.kernel_size[0] + 1
+            pool_length = inputs.shape[2] - convolution_layer.kernel_size[0] + 1
 
-            activations = self._activation(convolution_layer(tokens))
+            activations = self._activation(convolution_layer(inputs))
 
             indices = (
                 torch.arange(pool_length, device=activations.device).unsqueeze(0).expand(batch_size, pool_length)
             )  # Shape: (batch_size, pool_length)
             activations_mask = indices.ge(
-                last_unmasked_tokens - convolution_layer.kernel_size[0] + 1
+                last_unmasked_inputs - convolution_layer.kernel_size[0] + 1
             )  # Shape: (batch_size, pool_length)
             activations_mask = activations_mask.unsqueeze(1).expand_as(
                 activations
@@ -163,3 +180,44 @@ class CnnEncoder(Seq2VecEncoder):
         else:
             result = maxpool_output
         return cast(torch.FloatTensor, result)
+
+
+class ConcatSeq2VecEncoder(Seq2VecEncoder):
+    def __init__(
+        self,
+        encoders: Sequence[Seq2VecEncoder],
+        output_dim: Optional[int] = None,
+    ) -> None:
+        if not len({encoder.get_input_dim() for encoder in encoders}) == 1:
+            raise ValueError("All encoders must have the same input dimension")
+
+        super().__init__()
+        self._encoders = torch.nn.ModuleList(encoders)
+        self._output_dim = output_dim
+        self._projection: Optional[torch.nn.Linear] = None
+        if output_dim is not None:
+            self._projection = torch.nn.Linear(
+                sum(encoder.get_output_dim() for encoder in encoders),
+                output_dim,
+            )
+
+    def get_input_dim(self) -> int:
+        return cast(int, self._encoders[0].get_input_dim())
+
+    def get_output_dim(self) -> int:
+        if self._output_dim is not None:
+            return self._output_dim
+        return sum(encoder.get_output_dim() for encoder in self._encoders)
+
+    def forward(
+        self,
+        inputs: torch.Tensor,
+        mask: Optional[torch.BoolTensor] = None,
+    ) -> torch.FloatTensor:
+        output = cast(
+            torch.FloatTensor,
+            torch.cat([encoder(inputs, mask) for encoder in self._encoders], dim=-1),
+        )
+        if self._projection is not None:
+            output = self._projection(output)
+        return output

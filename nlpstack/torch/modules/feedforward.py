@@ -38,5 +38,8 @@ class FeedForward(torch.nn.Module):
             x = layer(x)
         return x
 
+    def get_input_dim(self) -> int:
+        return self._input_dim
+
     def get_output_dim(self) -> int:
         return self._hidden_dims[-1]
