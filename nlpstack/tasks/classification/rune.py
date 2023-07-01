@@ -7,7 +7,7 @@ from typing import Any, Dict, Iterable, Iterator, Literal, Mapping, Optional, Se
 import numpy
 
 from nlpstack.data import DataLoader, Vocabulary
-from nlpstack.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
+from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 from nlpstack.data.util import batched
 from nlpstack.evaluation import MultiMetrics
@@ -19,10 +19,10 @@ from nlpstack.torch.training import TorchTrainer
 from nlpstack.torch.training.callbacks import Callback
 from nlpstack.torch.training.optimizers import AdamFactory
 
-from .data import ClassificationExample, ClassificationInference, ClassificationPrediction
 from .datamodules import BasicClassificationDataModule
 from .metrics import Accuracy, ClassificationMetric
-from .models import TorchBasicClassifier
+from .torch import TorchBasicClassifier
+from .types import ClassificationExample, ClassificationInference, ClassificationPrediction
 
 logger = getLogger(__name__)
 
@@ -47,6 +47,8 @@ class BasicClassifier(
         token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
         datamodule: Optional[BasicClassificationDataModule] = None,
         # model configuration
+        dropout: Optional[float] = None,
+        class_weights: Optional[Union[Literal["balanced"], Mapping[str, float]]] = None,
         classifier: Optional[TorchBasicClassifier] = None,
         # training configuration
         max_epochs: int = 4,
@@ -100,7 +102,15 @@ class BasicClassifier(
             classifier = TorchBasicClassifier(
                 embedder=TextEmbedder({"tokens": Embedding(64)}),
                 encoder=BagOfEmbeddings(64),
+                dropout=dropout,
+                class_weights=class_weights,
             )
+        else:
+            if (dropout, class_weights) != (None, None):
+                warnings.warn(
+                    "Ignoring dropout and class_weights because classifier is given.",
+                    UserWarning,
+                )
 
         if trainer is None:
             trainer = TorchTrainer(

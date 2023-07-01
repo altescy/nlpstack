@@ -3,13 +3,13 @@ from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Seque
 
 import numpy
 
-from nlpstack.common import ProgressBar
-from nlpstack.data import DataModule, Dataset, Instance, Token, Vocabulary
+from nlpstack.common import FileBackendSequence, ProgressBar
+from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, LabelField, MetadataField, TextField
-from nlpstack.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
+from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 
-from .data import ClassificationExample, ClassificationInference, ClassificationPrediction
+from .types import ClassificationExample, ClassificationInference, ClassificationPrediction
 
 logger = getLogger(__name__)
 
@@ -56,7 +56,7 @@ class BasicClassificationDataModule(
                     label=example.label,
                 )
 
-        return Dataset.from_iterable(tokenized_document_generator())
+        return FileBackendSequence.from_iterable(tokenized_document_generator())
 
     def _build_vocab(self, dataset: Sequence[ClassificationExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
@@ -98,6 +98,13 @@ class BasicClassificationDataModule(
         sorted_indices = inference.probs.argsort(axis=1)[:, ::-1]
         sorted_probs = numpy.take_along_axis(inference.probs, sorted_indices, axis=1)
         for i, (top_indices, top_probs) in enumerate(zip(sorted_indices.tolist(), sorted_probs.tolist())):
+            num_labels_to_return = len(top_indices)
+            if inference.threshold is not None:
+                num_labels_to_return = sum(prob >= inference.threshold for prob in top_probs)
+            if inference.top_k is not None:
+                num_labels_to_return = min(num_labels_to_return, inference.top_k)
+            top_indices = top_indices[:num_labels_to_return]
+            top_probs = top_probs[:num_labels_to_return]
             yield ClassificationPrediction(
                 top_probs=top_probs,
                 top_labels=[self.vocab.get_token_by_index(self.label_namespace, index) for index in top_indices],

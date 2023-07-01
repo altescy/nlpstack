@@ -2,17 +2,17 @@ import itertools
 from typing import Any, Iterator, Mapping, Optional, Sequence, Union
 
 from nlpstack.data import Vocabulary
-from nlpstack.data.token_indexers import TokenIndexer
+from nlpstack.data.indexers import TokenIndexer
 from nlpstack.data.tokenizers import Token
-from nlpstack.sklearn.base import SklearnEstimatorForRune
+from nlpstack.sklearn.rune import SklearnEstimatorForRune
 from nlpstack.torch.training import TorchTrainer
 from nlpstack.torch.training.callbacks import Callback
 
-from .data import SequenceLabelingExample, SequenceLabelingPrediction
 from .datamodules import SequenceLabelingDataModule
 from .metrics import SequenceLabelingMetric
 from .rune import BasicSequenceLabeler
 from .torch import TorchSequenceLabeler
+from .types import SequenceLabelingExample, SequenceLabelingPrediction
 
 BasicInputsX = Sequence[Sequence[str]]
 BasicInputsY = Sequence[Sequence[str]]

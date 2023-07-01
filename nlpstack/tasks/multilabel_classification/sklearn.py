@@ -2,21 +2,21 @@ import itertools
 from typing import Any, Iterator, Literal, Mapping, Optional, Sequence, Union
 
 from nlpstack.data import Vocabulary
-from nlpstack.data.token_indexers import TokenIndexer
+from nlpstack.data.indexers import TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer
-from nlpstack.sklearn.base import SklearnEstimatorForRune
+from nlpstack.sklearn.rune import SklearnEstimatorForRune
 from nlpstack.torch.training import TorchTrainer
 from nlpstack.torch.training.callbacks import Callback
 
-from .data import MultilabelClassificationExample, MultilabelClassificationPrediction
 from .datamodules import MultilabelClassificationDataModule
 from .metrics import MultilabelClassificationMetric
 from .rune import MultilabelClassifier
 from .torch import TorchMultilabelClassifier
+from .types import MultilabelClassificationExample, MultilabelClassificationPrediction
 
 BasicInputsX = Sequence[str]
 BasicInputsY = Sequence[Sequence[str]]
-BasicOutputs = Sequence[MultilabelClassificationPrediction]
+BasicOutputs = Sequence[Sequence[str]]
 
 
 class SklearnMultilabelClassifier(
@@ -37,7 +37,7 @@ class SklearnMultilabelClassifier(
 
     @staticmethod
     def output_builder(predictions: Iterator[MultilabelClassificationPrediction]) -> BasicOutputs:
-        return list(predictions)
+        return [pred.top_labels for pred in predictions]
 
     def __init__(
         self,

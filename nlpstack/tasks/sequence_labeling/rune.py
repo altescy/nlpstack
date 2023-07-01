@@ -3,7 +3,7 @@ from logging import getLogger
 from typing import Any, Dict, Mapping, Optional, Sequence, Set, Union
 
 from nlpstack.data import DataLoader, Vocabulary
-from nlpstack.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
+from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 from nlpstack.rune import RuneForTorch
 from nlpstack.torch.modules.seq2seq_encoders import LstmSeq2SeqEncoder
@@ -13,10 +13,10 @@ from nlpstack.torch.training import TorchTrainer
 from nlpstack.torch.training.callbacks import Callback
 from nlpstack.torch.training.optimizers import AdamFactory
 
-from .data import SequenceLabelingExample, SequenceLabelingInference, SequenceLabelingPrediction
 from .datamodules import SequenceLabelingDataModule
 from .metrics import SequenceLabelingMetric, TokenBasedAccuracy
 from .torch import TorchSequenceLabeler
+from .types import SequenceLabelingExample, SequenceLabelingInference, SequenceLabelingPrediction
 
 logger = getLogger(__name__)
 

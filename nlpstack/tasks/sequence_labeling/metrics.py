@@ -5,8 +5,8 @@ import numpy
 
 from nlpstack.evaluation import Metric
 
-from .data import SequenceLabelingInference
 from .datamodules import SequenceLabelingDataModule
+from .types import SequenceLabelingInference
 from .util import bio_tags_to_spans, bioul_tags_to_spans, bmes_tags_to_spans, iob1_tags_to_spans
 
 LabelEncoding = Literal["BIO", "IOB1", "BIOUL", "BMES"]

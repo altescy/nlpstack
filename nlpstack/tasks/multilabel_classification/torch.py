@@ -12,8 +12,8 @@ from nlpstack.torch.modules.seq2vec_encoders import Seq2VecEncoder
 from nlpstack.torch.modules.text_embedders import TextEmbedder
 from nlpstack.torch.util import get_mask_from_text
 
-from .data import MultilabelClassificationInference
 from .datamodules import MultilabelClassificationDataModule
+from .types import MultilabelClassificationInference
 
 
 @dataclasses.dataclass
@@ -32,7 +32,7 @@ class TorchMultilabelClassifier(TorchModel[MultilabelClassificationInference]):
         feedforward: Optional[FeedForward] = None,
         dropout: Optional[float] = None,
         class_weights: Optional[Union[Literal["balanced"], Mapping[str, float]]] = None,
-        threshold: float = 0.5,
+        threshold: Optional[float] = 0.5,
         label_namespace: str = "labels",
     ) -> None:
         super().__init__()

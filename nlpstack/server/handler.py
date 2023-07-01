@@ -6,46 +6,49 @@ from logging import getLogger
 from pathlib import Path
 from typing import Any, Generic, Tuple, Type, TypeVar
 
-import colt
+from colt import ColtBuilder
 from colt.error import ConfigurationError
 
 from nlpstack.common import generate_json_schema
 from nlpstack.rune import Rune
 
 logger = getLogger(__name__)
+coltbuilder = ColtBuilder(typekey="type", strict=True)
 
 Example = TypeVar("Example")
 Prediction = TypeVar("Prediction")
 
 
-def _extract_example_and_prediction_classes(rune: Rune[Example, Prediction]) -> Tuple[Type[Example], Type[Prediction]]:
-    bases = getattr(rune, "__orig_bases__", None)
-    if bases is None:
-        raise ValueError("Rune must be a generic type")
-
-    rune_bases = [
-        base
-        for base in bases
-        if (isinstance(base, typing._GenericAlias) and issubclass(base.__origin__, Rune))  # type: ignore
-    ]
-    if len(bases) < 1:
-        raise ValueError("Rune must be a subclass of Rune")
-
-    rune_base = rune_bases[0]
-    rune_args = typing.get_args(rune_base)
-    if len(rune_args) < 2:
-        raise ValueError("Rune must have two type arguments")
-
-    input_class, output_class = rune_args[:2]
-    if not dataclasses.is_dataclass(input_class):
-        raise ValueError("Input class must be a dataclass")
-    if not dataclasses.is_dataclass(output_class):
-        raise ValueError("Output class must be a dataclass")
-
-    return input_class, output_class
-
-
 class RuneHandler(SimpleHTTPRequestHandler, Generic[Example, Prediction]):
+    @staticmethod
+    def _extract_example_and_prediction_classes(
+        rune: Rune[Example, Prediction]
+    ) -> Tuple[Type[Example], Type[Prediction]]:
+        bases = getattr(rune, "__orig_bases__", None)
+        if bases is None:
+            raise ValueError("Rune must be a generic type")
+
+        rune_bases = [
+            base
+            for base in bases
+            if (isinstance(base, typing._GenericAlias) and issubclass(base.__origin__, Rune))  # type: ignore
+        ]
+        if len(bases) < 1:
+            raise ValueError("Rune must be a subclass of Rune")
+
+        rune_base = rune_bases[0]
+        rune_args = typing.get_args(rune_base)
+        if len(rune_args) < 2:
+            raise ValueError("Rune must have two type arguments")
+
+        input_class, output_class = rune_args[:2]
+        if not dataclasses.is_dataclass(input_class):
+            raise ValueError("Input class must be a dataclass")
+        if not dataclasses.is_dataclass(output_class):
+            raise ValueError("Output class must be a dataclass")
+
+        return input_class, output_class
+
     def __init__(
         self,
         *args: Any,
@@ -53,7 +56,7 @@ class RuneHandler(SimpleHTTPRequestHandler, Generic[Example, Prediction]):
         health_check: str = "/health",
         **kwargs: Any,
     ) -> None:
-        input_class, output_class = _extract_example_and_prediction_classes(rune)
+        input_class, output_class = self._extract_example_and_prediction_classes(rune)
 
         self._rune = rune
         self._health_check = health_check
@@ -90,8 +93,8 @@ class RuneHandler(SimpleHTTPRequestHandler, Generic[Example, Prediction]):
         self.end_headers()
         self.wfile.write(schema.encode())
 
-    def _serve_prediction(self, example: Example) -> None:
-        prediction = next(self._rune.predict([example]))
+    def _serve_prediction(self, example: Example, **kwargs: Any) -> None:
+        prediction = next(self._rune.predict([example], **kwargs))
         self.send_response(200)
         self.send_header("Content-type", "application/json")
         self.end_headers()
@@ -142,12 +145,16 @@ class RuneHandler(SimpleHTTPRequestHandler, Generic[Example, Prediction]):
                     return
                 content_length = int(self.headers["Content-Length"])
                 try:
-                    body = self.rfile.read(content_length)
-                    example = colt.build(json.loads(body), self._input_class)
-                except (json.JSONDecodeError, ValueError, ConfigurationError):
+                    body = json.loads(self.rfile.read(content_length))
+                    if not isinstance(body, dict):
+                        raise ValueError("Body must be a JSON object")
+                    inputs = body.pop("inputs")
+                    kwargs = body
+                    example = coltbuilder(inputs, self._input_class)
+                except (json.JSONDecodeError, ValueError, ConfigurationError, KeyError):
                     self._handle_error_response(400, "Bad Request")
                     return
-                self._serve_prediction(example)
+                self._serve_prediction(example, **kwargs)
             else:
                 self._handle_error_response(404, "Not Found")
         except Exception as e:

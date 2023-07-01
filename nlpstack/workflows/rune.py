@@ -10,8 +10,7 @@ from typing import Any, Callable, Generic, Iterable, Iterator, Mapping, Optional
 import colt
 import minato
 
-from nlpstack.common import load_jsonnet
-from nlpstack.data import Dataset
+from nlpstack.common import FileBackendSequence, load_jsonnet
 from nlpstack.rune import Rune, RuneArchive
 
 from .workflow import Workflow
@@ -59,10 +58,12 @@ class RuneWorkflow(Workflow):
             print("No train dataset filename given.")
             exit(1)
 
-        train_examples: Sequence = Dataset.from_iterable(rune_config.reader(rune_config.train_dataset_filename))
+        train_examples: Sequence = FileBackendSequence.from_iterable(
+            rune_config.reader(rune_config.train_dataset_filename)
+        )
         valid_examples: Optional[Sequence] = None
         if rune_config.valid_dataset_filename is not None:
-            valid_examples = Dataset.from_iterable(rune_config.reader(rune_config.valid_dataset_filename))
+            valid_examples = FileBackendSequence.from_iterable(rune_config.reader(rune_config.valid_dataset_filename))
 
         model = rune_config.model
         model.train(train_examples, valid_examples)

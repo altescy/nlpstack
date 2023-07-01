@@ -3,13 +3,17 @@ from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
 import numpy
 
-from nlpstack.common import ProgressBar
-from nlpstack.data import DataModule, Dataset, Instance, Token, Vocabulary
-from nlpstack.data.fields import Field, MetadataField, TensorField, TextField
-from nlpstack.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
+from nlpstack.common import FileBackendSequence, ProgressBar
+from nlpstack.data import DataModule, Instance, Token, Vocabulary
+from nlpstack.data.fields import Field, MetadataField, MultiLabelField, TextField
+from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 
-from .data import MultilabelClassificationExample, MultilabelClassificationInference, MultilabelClassificationPrediction
+from .types import (
+    MultilabelClassificationExample,
+    MultilabelClassificationInference,
+    MultilabelClassificationPrediction,
+)
 
 logger = getLogger(__name__)
 
@@ -58,7 +62,7 @@ class MultilabelClassificationDataModule(
                     labels=example.labels,
                 )
 
-        return Dataset.from_iterable(tokenized_document_generator())
+        return FileBackendSequence.from_iterable(tokenized_document_generator())
 
     def _build_vocab(self, dataset: Sequence[MultilabelClassificationExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
@@ -92,10 +96,7 @@ class MultilabelClassificationDataModule(
             fields["metadata"] = MetadataField(metadata)
 
         if labels is not None:
-            label_indices = [self.vocab.get_index_by_token(self.label_namespace, label) for label in labels]
-            fields["labels"] = TensorField(
-                numpy.bincount(label_indices, minlength=self.vocab.get_vocab_size(self.label_namespace)).astype(int)
-            )
+            fields["labels"] = MultiLabelField(labels, vocab=self.vocab.get_token_to_index(self.label_namespace))
 
         return Instance(**fields)
 
@@ -105,7 +106,9 @@ class MultilabelClassificationDataModule(
         sorted_indices = inference.probs.argsort(axis=1)[:, ::-1]
         sorted_probs = numpy.take_along_axis(inference.probs, sorted_indices, axis=1)
         for i, (top_indices, top_probs) in enumerate(zip(sorted_indices.tolist(), sorted_probs.tolist())):
-            num_labels_to_return = sum(p >= inference.threshold for p in top_probs)
+            num_labels_to_return = len(top_indices)
+            if inference.threshold is not None:
+                num_labels_to_return = sum(prob >= inference.threshold for prob in top_probs)
             if inference.top_k is not None:
                 num_labels_to_return = min(num_labels_to_return, inference.top_k)
             top_probs = top_probs[:num_labels_to_return]

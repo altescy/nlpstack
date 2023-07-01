@@ -6,7 +6,7 @@ local pretrained_model_name = 'bert-base-cased';
     type: 'nlpstack.tasks.sequence_labeling.rune.BasicSequenceLabeler',
     token_indexers: {
       tokens: {
-        type: 'nlpstack.data.token_indexers.PretrainedTransformerIndexer',
+        type: 'nlpstack.data.indexers.PretrainedTransformerIndexer',
         pretrained_model_name: pretrained_model_name,
         tokenize_subwords: true,
       },

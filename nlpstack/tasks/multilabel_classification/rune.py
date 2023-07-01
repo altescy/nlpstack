@@ -3,7 +3,7 @@ from logging import getLogger
 from typing import Any, Dict, Literal, Mapping, Optional, Sequence, Set, Union
 
 from nlpstack.data import DataLoader, Vocabulary
-from nlpstack.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
+from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 from nlpstack.rune import RuneForTorch
 from nlpstack.torch.modules.seq2vec_encoders import BagOfEmbeddings
@@ -13,10 +13,14 @@ from nlpstack.torch.training import TorchTrainer
 from nlpstack.torch.training.callbacks import Callback
 from nlpstack.torch.training.optimizers import AdamFactory
 
-from .data import MultilabelClassificationExample, MultilabelClassificationInference, MultilabelClassificationPrediction
 from .datamodules import MultilabelClassificationDataModule
 from .metrics import MultilabelAccuracy, MultilabelClassificationMetric
 from .torch import TorchMultilabelClassifier
+from .types import (
+    MultilabelClassificationExample,
+    MultilabelClassificationInference,
+    MultilabelClassificationPrediction,
+)
 
 logger = getLogger(__name__)
 

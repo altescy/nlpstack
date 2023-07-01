@@ -3,7 +3,7 @@ from typing import Iterator, Optional, Sequence
 
 import minato
 
-from .data import MultilabelClassificationExample, MultilabelClassificationPrediction
+from .types import MultilabelClassificationExample, MultilabelClassificationPrediction
 
 
 class JsonlReader:

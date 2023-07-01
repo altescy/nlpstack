@@ -317,7 +317,7 @@
 
         const prediction_request = new Request("/predict", {
           method: 'POST',
-          body: JSON.stringify(object),
+          body: JSON.stringify({inputs: object}),
           headers: {
             'Content-Type': 'application/json'
           }

@@ -10,11 +10,11 @@ def test_basic_classifier() -> None:
     ]
     y = ["positive", "negative", "positive", "negative"]
 
-    classifier = SklearnBasicClassifier(max_epochs=16, learning_rate=1e-2)
+    classifier = SklearnBasicClassifier(class_weights="balanced", max_epochs=16, learning_rate=1e-2)
     classifier.fit(X, y)
 
     predictions = classifier.predict(X)
-    assert [pred.label for pred in predictions] == y
+    assert predictions == y
 
     score = classifier.score(X, y)
     assert score == 1.0

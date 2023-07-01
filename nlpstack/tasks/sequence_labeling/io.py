@@ -6,7 +6,7 @@ import minato
 
 from nlpstack.data import Token
 
-from .data import SequenceLabelingExample, SequenceLabelingPrediction
+from .types import SequenceLabelingExample, SequenceLabelingPrediction
 from .util import LabelEncoding, convert_encoding
 
 

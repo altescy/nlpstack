@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 
 from nlpstack import __version__
-from nlpstack.commands import serve  # noqa: F401
 from nlpstack.commands import workflow  # noqa: F401
 from nlpstack.commands.subcommand import Subcommand
 

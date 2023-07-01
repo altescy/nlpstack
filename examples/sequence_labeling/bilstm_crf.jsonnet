@@ -6,7 +6,7 @@ local token_character_namespace = 'token_characters';
     type: 'nlpstack.tasks.sequence_labeling.rune.BasicSequenceLabeler',
     token_indexers: {
       token_characters: {
-        type: 'nlpstack.data.token_indexers.TokenCharactersIndexer',
+        type: 'nlpstack.data.indexers.TokenCharactersIndexer',
         namespace: token_character_namespace,
         min_padding_length: 4,
       },

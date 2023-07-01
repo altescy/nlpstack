@@ -2,7 +2,8 @@ from functools import cached_property
 from logging import getLogger
 from typing import Any, Callable, Generic, Iterable, Iterator, Mapping, Optional, Sequence, TypeVar, Union
 
-from nlpstack.data import Dataset, Instance
+from nlpstack.common import FileBackendSequence
+from nlpstack.data import Instance
 from nlpstack.data.datamodule import DataModule
 from nlpstack.evaluation import EmptyMetric, Evaluator, Metric, MultiMetrics, SimpleEvaluator
 from nlpstack.torch.model import TorchModel
@@ -84,11 +85,13 @@ class RuneForTorch(
         self.datamodule.setup(**self.kwargs, **kwargs)
 
         logger.info("Reading training dataset...")
-        train_instances = Dataset.from_iterable(self.datamodule.read_dataset(train_dataset, is_training=True))
-        valid_instances: Optional[Dataset[Instance]] = None
+        train_instances: Sequence[Instance] = FileBackendSequence.from_iterable(
+            self.datamodule.read_dataset(train_dataset, is_training=True)
+        )
+        valid_instances: Optional[Sequence[Instance]] = None
         if valid_dataset is not None:
             logger.info("Reading validation dataset...")
-            valid_instances = Dataset.from_iterable(self.datamodule.read_dataset(valid_dataset))
+            valid_instances = FileBackendSequence.from_iterable(self.datamodule.read_dataset(valid_dataset))
 
         logger.info("Setup model...")
         self.model.setup(datamodule=self.datamodule, **self.kwargs, **kwargs)

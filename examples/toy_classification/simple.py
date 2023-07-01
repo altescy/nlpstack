@@ -3,8 +3,8 @@ import json
 from os import PathLike
 from typing import List, Union
 
-from nlpstack.tasks.classification.data import ClassificationExample
 from nlpstack.tasks.classification.rune import BasicClassifier
+from nlpstack.tasks.classification.types import ClassificationExample
 
 
 def load_dataset(filename: Union[str, PathLike]) -> List[ClassificationExample]:

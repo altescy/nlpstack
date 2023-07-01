@@ -1,5 +1,5 @@
-from nlpstack.tasks.classification.data import ClassificationExample
 from nlpstack.tasks.classification.rune import FastTextClassifier
+from nlpstack.tasks.classification.types import ClassificationExample
 
 
 def test_fasttext_classifier() -> None:

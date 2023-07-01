@@ -3,7 +3,7 @@
     type: 'nlpstack.tasks.classification.rune.BasicClassifier',
     max_epochs: 10,
     classifier: {
-      type: 'nlpstack.tasks.classification.models.TorchBasicClassifier',
+      type: 'nlpstack.tasks.classification.torch.TorchBasicClassifier',
       embedder: {
         token_embedders: {
           tokens: {

@@ -1,22 +1,22 @@
 import itertools
-from typing import Any, Iterator, Mapping, Optional, Sequence, Union
+from typing import Any, Iterator, Literal, Mapping, Optional, Sequence, Union
 
 from nlpstack.data import Vocabulary
-from nlpstack.data.token_indexers import TokenIndexer
+from nlpstack.data.indexers import TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer
-from nlpstack.sklearn.base import SklearnEstimatorForRune
+from nlpstack.sklearn.rune import SklearnEstimatorForRune
 from nlpstack.torch.training import TorchTrainer
 from nlpstack.torch.training.callbacks import Callback
 
-from .data import ClassificationExample, ClassificationPrediction
 from .datamodules import BasicClassificationDataModule
 from .metrics import ClassificationMetric
-from .models import TorchBasicClassifier
 from .rune import BasicClassifier as BasicClassifier
+from .torch import TorchBasicClassifier
+from .types import ClassificationExample, ClassificationPrediction
 
 BasicInputsX = Sequence[str]
 BasicInputsY = Sequence[str]
-BasicOutputs = Sequence[ClassificationPrediction]
+BasicOutputs = Sequence[str]
 
 
 class SklearnBasicClassifier(
@@ -37,7 +37,7 @@ class SklearnBasicClassifier(
 
     @staticmethod
     def output_builder(predictions: Iterator[ClassificationPrediction]) -> BasicOutputs:
-        return list(predictions)
+        return [pred.label for pred in predictions]
 
     def __init__(
         self,
@@ -52,6 +52,8 @@ class SklearnBasicClassifier(
         token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
         datamodule: Optional[BasicClassificationDataModule] = None,
         # model configuration
+        dropout: Optional[float] = None,
+        class_weights: Optional[Union[Literal["balanced"], Mapping[str, float]]] = None,
         classifier: Optional[TorchBasicClassifier] = None,
         # training configuration
         max_epochs: int = 4,
@@ -71,6 +73,8 @@ class SklearnBasicClassifier(
             vocab=vocab,
             tokenizer=tokenizer,
             token_indexers=token_indexers,
+            dropout=dropout,
+            class_weights=class_weights,
             classifier=classifier,
             max_epochs=max_epochs,
             batch_size=batch_size,

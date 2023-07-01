@@ -18,6 +18,8 @@ class ClassificationInference:
     probs: numpy.ndarray
     labels: Optional[numpy.ndarray] = None
     metadata: Optional[Sequence[Dict[str, Any]]] = None
+    top_k: Optional[int] = None
+    threshold: Optional[float] = None
 
 
 @dataclasses.dataclass
