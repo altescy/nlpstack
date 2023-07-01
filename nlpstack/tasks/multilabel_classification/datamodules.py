@@ -3,8 +3,8 @@ from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
 import numpy
 
-from nlpstack.common import ProgressBar
-from nlpstack.data import DataModule, Dataset, Instance, Token, Vocabulary
+from nlpstack.common import FileBackendSequence, ProgressBar
+from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, MultiLabelField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
@@ -58,7 +58,7 @@ class MultilabelClassificationDataModule(
                     labels=example.labels,
                 )
 
-        return Dataset.from_iterable(tokenized_document_generator())
+        return FileBackendSequence.from_iterable(tokenized_document_generator())
 
     def _build_vocab(self, dataset: Sequence[MultilabelClassificationExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:

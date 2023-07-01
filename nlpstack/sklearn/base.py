@@ -1,8 +1,8 @@
-from typing import Any, Callable, Generic, Iterator, Mapping, Optional, TypeVar
+from typing import Any, Callable, Generic, Iterator, Mapping, Optional, Sequence, TypeVar
 
 from sklearn.base import BaseEstimator
 
-from nlpstack.data import Dataset
+from nlpstack.common import FileBackendSequence
 from nlpstack.rune import Rune
 
 Self = TypeVar("Self", bound="SklearnEstimatorForRune")
@@ -45,10 +45,10 @@ class SklearnEstimatorForRune(
         resources: Optional[Mapping[str, Any]] = None,
         **kwargs: Any,
     ) -> Self:
-        train_dataset = Dataset.from_iterable(self.input_builder(X, y))
-        valid_dataset: Optional[Dataset[Example]] = None
+        train_dataset: Sequence[Example] = FileBackendSequence.from_iterable(self.input_builder(X, y))
+        valid_dataset: Optional[Sequence[Example]] = None
         if X_valid is not None and y_valid is not None:
-            valid_dataset = Dataset.from_iterable(self.input_builder(X_valid, y_valid))
+            valid_dataset = FileBackendSequence.from_iterable(self.input_builder(X_valid, y_valid))
         self._rune.train(train_dataset, valid_dataset, resources, **kwargs)
         return self
 
