@@ -1,6 +1,7 @@
 import functools
-from typing import Any, Dict, Iterator, Mapping, Sequence
+from typing import Any, Dict, Iterator, Mapping, Sequence, Union, cast
 
+import numpy
 from collatable.fields.adjacency_field import AdjacencyField  # noqa: F401
 from collatable.fields.field import Field  # noqa: F401
 from collatable.fields.index_field import IndexField  # noqa: F401
@@ -13,6 +14,7 @@ from collatable.fields.sequence_label_field import SequenceLabelField  # noqa: F
 from collatable.fields.span_field import SpanField  # noqa: F401
 from collatable.fields.tensor_field import TensorField  # noqa: F401
 from collatable.fields.text_field import TextField as SingleTextField  # noqa: F401
+from collatable.typing import Tensor
 
 from nlpstack.data.indexers import TokenIndexer
 from nlpstack.data.tokenizers import Token
@@ -102,3 +104,37 @@ class TextField(SequenceField[Dict[str, Any]]):
         collate_fn = super().collate
         arrays = [x.as_array() for x in arrays]
         return {key: collate_fn([x[key] for x in arrays]) for key in arrays[0]}
+
+
+class MultiLabelField(Field[Tensor]):
+    __slots__ = ["_labels", "_label_indices", "_num_labels"]
+
+    def __init__(
+        self,
+        labels: Union[Sequence[Sequence[int]], Sequence[Sequence[str]]],
+        vocab: Mapping[str, int],
+    ) -> None:
+        super().__init__()
+        self._labels = labels
+        self._num_labels = len(vocab)
+
+        self._label_indices: Sequence[int]
+        if all(isinstance(label, int) for label in labels):
+            self._label_indices = cast(Sequence[int], labels)
+        elif all(isinstance(label, str) for label in labels):
+            self._label_indices = [vocab[label] for label in cast(Sequence[str], labels)]
+        else:
+            raise ValueError("labels must be either all int or all str")
+
+    def __str__(self) -> str:
+        return f"[{', '.join(str(label) for label in self._labels)}]"
+
+    def __repr__(self) -> str:
+        return f"MultiLabelField(labels={self._labels})"
+
+    @property
+    def labels(self) -> Union[Sequence[Sequence[int]], Sequence[Sequence[str]]]:
+        return self._labels
+
+    def as_array(self) -> Tensor:
+        return numpy.bincount(self._label_indices, minlength=self._num_labels)

@@ -5,7 +5,7 @@ import numpy
 
 from nlpstack.common import ProgressBar
 from nlpstack.data import DataModule, Dataset, Instance, Token, Vocabulary
-from nlpstack.data.fields import Field, MetadataField, TensorField, TextField
+from nlpstack.data.fields import Field, MetadataField, MultiLabelField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 
@@ -92,10 +92,7 @@ class MultilabelClassificationDataModule(
             fields["metadata"] = MetadataField(metadata)
 
         if labels is not None:
-            label_indices = [self.vocab.get_index_by_token(self.label_namespace, label) for label in labels]
-            fields["labels"] = TensorField(
-                numpy.bincount(label_indices, minlength=self.vocab.get_vocab_size(self.label_namespace)).astype(int)
-            )
+            fields["labels"] = MultiLabelField(labels, vocab=self.vocab.get_token_to_index(self.label_namespace))
 
         return Instance(**fields)
 
