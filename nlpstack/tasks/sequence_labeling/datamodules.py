@@ -5,7 +5,7 @@ import numpy
 
 from nlpstack.common import ProgressBar
 from nlpstack.data import DataModule, Dataset, Instance, Vocabulary
-from nlpstack.data.fields import Field, LabelField, ListField, MetadataField, TextField
+from nlpstack.data.fields import Field, MetadataField, SequenceLabelField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, Token, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 
@@ -82,14 +82,16 @@ class SequenceLabelingDataModule(
         if isinstance(text, str):
             text = self._tokenizer.tokenize(text)
 
+        text_field = TextField(text, self._vocab, self._token_indexers)
+
         fields: Dict[str, Field] = {}
-        fields["tokens"] = TextField(text, self._vocab, self._token_indexers)
+        fields["tokens"] = text_field
 
         if labels is not None:
-            if len(labels) != len(text):
-                raise ValueError(f"Length of labels must be equal to length of text: {example}")
-            fields["labels"] = ListField(
-                [LabelField(label, vocab=self._vocab[self._label_namespace]) for label in labels],
+            fields["labels"] = SequenceLabelField(
+                labels,
+                text_field,
+                vocab=self.vocab.get_token_to_index(self._label_namespace),
             )
 
         fields["metadata"] = MetadataField(
