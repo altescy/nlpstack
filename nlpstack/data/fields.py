@@ -1,3 +1,4 @@
+import functools
 from typing import Any, Dict, Iterator, Mapping, Sequence
 
 from collatable.fields.adjacency_field import AdjacencyField  # noqa: F401
@@ -52,16 +53,25 @@ class MappingField(Field[Dict[str, Any]]):
 
 
 class TextField(SequenceField[Dict[str, Any]]):
+    __slots__ = ["_tokens", "_text_fields"]
+
     def __init__(
         self,
         tokens: Sequence[Token],
         vocab: Vocabulary,
         indexers: Mapping[str, TokenIndexer],
     ) -> None:
-        super().__init__(padding_value={key: indexer.get_pad_index(vocab) for key, indexer in indexers.items()})
+        super().__init__()
 
         self._tokens = tokens
-        self._indexed_tokens = {key: indexer(tokens, vocab) for key, indexer in indexers.items()}
+        self._text_fields = {
+            key: SingleTextField(
+                tokens,
+                indexer=functools.partial(indexer, vocab=vocab),
+                padding_value=indexer.get_pad_index(vocab),
+            )
+            for key, indexer in indexers.items()
+        }
 
     def __len__(self) -> int:
         return len(self.tokens)
@@ -83,14 +93,12 @@ class TextField(SequenceField[Dict[str, Any]]):
         return self._tokens
 
     def as_array(self) -> Dict[str, Any]:
-        return self._indexed_tokens
+        return {key: field.as_array() for key, field in self._text_fields.items()}
 
     def collate(  # type: ignore[override]
         self,
         arrays: Sequence,
     ) -> Dict[str, Any]:
         collate_fn = super().collate
-        if not isinstance(arrays[0], TextField):
-            return collate_fn(arrays)  # type: ignore[no-any-return]
         arrays = [x.as_array() for x in arrays]
         return {key: collate_fn([x[key] for x in arrays]) for key in arrays[0]}
