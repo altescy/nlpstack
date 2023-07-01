@@ -22,7 +22,7 @@ from nlpstack.torch.training.optimizers import AdamFactory
 from .data import ClassificationExample, ClassificationInference, ClassificationPrediction
 from .datamodules import BasicClassificationDataModule
 from .metrics import Accuracy, ClassificationMetric
-from .models import TorchBasicClassifier
+from .torch import TorchBasicClassifier
 
 logger = getLogger(__name__)
 

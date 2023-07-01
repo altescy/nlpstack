@@ -11,8 +11,8 @@ from nlpstack.torch.training.callbacks import Callback
 from .data import ClassificationExample, ClassificationPrediction
 from .datamodules import BasicClassificationDataModule
 from .metrics import ClassificationMetric
-from .models import TorchBasicClassifier
 from .rune import BasicClassifier as BasicClassifier
+from .torch import TorchBasicClassifier
 
 BasicInputsX = Sequence[str]
 BasicInputsY = Sequence[str]
