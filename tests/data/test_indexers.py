@@ -1,7 +1,7 @@
 import numpy
 
 from nlpstack.data import Token, Vocabulary
-from nlpstack.data.token_indexers import PretrainedFasttextIndexer
+from nlpstack.data.indexers import PretrainedFasttextIndexer
 
 
 def test_pretrained_fasttext_indexer() -> None:

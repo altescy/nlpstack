@@ -2,7 +2,7 @@ import itertools
 from typing import Any, Iterator, Literal, Mapping, Optional, Sequence, Union
 
 from nlpstack.data import Vocabulary
-from nlpstack.data.token_indexers import TokenIndexer
+from nlpstack.data.indexers import TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer
 from nlpstack.sklearn.base import SklearnEstimatorForRune
 from nlpstack.torch.training import TorchTrainer

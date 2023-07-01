@@ -6,7 +6,7 @@ import numpy
 from nlpstack.common import ProgressBar
 from nlpstack.data import DataModule, Dataset, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, TensorField, TextField
-from nlpstack.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
+from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 
 from .data import MultilabelClassificationExample, MultilabelClassificationInference, MultilabelClassificationPrediction

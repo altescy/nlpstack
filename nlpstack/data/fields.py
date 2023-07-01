@@ -15,7 +15,7 @@ from collatable.fields.tensor_field import TensorField  # noqa: F401
 from collatable.fields.text_field import TextField as SingleTextField
 from collatable.typing import DataArray
 
-from nlpstack.data.token_indexers import TokenIndexer
+from nlpstack.data.indexers import TokenIndexer
 from nlpstack.data.tokenizers import Token
 from nlpstack.data.vocabulary import Vocabulary
 

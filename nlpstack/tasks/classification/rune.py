@@ -7,7 +7,7 @@ from typing import Any, Dict, Iterable, Iterator, Literal, Mapping, Optional, Se
 import numpy
 
 from nlpstack.data import DataLoader, Vocabulary
-from nlpstack.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
+from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 from nlpstack.data.util import batched
 from nlpstack.evaluation import MultiMetrics

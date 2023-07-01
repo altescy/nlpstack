@@ -3,7 +3,7 @@ from logging import getLogger
 from typing import Any, Dict, Mapping, Optional, Sequence, Set, Union
 
 from nlpstack.data import DataLoader, Vocabulary
-from nlpstack.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
+from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 from nlpstack.rune import RuneForTorch
 from nlpstack.torch.modules.seq2seq_encoders import LstmSeq2SeqEncoder
