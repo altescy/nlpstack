@@ -1,5 +1,5 @@
 from contextlib import suppress
-from typing import Callable, Literal, Optional, Sequence, Union, cast
+from typing import Callable, Literal, Optional, Sequence, Tuple, Union, cast
 
 import torch
 
@@ -242,3 +242,100 @@ class ComposeSeq2SeqEncoder(Seq2SeqEncoder):
         for encoder in self._encoders:
             output = encoder(output, mask)
         return output
+
+
+class WindowConcatEncoder(Seq2SeqEncoder):
+    def __init__(
+        self,
+        input_dim: int,
+        window_size: Union[int, Tuple[int, int]],
+        output_dim: Optional[int] = None,
+    ) -> None:
+        super().__init__()
+        if isinstance(window_size, int):
+            window_size = (window_size, window_size)
+        if not all(s >= 0 for s in window_size):
+            raise ValueError("Window size must be greater than or equal to zero.")
+        self._input_dim = input_dim
+        self._window_size = window_size
+        self._projection: Optional[torch.nn.Linear] = None
+        if output_dim is not None:
+            self._projection = torch.nn.Linear(
+                (sum(window_size) + 1) * input_dim,
+                output_dim,
+            )
+
+    def get_input_dim(self) -> int:
+        return self._input_dim
+
+    def get_output_dim(self) -> int:
+        if self._projection is not None:
+            return self._projection.out_features
+        return (sum(self._window_size) + 1) * self._input_dim
+
+    def forward(
+        self,
+        inputs: torch.FloatTensor,
+        mask: torch.BoolTensor,
+    ) -> torch.FloatTensor:
+        batch_size, max_length, embedding_dim = inputs.size()
+        inputs = cast(torch.FloatTensor, inputs * mask.float().unsqueeze(2))
+
+        output = inputs
+        lws, rws = self._window_size
+        if lws > 0:
+            pad = inputs.new_zeros((batch_size, lws, embedding_dim))
+            x = torch.cat([pad, inputs], dim=1)
+            x = torch.cat([x[:, offset : offset + max_length] for offset in range(lws)], dim=2)
+            output = cast(torch.FloatTensor, torch.cat([output, x], dim=2))
+        if rws > 0:
+            pad = inputs.new_zeros((batch_size, rws, embedding_dim))
+            x = torch.cat([inputs, pad], dim=1)
+            x = torch.cat([x[:, offset : offset + max_length] for offset in range(1, rws + 1)], dim=2)
+            output = cast(torch.FloatTensor, torch.cat([output, x], dim=2))
+
+        if self._projection is not None:
+            output = self._projection(output)
+
+        return cast(torch.FloatTensor, output * mask.float().unsqueeze(2))
+
+
+class ResidualSeq2SeqEncoder(Seq2SeqEncoder):
+    def __init__(
+        self,
+        encoder: Seq2SeqEncoder,
+        projection: bool = True,
+    ) -> None:
+        super().__init__()
+
+        self._encoder = encoder
+        self._projection: Optional[torch.nn.Module] = None
+        if projection:
+            self._projection = torch.nn.Linear(
+                encoder.get_output_dim(),
+                encoder.get_input_dim(),
+            )
+        else:
+            if self._encoder.get_input_dim() != self._encoder.get_output_dim():
+                raise ValueError(
+                    "If not projecting, input and output dimensions must match, "
+                    f"but found {self._encoder.get_input_dim()} and {self._encoder.get_output_dim()}."
+                )
+
+    def get_input_dim(self) -> int:
+        return self._encoder.get_input_dim()
+
+    def get_output_dim(self) -> int:
+        return self.get_input_dim()
+
+    def forward(
+        self,
+        inputs: torch.FloatTensor,
+        mask: torch.BoolTensor,
+    ) -> torch.FloatTensor:
+        # Shape: (batch_size, max_length, embedding_size)
+        encodings = self._encoder(inputs, mask)
+        if self._projection is not None:
+            encodings = self._projection(encodings)
+
+        return cast(torch.FloatTensor, inputs + encodings)
