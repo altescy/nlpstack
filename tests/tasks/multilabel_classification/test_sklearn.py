@@ -50,7 +50,7 @@ def test_multilabel_classifier() -> None:
 
     predictions = classifier.predict(X)
     assert len(predictions) == len(X)
-    assert [set(pred.top_labels) for pred in predictions] == [set(gold) for gold in y]
+    assert [set(labels) for labels in predictions] == [set(labels) for labels in y]
 
     score = classifier.score(X, y)
     assert abs(score - 1.0) < 1e-6

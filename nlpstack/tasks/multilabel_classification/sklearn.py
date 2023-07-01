@@ -16,7 +16,7 @@ from .types import MultilabelClassificationExample, MultilabelClassificationPred
 
 BasicInputsX = Sequence[str]
 BasicInputsY = Sequence[Sequence[str]]
-BasicOutputs = Sequence[MultilabelClassificationPrediction]
+BasicOutputs = Sequence[Sequence[str]]
 
 
 class SklearnMultilabelClassifier(
@@ -37,7 +37,7 @@ class SklearnMultilabelClassifier(
 
     @staticmethod
     def output_builder(predictions: Iterator[MultilabelClassificationPrediction]) -> BasicOutputs:
-        return list(predictions)
+        return [pred.top_labels for pred in predictions]
 
     def __init__(
         self,

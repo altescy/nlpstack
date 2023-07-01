@@ -16,7 +16,7 @@ from .types import ClassificationExample, ClassificationPrediction
 
 BasicInputsX = Sequence[str]
 BasicInputsY = Sequence[str]
-BasicOutputs = Sequence[ClassificationPrediction]
+BasicOutputs = Sequence[str]
 
 
 class SklearnBasicClassifier(
@@ -37,7 +37,7 @@ class SklearnBasicClassifier(
 
     @staticmethod
     def output_builder(predictions: Iterator[ClassificationPrediction]) -> BasicOutputs:
-        return list(predictions)
+        return [pred.label for pred in predictions]
 
     def __init__(
         self,
