@@ -8,5 +8,5 @@ export VALID_DATASET_FILENAME=path/to/conll2003/valid.txt
 nlpstack workflow rune train config.jsonnet archive.tar.gz
 
 # Serve model
-nlpstack serve archive.tar.gz
+nlpstack workflow rune serve archive.tar.gz
 ```

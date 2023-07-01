@@ -37,4 +37,7 @@ nlpstack workflow rune evaluate config.jsonnet output/archive.tar.gz \
 nlpstack workflow rune predict config.jsonnet output/archive.tar.gz \
   --input-filename data/test.jsonl \
   --output-filename output/predictions.jsonl
+
+# serve model
+nlpstack workflow rune serve output/archive.tar.gz
 ```
