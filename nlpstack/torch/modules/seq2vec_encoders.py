@@ -22,7 +22,7 @@ class BagOfEmbeddings(Seq2VecEncoder):
     def __init__(
         self,
         input_dim: int,
-        pooling: Literal["mean", "max"] = "mean",
+        pooling: Literal["mean", "max", "sum"] = "mean",
     ) -> None:
         super().__init__()
         self._input_dim = input_dim
@@ -41,6 +41,11 @@ class BagOfEmbeddings(Seq2VecEncoder):
             return cast(
                 torch.FloatTensor,
                 inputs.masked_fill_(~mask.unsqueeze(-1), float("-inf")).max(dim=1).values,
+            )
+        elif self._pooling == "sum":
+            return cast(
+                torch.FloatTensor,
+                torch.sum(inputs * mask.unsqueeze(-1), dim=1),
             )
         raise ValueError(f"Unknown pooling: {self._pooling}")
 
