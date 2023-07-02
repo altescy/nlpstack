@@ -115,7 +115,12 @@ class TorchMultilabelClassifier(TorchModel[MultilabelClassificationInference]):
             inference.labels = labels.detach().cpu().numpy()
             output.loss = cast(
                 torch.FloatTensor,
-                F.binary_cross_entropy_with_logits(logits, labels.bool().float(), pos_weight=self._pos_weight)
+                F.binary_cross_entropy_with_logits(
+                    logits,
+                    labels.bool().float(),
+                    pos_weight=self._pos_weight,
+                    reduction="sum",
+                )
                 / logits.size(0),
             )
 
