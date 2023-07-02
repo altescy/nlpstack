@@ -20,6 +20,11 @@ class WhitespaceTokenizer(Tokenizer):
         return [Token(surface) for surface in text.split()]
 
 
+class CharacterTokenizer(Tokenizer):
+    def tokenize(self, text: str) -> List[Token]:
+        return [Token(surface) for surface in text]
+
+
 class SpacyTokenizer(Tokenizer):
     def __init__(self, lang: str) -> None:
         import spacy
