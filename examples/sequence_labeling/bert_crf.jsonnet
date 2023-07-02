@@ -22,7 +22,6 @@ local pretrained_model_name = 'bert-base-cased';
               pretrained_model_name: pretrained_model_name,
               train_parameters: false,
               last_layer_only: false,
-              max_length: 16,
             },
             dropout: 0.1,
           },
