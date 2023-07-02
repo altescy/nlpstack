@@ -41,3 +41,20 @@ nlpstack workflow rune predict config.jsonnet output/archive.tar.gz \
 # serve model
 nlpstack workflow rune serve output/archive.tar.gz
 ```
+
+## Experiment Tracking / Hyperparameter Tuning
+
+By using `rune-mlflow` workflow, you can track experiments and tune hyperparameters.
+Please note that `MlflowCallback` is required to track metric.
+
+```shell
+# setup mlflow if you need
+export MLFLOW_TRACKING_URI=...
+export MLFLOW_EXPERIMENT_NAME=...
+
+# train model with mlflow
+nlpstack workflow rune-mlflow train config.jsonnet
+
+# tune hyperparameters
+nlpstack workflow rune-mlflow tune tuning.jsonnet hparams.jsonnet --n-trials 10
+```
