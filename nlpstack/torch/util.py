@@ -86,7 +86,7 @@ def masked_mean(
     dim: int,
     keepdim: bool = False,
 ) -> TensorType:
-    replaced_vector = vector.masked_fill(~mask, 0.0)
+    replaced_vector = vector * mask
     value_sum = torch.sum(replaced_vector, dim=dim, keepdim=keepdim)
     value_count = torch.sum(mask, dim=dim, keepdim=keepdim)
     return cast(TensorType, value_sum / value_count.float().clamp(min=tiny_value_of_dtype(torch.float)))

@@ -32,21 +32,14 @@ class BagOfEmbeddings(Seq2VecEncoder):
         if mask is None:
             mask = cast(torch.BoolTensor, torch.ones_like(inputs[..., 0], dtype=torch.bool))
 
+        mask = cast(torch.BoolTensor, mask.unsqueeze(-1))
+
         if self._pooling == "mean":
-            return cast(
-                torch.FloatTensor,
-                torch.sum(inputs * mask.unsqueeze(-1), dim=1) / mask.sum(dim=1).unsqueeze(-1),
-            )
+            return masked_mean(inputs, mask, dim=1)
         elif self._pooling == "max":
-            return cast(
-                torch.FloatTensor,
-                inputs.masked_fill_(~mask.unsqueeze(-1), float("-inf")).max(dim=1).values,
-            )
+            return cast(torch.FloatTensor, inputs.masked_fill_(~mask, float("-inf")).max(dim=1).values)
         elif self._pooling == "sum":
-            return cast(
-                torch.FloatTensor,
-                torch.sum(inputs * mask.unsqueeze(-1), dim=1),
-            )
+            return cast(torch.FloatTensor, torch.sum(inputs * mask, dim=1))
         raise ValueError(f"Unknown pooling: {self._pooling}")
 
     def get_input_dim(self) -> int:
