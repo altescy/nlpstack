@@ -1,4 +1,5 @@
-from typing import List, NamedTuple, Optional
+from os import PathLike
+from typing import List, NamedTuple, Optional, Union
 
 import numpy
 
@@ -45,7 +46,7 @@ class SpacyTokenizer(Tokenizer):
 
 
 class PretrainedTransformerTokenizer(Tokenizer):
-    def __init__(self, pretrained_model_name: str) -> None:
+    def __init__(self, pretrained_model_name: Union[str, PathLike]) -> None:
         from transformers import AutoTokenizer
 
         self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name)
