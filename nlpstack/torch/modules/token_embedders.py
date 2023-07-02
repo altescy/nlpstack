@@ -1,4 +1,5 @@
-from typing import Any, Optional, cast
+from os import PathLike
+from typing import Any, Optional, Union, cast
 
 import torch
 
@@ -126,7 +127,7 @@ class AggregativeTokenEmbedder(TokenEmbedder):
 class PretrainedTransformerEmbedder(TokenEmbedder):
     def __init__(
         self,
-        pretrained_model_name: str,
+        pretrained_model_name: Union[str, PathLike],
         eval_mode: bool = False,
         train_parameters: bool = True,
         last_layer_only: bool = True,

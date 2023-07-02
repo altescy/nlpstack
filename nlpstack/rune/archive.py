@@ -1,13 +1,14 @@
 import dataclasses
 import datetime
 import json
-import pickle
 import tarfile
 import tempfile
 from logging import getLogger
 from os import PathLike
 from pathlib import Path
 from typing import ClassVar, Generic, List, Mapping, Optional, Sequence, Tuple, Type, TypeVar, Union
+
+import dill as pickle
 
 from .base import Rune
 

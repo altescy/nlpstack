@@ -1,7 +1,7 @@
 from nlpstack.tasks.multilabel_classification.metrics import (
     AverageAccuracy,
     MacroMultilabelFBeta,
-    MicroMultilabelFbeta,
+    MicroMultilabelFBeta,
     MultilabelAccuracy,
     OverallAccuracy,
 )
@@ -43,7 +43,7 @@ def test_multilabel_classifier() -> None:
             AverageAccuracy(),
             OverallAccuracy(),
             MacroMultilabelFBeta(),
-            MicroMultilabelFbeta(),
+            MicroMultilabelFBeta(),
         ],
     )
     classifier.fit(X, y)
