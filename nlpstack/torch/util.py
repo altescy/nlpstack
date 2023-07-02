@@ -224,6 +224,41 @@ def add_positional_features(
     return cast(TensorType, tensor + sinusoids.unsqueeze(0))
 
 
+def fold(tensor: TensorType, max_length: int) -> TensorType:
+    assert tensor.dim() >= 2
+
+    batch_size = tensor.size(0)
+    original_length = tensor.size(1)
+    if original_length <= max_length:
+        return tensor
+
+    num_segments, remainder = divmod(original_length, max_length)
+    if remainder > 0:
+        num_segments += 1
+        tensor = cast(TensorType, torch.cat([tensor[:, :-remainder], tensor[:, -max_length:]], dim=1))
+    rest_shape = tensor.size()[2:]
+    return cast(TensorType, tensor.reshape(batch_size * num_segments, max_length, *rest_shape))
+
+
+def unfold(tensor: TensorType, original_length: int) -> TensorType:
+    assert tensor.dim() >= 2
+
+    folded_length = tensor.size(1)
+    if original_length <= folded_length:
+        return tensor
+
+    num_segments, remainder = divmod(original_length, folded_length)
+    if remainder > 0:
+        num_segments += 1
+    batch_size = tensor.size(0) // num_segments
+    unfolded_length = original_length + (remainder > 0) * (folded_length - remainder)
+    rest_shape = tensor.size()[2:]
+    x = cast(TensorType, tensor.reshape(batch_size, unfolded_length, *rest_shape))
+    if remainder > 0:
+        x = cast(TensorType, torch.cat([x[:, :-folded_length], x[:, -remainder:]], dim=1))
+    return x
+
+
 @overload
 def viterbi_decode(
     tag_sequence: torch.Tensor,
