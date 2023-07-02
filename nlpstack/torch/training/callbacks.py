@@ -3,9 +3,11 @@ import tempfile
 import typing
 from logging import Logger, getLogger
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any, Dict, Mapping, Optional
 
 import torch
+
+from nlpstack.mlflow.util import flatten_dict_for_mlflow_log
 
 if typing.TYPE_CHECKING:
     from nlpstack.torch.training.trainer import TorchTrainer, TrainingState
@@ -171,7 +173,31 @@ class MlflowCallback(Callback):
         metrics: Mapping[str, Any],
         resources: Mapping[str, Any],
     ) -> None:
+        metrics = flatten_dict_for_mlflow_log(metrics)
         for key, value in metrics.items():
             if key in ("train_loss",):
                 continue
-            self._mlflow.log_metric(key, value, step=training_state.step)
+            if isinstance(value, (int, float)):
+                self._mlflow.log_metric(key, value, step=training_state.step)
+            else:
+                self._log_nonnumerical_metric(key, value, training_state.step)
+
+    def _log_nonnumerical_metric(self, key: str, value: Any, step: int) -> None:
+        with tempfile.TemporaryDirectory() as _tempdir:
+            tempdir = Path(_tempdir)
+
+            temppath = tempdir / key
+            temppath.write_text(repr(value))
+
+            self._mlflow.log_artifact(temppath, f"metrics/step_{step}")
+
+    def __getstate__(self) -> Dict[str, Any]:
+        state = self.__dict__.copy()
+        state.pop("_mlflow")
+        return state
+
+    def __setstate__(self, state: Dict[str, Any]) -> None:
+        import mlflow
+
+        state["_mlflow"] = mlflow
+        self.__dict__.update(state)

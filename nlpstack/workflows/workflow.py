@@ -69,6 +69,10 @@ class Workflow:
             elif not positional:
                 argparse_kwargs["required"] = True
 
+            if arg_type == bool and default is not None:
+                argparse_kwargs.pop("type")
+                argparse_kwargs["action"] = "store_false" if default else "store_true"
+
             if positional:
                 parser.add_argument(name, **argparse_kwargs)
             else:
