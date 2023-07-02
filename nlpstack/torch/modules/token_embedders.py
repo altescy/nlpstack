@@ -7,7 +7,7 @@ from nlpstack.torch.modules.lazy import LazyEmbedding
 from nlpstack.torch.modules.scalarmix import ScalarMix
 from nlpstack.torch.modules.seq2vec_encoders import BagOfEmbeddings, Seq2VecEncoder
 from nlpstack.torch.modules.time_distributed import TimeDistributed
-from nlpstack.torch.util import batched_span_select
+from nlpstack.torch.util import batched_span_select, fold, unfold
 
 
 class TokenEmbedder(torch.nn.Module):
@@ -132,6 +132,7 @@ class PretrainedTransformerEmbedder(TokenEmbedder):
         last_layer_only: bool = True,
         submodule: Optional[str] = None,
         gradient_checkpointing: Optional[bool] = None,
+        max_length: Optional[int] = None,
     ) -> None:
         from transformers import AutoModel
 
@@ -157,6 +158,8 @@ class PretrainedTransformerEmbedder(TokenEmbedder):
         if not last_layer_only:
             self._scalaer_mix = ScalarMix(self._model.config.num_hidden_layers)
             self._model.config.output_hidden_states = True
+
+        self._max_length = max_length
 
     def train(self, mode: bool = True) -> "PretrainedTransformerEmbedder":
         self.training = mode
@@ -184,6 +187,15 @@ class PretrainedTransformerEmbedder(TokenEmbedder):
             else:
                 assert token_ids.shape == type_ids.shape
 
+        sequence_length = token_ids.shape[1]
+
+        if self._max_length is not None:
+            token_ids = fold(token_ids, self._max_length)
+            if mask is not None:
+                mask = fold(mask, self._max_length)
+            if type_ids is not None:
+                type_ids = fold(type_ids, self._max_length)
+
         transofrmer_inputs = {
             "input_ids": token_ids,
             "attention_mask": mask.float() if mask is not None else None,
@@ -200,5 +212,8 @@ class PretrainedTransformerEmbedder(TokenEmbedder):
             embeddings = self._scalaer_mix(hidden_states)
         else:
             embeddings = transformer_outputs.last_hidden_state
+
+        if self._max_length is not None:
+            embeddings = unfold(embeddings, sequence_length)
 
         return cast(torch.FloatTensor, embeddings)
