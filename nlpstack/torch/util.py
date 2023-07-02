@@ -80,6 +80,37 @@ def logsumexp(tensor: torch.Tensor, dim: int = -1, keepdim: bool = False) -> tor
     return cast(torch.Tensor, max_score + (stable_vec.exp().sum(dim, keepdim=keepdim)).log())
 
 
+def masked_mean(
+    vector: TensorType,
+    mask: torch.BoolTensor,
+    dim: int,
+    keepdim: bool = False,
+) -> TensorType:
+    replaced_vector = vector.masked_fill(~mask, 0.0)
+    value_sum = torch.sum(replaced_vector, dim=dim, keepdim=keepdim)
+    value_count = torch.sum(mask, dim=dim, keepdim=keepdim)
+    return cast(TensorType, value_sum / value_count.float().clamp(min=tiny_value_of_dtype(torch.float)))
+
+
+def masked_softmax(
+    vector: TensorType,
+    mask: torch.BoolTensor,
+    dim: int = -1,
+    memory_efficient: bool = False,
+) -> TensorType:
+    while mask.dim() < vector.dim():
+        mask = cast(torch.BoolTensor, mask.unsqueeze(1))
+    if not memory_efficient:
+        # To limit numerical errors from large vector elements outside the mask, we zero these out.
+        result = torch.nn.functional.softmax(vector * mask, dim=dim)
+        result = result * mask
+        result = result / (result.sum(dim=dim, keepdim=True) + tiny_value_of_dtype(result.dtype))
+    else:
+        masked_vector = vector.masked_fill(~mask, min_value_of_dtype(vector.dtype))
+        result = torch.nn.functional.softmax(masked_vector, dim=dim)
+    return cast(TensorType, result)
+
+
 def get_device_of(tensor: torch.Tensor) -> int:
     """
     Returns the device of the tensor.

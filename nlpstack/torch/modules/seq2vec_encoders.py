@@ -2,7 +2,9 @@ from typing import Callable, List, Literal, Optional, Sequence, Union, cast
 
 import torch
 
-from nlpstack.torch.util import min_value_of_dtype
+from nlpstack.torch.modules.feedforward import FeedForward
+from nlpstack.torch.modules.time_distributed import TimeDistributed
+from nlpstack.torch.util import masked_mean, masked_softmax, min_value_of_dtype
 
 
 class Seq2VecEncoder(torch.nn.Module):
@@ -221,3 +223,54 @@ class ConcatSeq2VecEncoder(Seq2VecEncoder):
         if self._projection is not None:
             output = self._projection(output)
         return output
+
+
+class SelfAttentiveSeq2VecEncoder(Seq2VecEncoder):
+    def __init__(
+        self,
+        input_dim: int,
+        feedforward: Optional[FeedForward] = None,
+    ) -> None:
+        super().__init__()
+        self._input_dim = input_dim
+
+        if feedforward is None:
+            scorer: torch.nn.Module = torch.nn.Linear(input_dim, 1)
+        else:
+            scorer = torch.nn.Sequential(
+                feedforward,
+                torch.nn.Linear(feedforward.get_output_dim(), 1),  # type: ignore
+            )
+        self._global_attention = TimeDistributed(scorer)  # type: ignore
+
+    def get_input_dim(self) -> int:
+        return self._input_dim
+
+    def get_output_dim(self) -> int:
+        return self._input_dim
+
+    def forward(
+        self,
+        inputs: torch.Tensor,
+        mask: Optional[torch.BoolTensor] = None,
+    ) -> torch.FloatTensor:
+        batch_size, max_length, _embedding_dim = inputs.size()
+
+        if mask is None:
+            mask = cast(torch.BoolTensor, inputs.new_ones((batch_size, max_length), dtype=torch.bool))
+
+        # Shape: (batch_size, max_length, 1)
+        mask = cast(torch.BoolTensor, mask.unsqueeze(-1))
+
+        # Shape: (batch_size, max_length, 1)
+        global_attention_logits = self._global_attention(inputs)
+        # Shape: (batch_size, max_length, 1)
+        global_attention_weights = masked_softmax(global_attention_logits, mask, dim=1)
+
+        # Shape: (batch_size, max_length, embedding_dim)
+        weighted_embeddings = global_attention_weights * inputs
+
+        # Shape: (batch_size, embedding_dim)
+        output = masked_mean(weighted_embeddings, mask, dim=1)
+
+        return cast(torch.FloatTensor, output)

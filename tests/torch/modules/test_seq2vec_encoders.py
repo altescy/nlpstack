@@ -5,6 +5,7 @@ from nlpstack.torch.modules.seq2vec_encoders import (
     BagOfEmbeddings,
     CnnEncoder,
     ConcatSeq2VecEncoder,
+    SelfAttentiveSeq2VecEncoder,
     Seq2VecEncoder,
     TokenPooler,
 )
@@ -17,6 +18,7 @@ from nlpstack.torch.modules.seq2vec_encoders import (
         CnnEncoder(6, 3, (2, 3)),
         TokenPooler(6, (0, -1), 6),
         ConcatSeq2VecEncoder([BagOfEmbeddings(6, "mean"), BagOfEmbeddings(6, "max")], 6),
+        SelfAttentiveSeq2VecEncoder(6),
     ],
 )
 def test_seq2vec_encoders(seq2vec_encoder: Seq2VecEncoder) -> None:
