@@ -16,4 +16,4 @@ def _environment_variables() -> Dict[str, str]:
 
 def load_jsonnet(filename: Union[str, PathLike], ext_vars: Optional[Dict[str, Any]] = None) -> Any:
     ext_vars = {**_environment_variables(), **(ext_vars or {})}
-    return json.loads(evaluate_file(str(filename), ext_vars=_environment_variables()))
+    return json.loads(evaluate_file(str(filename), ext_vars=ext_vars))
