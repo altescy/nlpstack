@@ -94,7 +94,7 @@ class AverageAccuracy(MultilabelClassificationMetric):
         self._total = 0
 
 
-class MicroMultilabelFbeta(MultilabelClassificationMetric):
+class MicroMultilabelFBeta(MultilabelClassificationMetric):
     def __init__(
         self,
         beta: float = 1.0,
