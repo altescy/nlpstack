@@ -236,7 +236,7 @@ def fold(tensor: TensorType, max_length: int) -> TensorType:
     if remainder > 0:
         num_segments += 1
         tensor = cast(TensorType, torch.cat([tensor[:, :-remainder], tensor[:, -max_length:]], dim=1))
-    rest_shape = (-1 for _ in range(tensor.dim() - 2))
+    rest_shape = tensor.size()[2:]
     return cast(TensorType, tensor.reshape(batch_size * num_segments, max_length, *rest_shape))
 
 
@@ -252,7 +252,7 @@ def unfold(tensor: TensorType, original_length: int) -> TensorType:
         num_segments += 1
     batch_size = tensor.size(0) // num_segments
     unfolded_length = original_length + (remainder > 0) * (folded_length - remainder)
-    rest_shape = (-1 for _ in range(tensor.dim() - 2))
+    rest_shape = tensor.size()[2:]
     x = cast(TensorType, tensor.reshape(batch_size, unfolded_length, *rest_shape))
     if remainder > 0:
         x = cast(TensorType, torch.cat([x[:, :-folded_length], x[:, -remainder:]], dim=1))
