@@ -207,6 +207,10 @@ class TorchTrainer:
         totalbar_template = totalbar_template.replace("$mdl$", str(max_desc_len))
         batchbar_template = batchbar_template.replace("$mdl$", str(max_desc_len))
 
+        # compute forward pass to initialize model parameters
+        with torch.no_grad():
+            model(**(move_to_device(next(iter(self._train_dataloader(train))), device)))
+
         for callback in self._callbacks:
             callback.on_start(
                 trainer=self,
