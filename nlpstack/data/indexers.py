@@ -173,12 +173,17 @@ class PretrainedTransformerIndexer(TokenIndexer):
         pretrained_model_name: str,
         namespace: Optional[str] = None,
         tokenize_subwords: bool = False,
+        add_special_tokens: bool = False,
     ) -> None:
         from transformers import AutoTokenizer
+
+        if tokenize_subwords and add_special_tokens:
+            raise ValueError("Currently, tokenize_subwords and add_special_tokens cannot be True at the same time.")
 
         self._pretrained_model_name = pretrained_model_name
         self._namespace = namespace
         self._tokenize_subwords = tokenize_subwords
+        self._add_special_tokens = add_special_tokens
         self._tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name)
 
     def build_vocab(self, vocab: Vocabulary, documents: Iterable[Sequence[Token]]) -> None:
@@ -197,10 +202,16 @@ class PretrainedTransformerIndexer(TokenIndexer):
         indices: List[int] = []
         type_ids: List[int] = []
         mask: List[bool] = []
-        for token in tokens:
-            indices.append(self._tokenizer.convert_tokens_to_ids(token.surface))
-            type_ids.append(0)
-            mask.append(True)
+
+        tokenized = self._tokenizer.encode_plus(
+            [token.surface for token in tokens],
+            add_special_tokens=self._add_special_tokens,
+        )
+
+        indices = tokenized["input_ids"]
+        type_ids = tokenized["token_type_ids"] if "token_type_ids" in tokenized else [0] * len(indices)
+        mask = tokenized["attention_mask"]
+
         return {
             "token_ids": numpy.array(indices, dtype=int),
             "mask": numpy.array(mask, dtype=bool),
