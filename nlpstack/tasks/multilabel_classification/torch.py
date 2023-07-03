@@ -65,11 +65,8 @@ class TorchMultilabelClassifier(TorchModel[MultilabelClassificationInference]):
         if self._class_weights is not None and self._pos_weight is not None:
             self._pos_weight.materialize((num_labels,))
             if self._class_weights == "balanced":
-                label_counts = {
-                    key: value + 1  # plus one for smoothing
-                    for key, value in vocab.get_token_to_count(self._label_namespace).items()
-                }
-                total_label_count = sum(label_counts.values())
+                label_counts = vocab.get_token_to_count(self._label_namespace)
+                total_label_count = vocab.get_num_documents(self._label_namespace)
                 for label_index, label in vocab.get_index_to_token(self._label_namespace).items():
                     self._pos_weight[label_index] = total_label_count / label_counts[label]
             else:
