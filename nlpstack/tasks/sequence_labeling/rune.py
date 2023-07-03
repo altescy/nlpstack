@@ -50,6 +50,8 @@ class BasicSequenceLabeler(
         trainer: Optional[TorchTrainer] = None,
         # evaluation configuration
         metric: Optional[Union[SequenceLabelingMetric, Sequence[SequenceLabelingMetric]]] = None,
+        # other configuration
+        random_seed: Optional[int] = None,
         **kwargs: Any,
     ) -> None:
         if datamodule is None:
@@ -139,5 +141,6 @@ class BasicSequenceLabeler(
             model=sequence_labeler,
             trainer=trainer,
             metric=metric,
+            random_seed=random_seed,
             **kwargs,
         )

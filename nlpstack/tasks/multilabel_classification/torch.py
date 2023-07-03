@@ -66,9 +66,11 @@ class TorchMultilabelClassifier(TorchModel[MultilabelClassificationInference]):
             self._pos_weight.materialize((num_labels,))
             if self._class_weights == "balanced":
                 label_counts = vocab.get_token_to_count(self._label_namespace)
-                total_label_count = sum(label_counts.values())
+                total_label_count = vocab.get_num_documents(self._label_namespace)
                 for label_index, label in vocab.get_index_to_token(self._label_namespace).items():
-                    self._pos_weight[label_index] = total_label_count / label_counts[label]
+                    num_positives = label_counts[label] + 0.5
+                    num_negatives = total_label_count - num_positives + 0.5
+                    self._pos_weight[label_index] = num_negatives / num_positives
             else:
                 torch.nn.init.constant_(self._pos_weight, 1.0)
                 for label, weight in self._class_weights.items():
@@ -115,7 +117,12 @@ class TorchMultilabelClassifier(TorchModel[MultilabelClassificationInference]):
             inference.labels = labels.detach().cpu().numpy()
             output.loss = cast(
                 torch.FloatTensor,
-                F.binary_cross_entropy_with_logits(logits, labels.bool().float(), pos_weight=self._pos_weight)
+                F.binary_cross_entropy_with_logits(
+                    logits,
+                    labels.bool().float(),
+                    pos_weight=self._pos_weight,
+                    reduction="sum",
+                )
                 / logits.size(0),
             )
 

@@ -45,6 +45,7 @@ def test_multilabel_classifier() -> None:
             MacroMultilabelFBeta(),
             MicroMultilabelFBeta(),
         ],
+        random_seed=42,
     )
     classifier.fit(X, y)
 

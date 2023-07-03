@@ -26,6 +26,7 @@ def test_basic_sequence_labeler() -> None:
             decoder=CrfDecoder("BIO"),
         ),
         metric=[SpanBasedF1(), TokenBasedAccuracy()],
+        random_seed=42,
     )
     sequence_labeler.fit(X, y)
 

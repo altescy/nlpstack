@@ -1,6 +1,8 @@
+from contextlib import suppress
 from os import PathLike
 from typing import Any, Optional, Union, cast
 
+import minato
 import torch
 
 from nlpstack.data import Vocabulary
@@ -136,6 +138,9 @@ class PretrainedTransformerEmbedder(TokenEmbedder):
         max_length: Optional[int] = None,
     ) -> None:
         from transformers import AutoModel
+
+        with suppress(FileNotFoundError):
+            pretrained_model_name = minato.cached_path(pretrained_model_name)
 
         super().__init__()
         self._model = AutoModel.from_pretrained(pretrained_model_name)

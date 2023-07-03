@@ -65,7 +65,7 @@ class PytorchSeq2SeqWrapper(Seq2SeqEncoder):
 
     def forward(self, inputs: torch.FloatTensor, mask: torch.BoolTensor) -> torch.FloatTensor:
         batch_size, seq_len, _ = inputs.size()
-        sorted_seq_len = mask.sum(dim=1)
+        sorted_seq_len = mask.sum(dim=1).detach().cpu()
         sorted_seq_len, sorted_idx = sorted_seq_len.sort(descending=True)
         _, unsorted_idx = sorted_idx.sort()
         sorted_inputs = inputs[sorted_idx]

@@ -10,6 +10,7 @@ from nlpstack.torch.model import TorchModel
 from nlpstack.torch.picklable import TorchPicklable
 from nlpstack.torch.predictor import TorchPredictor
 from nlpstack.torch.training import TorchTrainer
+from nlpstack.torch.util import set_random_seed
 
 from .base import Rune, SetupMode
 
@@ -44,12 +45,15 @@ class RuneForTorch(
             [Metric[Inference]],
             Evaluator[Inference],
         ] = SimpleEvaluator,
+        random_seed: Optional[int] = None,
         **kwargs: Any,
     ) -> None:
         self.datamodule = datamodule
         self.model = model
         self.trainer = trainer
         self.kwargs = kwargs
+
+        self.random_seed = random_seed
 
         self.metric: Metric[Inference]
         if metric is None:
@@ -81,6 +85,9 @@ class RuneForTorch(
         resources: Optional[Mapping[str, Any]] = None,
         **kwargs: Any,
     ) -> Self:
+        if self.random_seed is not None:
+            set_random_seed(self.random_seed)
+
         logger.info("Setup datamodule...")
         self.datamodule.setup(**self.kwargs, **kwargs)
 

@@ -1,6 +1,7 @@
 import math
+import random
 from logging import getLogger
-from typing import Any, List, Mapping, Optional, Tuple, TypeVar, Union, cast, overload
+from typing import Any, List, Literal, Mapping, Optional, Sequence, Tuple, TypeVar, Union, cast, overload
 
 import numpy
 import torch
@@ -9,6 +10,14 @@ logger = getLogger(__name__)
 
 T = TypeVar("T")
 TensorType = TypeVar("TensorType", bound=torch.Tensor)
+
+
+def set_random_seed(seed: int) -> None:
+    random.seed(seed)
+    numpy.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
 
 
 def get_mask_from_text(text: Mapping[str, Mapping[str, torch.Tensor]]) -> torch.BoolTensor:
@@ -80,6 +89,12 @@ def logsumexp(tensor: torch.Tensor, dim: int = -1, keepdim: bool = False) -> tor
     return cast(torch.Tensor, max_score + (stable_vec.exp().sum(dim, keepdim=keepdim)).log())
 
 
+def replace_masked_values(tensor: TensorType, mask: torch.BoolTensor, replace_with: float) -> TensorType:
+    if tensor.dim() != mask.dim():
+        raise ValueError("tensor.dim() (%d) != mask.dim() (%d)" % (tensor.dim(), mask.dim()))
+    return cast(TensorType, tensor.masked_fill(~mask, replace_with))
+
+
 def masked_mean(
     vector: TensorType,
     mask: torch.BoolTensor,
@@ -90,6 +105,37 @@ def masked_mean(
     value_sum = torch.sum(replaced_vector, dim=dim, keepdim=keepdim)
     value_count = torch.sum(mask, dim=dim, keepdim=keepdim)
     return cast(TensorType, value_sum / value_count.float().clamp(min=tiny_value_of_dtype(torch.float)))
+
+
+def masked_max(
+    vector: TensorType,
+    mask: torch.BoolTensor,
+    dim: int,
+    keepdim: bool = False,
+) -> TensorType:
+    replaced_vector = vector.masked_fill(~mask, min_value_of_dtype(vector.dtype))
+    max_value, _ = replaced_vector.max(dim=dim, keepdim=keepdim)
+    return cast(TensorType, max_value)
+
+
+def masked_pool(
+    inputs: TensorType,
+    mask: Optional[torch.BoolTensor] = None,
+    method: Literal["mean", "max", "sum"] = "mean",
+    dim: int = 1,
+    keepdim: bool = False,
+) -> TensorType:
+    if mask is None:
+        mask = cast(torch.BoolTensor, inputs.new_ones(inputs.size()).bool())
+
+    if method == "mean":
+        return masked_mean(inputs, mask, dim=dim, keepdim=keepdim)
+    if method == "max":
+        return masked_max(inputs, mask, dim=dim, keepdim=keepdim)
+    if method == "sum":
+        return cast(TensorType, replace_masked_values(inputs, mask, 0.0).sum(dim=dim, keepdim=keepdim))
+
+    raise ValueError(f"Invalid pooling method: {method}")
 
 
 def masked_softmax(
@@ -109,6 +155,36 @@ def masked_softmax(
         masked_vector = vector.masked_fill(~mask, min_value_of_dtype(vector.dtype))
         result = torch.nn.functional.softmax(masked_vector, dim=dim)
     return cast(TensorType, result)
+
+
+def _get_combination(combination: str, tensors: Sequence[TensorType]) -> TensorType:
+    if combination.isdigit():
+        index = int(combination) - 1
+        return tensors[index]
+    else:
+        if len(combination) != 3:
+            raise ValueError("Invalid combination: " + combination)
+        first_tensor = _get_combination(combination[0], tensors)
+        second_tensor = _get_combination(combination[2], tensors)
+        operation = combination[1]
+        if operation == "*":
+            return cast(TensorType, first_tensor * second_tensor)
+        elif operation == "/":
+            return cast(TensorType, first_tensor / second_tensor)
+        elif operation == "+":
+            return cast(TensorType, first_tensor + second_tensor)
+        elif operation == "-":
+            return cast(TensorType, first_tensor - second_tensor)
+        else:
+            raise ValueError("Invalid operation: " + operation)
+
+
+def combine_tensors(combination: str, tensors: Sequence[TensorType]) -> TensorType:
+    if len(tensors) > 9:
+        raise ValueError("Double-digit tensor lists not currently supported")
+    combination = combination.replace("x", "1").replace("y", "2")
+    to_concatenate: List[torch.Tensor] = [_get_combination(piece, tensors) for piece in combination.split(",")]
+    return cast(TensorType, torch.cat(to_concatenate, dim=-1))
 
 
 def get_device_of(tensor: torch.Tensor) -> int:

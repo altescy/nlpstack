@@ -63,6 +63,8 @@ class SklearnBasicSequenceLabeler(
         trainer: Optional[TorchTrainer] = None,
         # evaluation configuration
         metric: Optional[Union[SequenceLabelingMetric, Sequence[SequenceLabelingMetric]]] = None,
+        # other configuration
+        random_state: Optional[int] = None,
         **kwargs: Any,
     ) -> None:
         rune = BasicSequenceLabeler(
@@ -79,6 +81,7 @@ class SklearnBasicSequenceLabeler(
             training_callbacks=training_callbacks,
             trainer=trainer,
             metric=metric,
+            random_state=random_state,
             **kwargs,
         )
         super().__init__(rune)
