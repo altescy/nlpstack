@@ -1,3 +1,4 @@
+from contextlib import suppress
 from functools import cached_property
 from os import PathLike
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, Union
@@ -170,12 +171,15 @@ class PretrainedFasttextIndexer(TokenIndexer):
 class PretrainedTransformerIndexer(TokenIndexer):
     def __init__(
         self,
-        pretrained_model_name: str,
+        pretrained_model_name: Union[str, PathLike],
         namespace: Optional[str] = None,
         tokenize_subwords: bool = False,
         add_special_tokens: bool = False,
     ) -> None:
         from transformers import AutoTokenizer
+
+        with suppress(FileNotFoundError):
+            pretrained_model_name = minato.cached_path(pretrained_model_name)
 
         if tokenize_subwords and add_special_tokens:
             raise ValueError("Currently, tokenize_subwords and add_special_tokens cannot be True at the same time.")

@@ -1,6 +1,8 @@
+from contextlib import suppress
 from os import PathLike
 from typing import List, NamedTuple, Optional, Union
 
+import minato
 import numpy
 
 
@@ -48,6 +50,9 @@ class SpacyTokenizer(Tokenizer):
 class PretrainedTransformerTokenizer(Tokenizer):
     def __init__(self, pretrained_model_name: Union[str, PathLike]) -> None:
         from transformers import AutoTokenizer
+
+        with suppress(FileNotFoundError):
+            pretrained_model_name = minato.cached_path(pretrained_model_name)
 
         self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name)
 
