@@ -42,6 +42,7 @@ class Vocabulary:
         self._token_to_index: Dict[str, Dict[str, int]] = {}
         self._index_to_token: Dict[str, Dict[int, str]] = {}
         self._token_to_count: Dict[str, Dict[str, int]] = {}
+        self._num_documents: Dict[str, int] = {}
 
     def __getitem__(self, namespace: str) -> Mapping[str, int]:
         if namespace not in self._token_to_index:
@@ -169,6 +170,11 @@ class Vocabulary:
             raise KeyError(f"Namespace {namespace} not found.")
         return len(self._index_to_token[namespace])
 
+    def get_num_documents(self, namespace: str) -> int:
+        if namespace not in self._num_documents:
+            raise KeyError(f"Namespace {namespace} not found.")
+        return self._num_documents[namespace]
+
     def has_namespace(self, namespace: str) -> bool:
         return namespace in self._index_to_token
 
@@ -238,6 +244,8 @@ class Vocabulary:
         max_count = self._max_count.get(namespace, float("inf"))
 
         ignored_tokens = self._ignored_tokens.get(namespace, set())
+
+        self._num_documents[namespace] = num_documents
 
         for token in token_count:
             if token in ignored_tokens:
