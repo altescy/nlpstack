@@ -4,7 +4,7 @@ import torch
 
 from nlpstack.torch.modules.feedforward import FeedForward
 from nlpstack.torch.modules.time_distributed import TimeDistributed
-from nlpstack.torch.util import masked_mean, masked_softmax, min_value_of_dtype
+from nlpstack.torch.util import combine_tensors, masked_mean, masked_pool, masked_softmax, min_value_of_dtype
 
 
 class Seq2VecEncoder(torch.nn.Module):
@@ -33,14 +33,7 @@ class BagOfEmbeddings(Seq2VecEncoder):
             mask = cast(torch.BoolTensor, torch.ones_like(inputs[..., 0], dtype=torch.bool))
 
         mask = cast(torch.BoolTensor, mask.unsqueeze(-1))
-
-        if self._pooling == "mean":
-            return masked_mean(inputs, mask, dim=1)
-        elif self._pooling == "max":
-            return cast(torch.FloatTensor, inputs.masked_fill_(~mask, float("-inf")).max(dim=1).values)
-        elif self._pooling == "sum":
-            return cast(torch.FloatTensor, torch.sum(inputs * mask, dim=1))
-        raise ValueError(f"Unknown pooling: {self._pooling}")
+        return masked_pool(inputs, mask, self._pooling)
 
     def get_input_dim(self) -> int:
         return self._input_dim
@@ -186,6 +179,7 @@ class ConcatSeq2VecEncoder(Seq2VecEncoder):
     def __init__(
         self,
         encoders: Sequence[Seq2VecEncoder],
+        combination: Optional[str] = None,
         output_dim: Optional[int] = None,
     ) -> None:
         if not len({encoder.get_input_dim() for encoder in encoders}) == 1:
@@ -193,6 +187,7 @@ class ConcatSeq2VecEncoder(Seq2VecEncoder):
 
         super().__init__()
         self._encoders = torch.nn.ModuleList(encoders)
+        self._combination = combination
         self._output_dim = output_dim
         self._projection: Optional[torch.nn.Linear] = None
         if output_dim is not None:
@@ -214,13 +209,16 @@ class ConcatSeq2VecEncoder(Seq2VecEncoder):
         inputs: torch.Tensor,
         mask: Optional[torch.BoolTensor] = None,
     ) -> torch.FloatTensor:
-        output = cast(
-            torch.FloatTensor,
-            torch.cat([encoder(inputs, mask) for encoder in self._encoders], dim=-1),
-        )
+        tensors: List[torch.Tensor] = [encoder(inputs, mask) for encoder in self._encoders]
+        if self._combination is not None:
+            output = combine_tensors(self._combination, tensors)
+        else:
+            output = torch.cat(tensors, dim=-1)
+
         if self._projection is not None:
             output = self._projection(output)
-        return output
+
+        return cast(torch.FloatTensor, output)
 
 
 class SelfAttentiveSeq2VecEncoder(Seq2VecEncoder):
