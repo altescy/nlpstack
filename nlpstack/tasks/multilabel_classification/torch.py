@@ -68,7 +68,9 @@ class TorchMultilabelClassifier(TorchModel[MultilabelClassificationInference]):
                 label_counts = vocab.get_token_to_count(self._label_namespace)
                 total_label_count = vocab.get_num_documents(self._label_namespace)
                 for label_index, label in vocab.get_index_to_token(self._label_namespace).items():
-                    self._pos_weight[label_index] = total_label_count / label_counts[label]
+                    num_positives = label_counts[label] + 0.5
+                    num_negatives = total_label_count - num_positives + 0.5
+                    self._pos_weight[label_index] = num_negatives / num_positives
             else:
                 torch.nn.init.constant_(self._pos_weight, 1.0)
                 for label, weight in self._class_weights.items():
