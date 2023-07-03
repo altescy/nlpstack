@@ -178,13 +178,12 @@ class PretrainedTransformerIndexer(TokenIndexer):
     ) -> None:
         from transformers import AutoTokenizer
 
-        with suppress(FileNotFoundError):
-            pretrained_model_name = minato.cached_path(pretrained_model_name)
-
         if tokenize_subwords and add_special_tokens:
             raise ValueError("Currently, tokenize_subwords and add_special_tokens cannot be True at the same time.")
 
-        self._pretrained_model_name = pretrained_model_name
+        with suppress(FileNotFoundError):
+            pretrained_model_name = minato.cached_path(pretrained_model_name)
+
         self._namespace = namespace
         self._tokenize_subwords = tokenize_subwords
         self._add_special_tokens = add_special_tokens
