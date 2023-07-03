@@ -1,4 +1,5 @@
 import math
+import random
 from logging import getLogger
 from typing import Any, List, Literal, Mapping, Optional, Sequence, Tuple, TypeVar, Union, cast, overload
 
@@ -9,6 +10,14 @@ logger = getLogger(__name__)
 
 T = TypeVar("T")
 TensorType = TypeVar("TensorType", bound=torch.Tensor)
+
+
+def set_random_seed(seed: int) -> None:
+    random.seed(seed)
+    numpy.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
 
 
 def get_mask_from_text(text: Mapping[str, Mapping[str, torch.Tensor]]) -> torch.BoolTensor:

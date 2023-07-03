@@ -63,6 +63,8 @@ class SklearnBasicClassifier(
         trainer: Optional[TorchTrainer] = None,
         # evaluation configuration
         metric: Optional[Union[ClassificationMetric, Sequence[ClassificationMetric]]] = None,
+        # other configuration
+        random_seed: Optional[int] = None,
         **kwargs: Any,
     ) -> None:
         rune = BasicClassifier(
@@ -82,6 +84,7 @@ class SklearnBasicClassifier(
             training_callbacks=training_callbacks,
             trainer=trainer,
             metric=metric,
+            random_seed=random_seed,
             **kwargs,
         )
         super().__init__(rune)

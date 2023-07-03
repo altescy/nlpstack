@@ -58,6 +58,8 @@ class BasicClassifier(
         trainer: Optional[TorchTrainer] = None,
         # evaluation configuration
         metric: Optional[Union[ClassificationMetric, Sequence[ClassificationMetric]]] = None,
+        # other configuration
+        random_seed: Optional[int] = None,
         **kwargs: Any,
     ) -> None:
         if datamodule is None:
@@ -135,6 +137,7 @@ class BasicClassifier(
             model=classifier,
             trainer=trainer,
             metric=metric,
+            random_seed=random_seed,
             **kwargs,
         )
 

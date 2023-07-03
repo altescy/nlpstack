@@ -56,6 +56,8 @@ class MultilabelClassifier(
         trainer: Optional[TorchTrainer] = None,
         # evaluation configuration
         metric: Optional[Union[MultilabelClassificationMetric, Sequence[MultilabelClassificationMetric]]] = None,
+        # other configuration
+        random_seed: Optional[int] = None,
         **kwargs: Any,
     ) -> None:
         if datamodule is None:
@@ -150,5 +152,6 @@ class MultilabelClassifier(
             model=classifier,
             trainer=trainer,
             metric=metric,
+            random_seed=random_seed,
             **kwargs,
         )
