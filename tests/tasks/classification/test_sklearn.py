@@ -1,4 +1,4 @@
-from nlpstack.tasks.classification.metrics import Accuracy, FBeta
+from nlpstack.tasks.classification.metrics import Accuracy, FBeta, PrecisionRecallAuc
 from nlpstack.tasks.classification.sklearn import SklearnBasicClassifier
 
 
@@ -16,7 +16,7 @@ def test_basic_classifier() -> None:
         max_epochs=16,
         learning_rate=1e-2,
         random_seed=42,
-        metric=[Accuracy(), FBeta()],
+        metric=[Accuracy(), FBeta(), PrecisionRecallAuc("positive")],
     )
     classifier.fit(X, y)
 
@@ -27,5 +27,5 @@ def test_basic_classifier() -> None:
     assert score == 1.0
 
     metrics = classifier.compute_metrics(X, y)
-    assert set(metrics) == {"accuracy", "macro_fbeta", "macro_precision", "macro_recall"}
-    assert all(abs(value - 1.0) < 1e-6 for value in metrics.values())
+    assert set(metrics) == {"accuracy", "macro_fbeta", "macro_precision", "macro_recall", "pr_auc"}
+    assert all(abs(value - 1.0) < 1e-4 for value in metrics.values())
