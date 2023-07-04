@@ -48,6 +48,9 @@ class FBeta(ClassificationMetric):
         self._false_positive: Optional[numpy.ndarray] = None
         self._false_negative: Optional[numpy.ndarray] = None
 
+        if not set(self.average) <= {"micro", "macro"}:
+            raise ValueError(f"Invalid average: {self.average}")
+
     def update(self, inference: ClassificationInference) -> None:
         assert inference.labels is not None
         if self.topk is None:
@@ -63,8 +66,6 @@ class FBeta(ClassificationMetric):
             self._false_positive = numpy.zeros(num_classes, dtype=int)
         if self._false_negative is None:
             self._false_negative = numpy.zeros(num_classes, dtype=int)
-
-        assert num_classes == self._true_positive.shape[1]
 
         for i in range(num_classes):
             self._true_positive[i] += ((inference.labels == i) & (prediction == i).any(axis=1)).sum()
@@ -90,8 +91,6 @@ class FBeta(ClassificationMetric):
             metrics["micro_fbeta"] = fbeta
             metrics["micro_precision"] = precision
             metrics["micro_recall"] = recall
-        else:
-            raise ValueError(f"Invalid average: {self.average}")
 
         return metrics
 
