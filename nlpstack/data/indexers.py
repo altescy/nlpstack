@@ -1,5 +1,5 @@
+import functools
 from contextlib import suppress
-from functools import cached_property
 from os import PathLike
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, Union
 
@@ -143,7 +143,8 @@ class PretrainedFasttextIndexer(TokenIndexer):
         self._feature_name = feature_name
         self._namespace = namespace
 
-    @cached_property
+    @property
+    @functools.lru_cache
     def fasttext(self) -> "fasttext.FastText":
         if fasttext is None:
             raise ModuleNotFoundError("Please install fasttext.")
@@ -163,7 +164,7 @@ class PretrainedFasttextIndexer(TokenIndexer):
 
     def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> Dict[str, Any]:
         return {
-            "embeddings": numpy.array([self.fasttext[self._get_token_feature(token)] for token in tokens]),
+            "embeddings": numpy.array([self.fasttext[self._get_token_feature(token)] for token in tokens]),  # type: ignore[index]
             "mask": numpy.array([True] * len(tokens), dtype=bool),
         }
 

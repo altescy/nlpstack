@@ -1,9 +1,11 @@
-from typing import Dict, Literal, Optional, Sequence, Union
+from typing import Any, Dict, List, Literal, Optional, Sequence, Union
 
 import numpy
+import sklearn.metrics
 
 from nlpstack.evaluation import Metric
 
+from .datamodules import BasicClassificationDataModule
 from .types import ClassificationInference
 
 
@@ -48,6 +50,9 @@ class FBeta(ClassificationMetric):
         self._false_positive: Optional[numpy.ndarray] = None
         self._false_negative: Optional[numpy.ndarray] = None
 
+        if not set(self.average) <= {"micro", "macro"}:
+            raise ValueError(f"Invalid average: {self.average}")
+
     def update(self, inference: ClassificationInference) -> None:
         assert inference.labels is not None
         if self.topk is None:
@@ -63,8 +68,6 @@ class FBeta(ClassificationMetric):
             self._false_positive = numpy.zeros(num_classes, dtype=int)
         if self._false_negative is None:
             self._false_negative = numpy.zeros(num_classes, dtype=int)
-
-        assert num_classes == self._true_positive.shape[1]
 
         for i in range(num_classes):
             self._true_positive[i] += ((inference.labels == i) & (prediction == i).any(axis=1)).sum()
@@ -90,8 +93,6 @@ class FBeta(ClassificationMetric):
             metrics["micro_fbeta"] = fbeta
             metrics["micro_precision"] = precision
             metrics["micro_recall"] = recall
-        else:
-            raise ValueError(f"Invalid average: {self.average}")
 
         return metrics
 
@@ -99,3 +100,42 @@ class FBeta(ClassificationMetric):
         self._true_positive = None
         self._false_positive = None
         self._false_negative = None
+
+
+class PrecisionRecallAuc(ClassificationMetric):  # type: ignore[misc]
+    def __init__(
+        self,
+        positive_label: str,
+        label_namespace: str = "labels",
+    ) -> None:
+        super().__init__()
+        self._positive_label = positive_label
+        self._positive_label_index: Optional[int] = None
+        self._label_namespace = label_namespace
+
+        self._all_predictions: List[float] = []
+        self._all_gold_labels: List[int] = []
+
+    def setup(self, *args: Any, datamodule: BasicClassificationDataModule, **kwargs: Any) -> None:
+        self._positive_label_index = datamodule.vocab.get_index_by_token(self._label_namespace, self._positive_label)
+
+    def update(self, inference: ClassificationInference) -> None:
+        assert inference.labels is not None
+        assert self._positive_label_index is not None
+
+        self._all_predictions.extend(inference.probs[:, self._positive_label_index].tolist())
+        self._all_gold_labels.extend((inference.labels == self._positive_label_index).tolist())
+
+    def compute(self) -> Dict[str, float]:
+        if not self._all_gold_labels:
+            return {"pr_auc": 0.0}
+        precisions, recalls, _ = sklearn.metrics.precision_recall_curve(
+            self._all_gold_labels,
+            self._all_predictions,
+        )
+        auc = float(sklearn.metrics.auc(recalls, precisions))
+        return {"pr_auc": auc}
+
+    def reset(self) -> None:
+        self._all_predictions = []
+        self._all_gold_labels = []
