@@ -3987,4 +3987,4 @@ all = ["fasttext-wheel", "mlflow", "optuna", "spacy", "transformers"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8,<4.0"
-content-hash = "280eef398721bdfac55eb487ba34260984e919acb26f907d4046d82d2359525c"
+content-hash = "bf3d9f8de2abe9b47d46dd5c74e9762de5f461ea8d201b7f1f8c2faaeb37ad5f"
