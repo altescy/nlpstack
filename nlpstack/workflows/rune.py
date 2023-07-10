@@ -246,6 +246,8 @@ class RuneMlflowWorkflow(Workflow):
         resume: bool = False,
         optuna_config_filename: str = "optuna.jsonnet",
     ) -> None:
+        """tune hyper-parameters with optuna and save archive with mlflow"""
+
         import mlflow
         import optuna
         from optuna.pruners import BasePruner
@@ -416,3 +418,41 @@ class RuneMlflowWorkflow(Workflow):
                     mlflow.log_artifact(best_result_filename)
                 finally:
                     mlflow.log_artifact(optuna_storage_path)
+
+    def evaluate(
+        self,
+        config_filename: str,
+        archive_filename: str,
+        *,
+        input_filename: str,
+        metric_prefix: Optional[str] = None,
+        run_id: Optional[str] = None,
+    ) -> None:
+        """evaluate a model and output metrics"""
+        import mlflow
+
+        config = load_jsonnet(minato.cached_path(config_filename))
+        rune_config = coltbuilder(config, RuneConfig)
+
+        if rune_config.reader is None:
+            print("No reader given.")
+            exit(1)
+
+        archive = RuneArchive.load(minato.cached_path(archive_filename))  # type: ignore[var-annotated]
+        model = archive.rune
+
+        if not isinstance(model, Rune):
+            print(f"Given model is not a Rune: {type(model)}")
+            print(archive)
+            exit(1)
+
+        model.setup("evaluation", **coltbuilder(rune_config.evaluator or {}))
+
+        with mlflow.start_run(run_id=run_id):
+            logger.info("Start evaluation...")
+            metrics = model.evaluate(rune_config.reader(input_filename))
+            if metric_prefix is not None:
+                metrics = {f"{metric_prefix}{key}": value for key, value in metrics.items()}
+
+            logger.info("Metrics: %s", json.dumps(metrics))
+            mlflow.log_metrics(metrics)
