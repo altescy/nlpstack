@@ -207,8 +207,8 @@ class PretrainedTransformerIndexer(TokenIndexer):
         type_ids: List[int] = []
         mask: List[bool] = []
 
-        tokenized = self._tokenizer.encode_plus(
-            [token.surface for token in tokens],
+        tokenized = self._tokenizer.prepare_for_model(
+            self._tokenizer.convert_tokens_to_ids([token.surface for token in tokens]),
             add_special_tokens=self._add_special_tokens,
         )
 
