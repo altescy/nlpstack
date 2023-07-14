@@ -1,6 +1,7 @@
 from typing import Any, Type
 
 import torch
+from torch.optim import Optimizer
 
 if torch.__version__ >= "2.0.0":
     from torch.optim.lr_scheduler import LRScheduler
@@ -11,13 +12,13 @@ else:
 class OptimizerFactory:
     def __init__(
         self,
-        optimizer_cls: Type[torch.optim.Optimizer],
+        optimizer_cls: Type[Optimizer],
         **kwargs: Any,
     ) -> None:
         self._optimizer_cls = optimizer_cls
         self._kwargs = kwargs
 
-    def setup(self, model: torch.nn.Module) -> torch.optim.Optimizer:
+    def setup(self, model: torch.nn.Module) -> Optimizer:
         return self._optimizer_cls(model.parameters(), **self._kwargs)
 
 
