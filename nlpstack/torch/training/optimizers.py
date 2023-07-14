@@ -2,6 +2,11 @@ from typing import Any, Type
 
 import torch
 
+if torch.__version__ >= "2.0.0":
+    from torch.optim.lr_scheduler import LRScheduler
+else:
+    from torch.optim.lr_scheduler import _LRScheduler as LRScheduler
+
 
 class OptimizerFactory:
     def __init__(
@@ -44,13 +49,13 @@ class RpropFactory(OptimizerFactory):
 class LRSchedulerFactory:
     def __init__(
         self,
-        scheduler_cls: Type[torch.optim.lr_scheduler.LRScheduler],
+        scheduler_cls: Type[LRScheduler],
         **kwargs: Any,
     ) -> None:
         self._scheduler_cls = scheduler_cls
         self._kwargs = kwargs
 
-    def setup(self, optimizer: torch.optim.Optimizer) -> torch.optim.lr_scheduler.LRScheduler:
+    def setup(self, optimizer: torch.optim.Optimizer) -> LRScheduler:
         return self._scheduler_cls(optimizer, **self._kwargs)  # type: ignore[arg-type]
 
 
