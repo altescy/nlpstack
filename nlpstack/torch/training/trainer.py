@@ -107,8 +107,6 @@ class TorchTrainer:
             warnings.warn("batch_size is ignored when valid_dataloader is provided")
         if learning_rate is not None and optimizer_factory is not None:
             warnings.warn("learning_rate is ignored when optimizer_factory is provided")
-        if devices is not None and not isinstance(devices, (int, str)) and len(devices) > 1:
-            raise ValueError("Currently, only a single device is supported")
 
         learning_rate = learning_rate or 1e-3
         available_dataloader = train_dataloader or valid_dataloader
@@ -168,8 +166,13 @@ class TorchTrainer:
 
         if self._devices is not None:
             if len(self._devices) > 1:
-                raise ValueError("Currently, only a single device is supported")
-            model = model.to(device=self._devices[0])
+                assert all(device.index is not None for device in self._devices), "Device indices must be specified"
+                model = torch.nn.DataParallel(  # type: ignore[assignment]
+                    model,
+                    device_ids=[device.index for device in self._devices if device.index is not None],
+                )
+            else:
+                model = model.to(device=self._devices[0])
 
         if valid is not None and self._valid_dataloader is None:
             raise ValueError("valid_dataloader is required when valid is not None")
@@ -386,6 +389,9 @@ class TorchTrainer:
             logger.info("Training stopped early!")
         except KeyboardInterrupt:
             logger.info("Training interrupted!")
+
+        if isinstance(state.model, torch.nn.DataParallel):
+            state.model = state.model.module  # type: ignore[assignment]
 
         for callback in self._callbacks:
             callback.on_end(
