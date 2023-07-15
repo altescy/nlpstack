@@ -10,6 +10,7 @@ import torch
 from nlpstack.mlflow.util import flatten_dict_for_mlflow_log
 
 if typing.TYPE_CHECKING:
+    from nlpstack.torch.model import TorchModelOutput
     from nlpstack.torch.training.trainer import TorchTrainer, TrainingState
 
 
@@ -35,7 +36,7 @@ class Callback:
         trainer: "TorchTrainer",
         training_state: "TrainingState",
         batch_inputs: Mapping[str, Any],
-        batch_outputs: Mapping[str, Any],
+        batch_outputs: "TorchModelOutput",
         batch_metrics: Mapping[str, Any],
         is_training: bool,
         resources: Mapping[str, Any],
@@ -156,7 +157,7 @@ class MlflowCallback(Callback):
         trainer: "TorchTrainer",
         training_state: "TrainingState",
         batch_inputs: Mapping[str, Any],
-        batch_outputs: Mapping[str, Any],
+        batch_outputs: "TorchModelOutput",
         batch_metrics: Mapping[str, Any],
         is_training: bool,
         resources: Mapping[str, Any],

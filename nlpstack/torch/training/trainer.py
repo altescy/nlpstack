@@ -1,14 +1,14 @@
 import dataclasses
 import warnings
 from logging import getLogger
-from typing import Any, Dict, Mapping, Optional, Sequence, TypeVar, Union
+from typing import Any, Dict, Generic, Mapping, Optional, Sequence, TypeVar, Union, cast
 
 import torch
 
 from nlpstack.common import ProgressBar
 from nlpstack.data import DataLoader, Instance
 from nlpstack.evaluation import EmptyMetric, Metric
-from nlpstack.torch.model import TorchModel
+from nlpstack.torch.model import TorchModel, TorchModelOutput
 from nlpstack.torch.training.callbacks import Callback, StopEarly
 from nlpstack.torch.training.optimizers import AdamFactory, LRScheduler, LRSchedulerFactory, Optimizer, OptimizerFactory
 from nlpstack.torch.util import move_to_device
@@ -16,10 +16,11 @@ from nlpstack.torch.util import move_to_device
 logger = getLogger(__name__)
 
 Inference = TypeVar("Inference")
+TorchModelOutputType = TypeVar("TorchModelOutputType", bound=TorchModelOutput)
 
 
 @dataclasses.dataclass
-class TrainingState:
+class TrainingState(Generic[TorchModelOutputType]):
     """The state of the training loop.
 
     TrainingState is a dataclass that stores the state of the training loop. It is used by the Trainer
@@ -35,7 +36,7 @@ class TrainingState:
 
     epoch: int
     step: int
-    model: TorchModel
+    model: TorchModel[TorchModelOutputType]
     optimizer: Optimizer
     lrscheduler: Optional[LRScheduler] = None
 
@@ -55,6 +56,50 @@ class TrainingState:
         self.optimizer.load_state_dict(state_dict["optimizer"])
         if self.lrscheduler is not None:
             self.lrscheduler.load_state_dict(state_dict["lr_scheduler"])
+
+
+class TrainingEngine:
+    def create_state(
+        self,
+        trainer: "TorchTrainer",
+        model: TorchModel[TorchModelOutputType],
+    ) -> TrainingState[TorchModelOutputType]:
+        optimizer = trainer._optimizer_factory.setup(model)
+        lrscheduler = trainer._lrscheduler_factory.setup(optimizer) if trainer._lrscheduler_factory else None
+        return TrainingState(epoch=0, step=0, model=model, optimizer=optimizer, lrscheduler=lrscheduler)
+
+    def train_step(
+        self,
+        state: TrainingState[TorchModelOutputType],
+        inputs: Mapping[str, Any],
+        device: torch.device,
+    ) -> TorchModelOutputType:
+        state.model.train()
+        state.optimizer.zero_grad()
+
+        inputs = move_to_device(inputs, device)
+        output = cast(TorchModelOutputType, state.model(**inputs))
+
+        assert output.loss is not None
+
+        output.loss.backward()  # type: ignore[no-untyped-call]
+        state.optimizer.step()
+        state.step += 1
+
+        return output
+
+    def eval_step(
+        self,
+        state: TrainingState[TorchModelOutputType],
+        inputs: Mapping[str, Any],
+        device: torch.device,
+    ) -> TorchModelOutputType:
+        state.model.eval()
+
+        inputs = move_to_device(inputs, device)
+        output = cast(TorchModelOutputType, state.model(**inputs))
+
+        return output
 
 
 class TorchTrainer:
@@ -90,6 +135,7 @@ class TorchTrainer:
         valid_dataloader: Optional[DataLoader] = None,
         optimizer_factory: Optional[OptimizerFactory] = None,
         lrscheduler_factory: Optional[LRSchedulerFactory] = None,
+        training_engine: Optional[TrainingEngine] = None,
         callbacks: Optional[Sequence[Callback]] = None,
         devices: Optional[Union[int, str, Sequence[Union[int, str]]]] = None,
     ) -> None:
@@ -117,6 +163,7 @@ class TorchTrainer:
         self._valid_dataloader = valid_dataloader or DataLoader(batch_size=batch_size, shuffle=False)
         self._optimizer_factory = optimizer_factory or AdamFactory(lr=learning_rate)
         self._lrscheduler_factory = lrscheduler_factory
+        self._training_engine = training_engine or TrainingEngine()
         self._max_epochs = max_epochs
         self._callbacks = callbacks or []
         self._devices = [torch.device(device) for device in devices] if devices else [torch.device("cpu")]
@@ -145,13 +192,13 @@ class TorchTrainer:
 
     def train(
         self,
-        model: TorchModel[Inference],
+        model: TorchModel[TorchModelOutputType],
         train: Sequence[Instance],
         valid: Optional[Sequence[Instance]] = None,
         *,
         metric: Optional[Metric[Inference]] = None,
         resources: Optional[Mapping[str, Any]] = None,
-    ) -> TrainingState:
+    ) -> TrainingState[TorchModelOutputType]:
         """Runs the training/validation loop with the given model and training data.
 
         Args:
@@ -181,16 +228,7 @@ class TorchTrainer:
         resources = resources or {}
 
         device = model.get_device()
-        optimizer = self._optimizer_factory.setup(model)
-        lrscheduler = self._lrscheduler_factory.setup(optimizer) if self._lrscheduler_factory else None
-
-        state = TrainingState(
-            epoch=0,
-            step=0,
-            model=model,
-            optimizer=optimizer,
-            lrscheduler=lrscheduler,
-        )
+        state = self._training_engine.create_state(self, model)
 
         metrics: Dict[str, float] = {}
 
@@ -238,24 +276,17 @@ class TorchTrainer:
                         num_train_batches = 0
                         total_train_loss = 0.0
                         for batch in batchbar:
-                            batch = move_to_device(batch, device)
+                            output = self._training_engine.train_step(state, batch, device)
+                            assert output.loss is not None
 
-                            output = model(**batch)
-                            loss = output.loss
-
-                            optimizer.zero_grad()
-                            loss.backward()
-                            optimizer.step()
-
-                            state.step += 1
                             num_train_batches += 1
-                            total_train_loss += loss.item()
+                            total_train_loss += output.loss.item()
 
                             metric.update(output.inference)
 
                             batch_train_metrics = self._get_metrics(
                                 training_state=state,
-                                total_loss=loss.item(),
+                                total_loss=output.loss.item(),
                                 num_batches=1,
                                 metric=metric,
                                 reset=False,
@@ -312,19 +343,17 @@ class TorchTrainer:
                             num_valid_batches = 0
                             total_valid_loss = 0.0
                             for batch in batchbar:
-                                batch = move_to_device(batch, device)
-
-                                output = model(**batch)
-                                loss = output.loss
+                                output = self._training_engine.eval_step(state, batch, device)
+                                assert output.loss is not None
 
                                 num_valid_batches += 1
-                                total_valid_loss += loss.item()
+                                total_valid_loss += output.loss.item()
 
                                 metric.update(output.inference)
 
                                 batch_valid_metrics = self._get_metrics(
                                     training_state=state,
-                                    total_loss=loss.item(),
+                                    total_loss=output.loss.item(),
                                     num_batches=1,
                                     metric=metric,
                                     reset=False,
@@ -368,8 +397,8 @@ class TorchTrainer:
                             )
                         )
 
-                    if lrscheduler is not None:
-                        lrscheduler.step()
+                    if state.lrscheduler is not None:
+                        state.lrscheduler.step()
 
                     logger.info(
                         f"Epoch {epoch}/{self._max_epochs} - "
