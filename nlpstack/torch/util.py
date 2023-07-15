@@ -121,7 +121,7 @@ def masked_max(
 def masked_pool(
     inputs: TensorType,
     mask: Optional[torch.BoolTensor] = None,
-    method: Literal["mean", "max", "sum"] = "mean",
+    method: Literal["mean", "max", "sum", "hier"] = "mean",
     dim: int = 1,
     keepdim: bool = False,
 ) -> TensorType:

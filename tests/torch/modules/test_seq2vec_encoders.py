@@ -7,6 +7,7 @@ from nlpstack.torch.modules.seq2vec_encoders import (
     ConcatSeq2VecEncoder,
     SelfAttentiveSeq2VecEncoder,
     Seq2VecEncoder,
+    SwemSeq2VecEncoder,
     TokenPooler,
 )
 
@@ -17,6 +18,7 @@ from nlpstack.torch.modules.seq2vec_encoders import (
         BagOfEmbeddings(6, "mean"),
         BagOfEmbeddings(6, "max"),
         BagOfEmbeddings(6, "sum"),
+        SwemSeq2VecEncoder(6, 3),
         CnnEncoder(6, 3, (2, 3)),
         TokenPooler(6, (0, -1), 6),
         ConcatSeq2VecEncoder([BagOfEmbeddings(6, "mean"), BagOfEmbeddings(6, "max")], output_dim=6),
