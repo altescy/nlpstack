@@ -3,13 +3,14 @@ import tempfile
 import typing
 from logging import Logger, getLogger
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional
+from typing import Any, Dict, Mapping, Optional, Sequence
 
 import torch
 
 from nlpstack.mlflow.util import flatten_dict_for_mlflow_log
 
 if typing.TYPE_CHECKING:
+    from nlpstack.torch.model import TorchModelOutput
     from nlpstack.torch.training.trainer import TorchTrainer, TrainingState
 
 
@@ -34,8 +35,8 @@ class Callback:
         self,
         trainer: "TorchTrainer",
         training_state: "TrainingState",
-        batch_inputs: Mapping[str, Any],
-        batch_outputs: Mapping[str, Any],
+        batch_inputs: Sequence[Mapping[str, Any]],
+        batch_outputs: Sequence["TorchModelOutput"],
         batch_metrics: Mapping[str, Any],
         is_training: bool,
         resources: Mapping[str, Any],
@@ -155,8 +156,8 @@ class MlflowCallback(Callback):
         self,
         trainer: "TorchTrainer",
         training_state: "TrainingState",
-        batch_inputs: Mapping[str, Any],
-        batch_outputs: Mapping[str, Any],
+        batch_inputs: Sequence[Mapping[str, Any]],
+        batch_outputs: Sequence["TorchModelOutput"],
         batch_metrics: Mapping[str, Any],
         is_training: bool,
         resources: Mapping[str, Any],

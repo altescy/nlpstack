@@ -1,14 +1,15 @@
 import dataclasses
 import warnings
 from logging import getLogger
-from typing import Any, Dict, Mapping, Optional, Sequence, TypeVar, Union
+from typing import Any, Dict, Generic, List, Mapping, Optional, Sequence, TypeVar, Union, cast
 
 import torch
 
 from nlpstack.common import ProgressBar
 from nlpstack.data import DataLoader, Instance
+from nlpstack.data.util import batched_iterator
 from nlpstack.evaluation import EmptyMetric, Metric
-from nlpstack.torch.model import TorchModel
+from nlpstack.torch.model import TorchModel, TorchModelOutput
 from nlpstack.torch.training.callbacks import Callback, StopEarly
 from nlpstack.torch.training.optimizers import AdamFactory, LRScheduler, LRSchedulerFactory, Optimizer, OptimizerFactory
 from nlpstack.torch.util import move_to_device
@@ -16,10 +17,11 @@ from nlpstack.torch.util import move_to_device
 logger = getLogger(__name__)
 
 Inference = TypeVar("Inference")
+TorchModelOutputType = TypeVar("TorchModelOutputType", bound=TorchModelOutput)
 
 
 @dataclasses.dataclass
-class TrainingState:
+class TrainingState(Generic[TorchModelOutputType]):
     """The state of the training loop.
 
     TrainingState is a dataclass that stores the state of the training loop. It is used by the Trainer
@@ -35,7 +37,7 @@ class TrainingState:
 
     epoch: int
     step: int
-    model: TorchModel
+    model: TorchModel[TorchModelOutputType]
     optimizer: Optimizer
     lrscheduler: Optional[LRScheduler] = None
 
@@ -55,6 +57,49 @@ class TrainingState:
         self.optimizer.load_state_dict(state_dict["optimizer"])
         if self.lrscheduler is not None:
             self.lrscheduler.load_state_dict(state_dict["lr_scheduler"])
+
+
+class TrainingEngine:
+    def create_state(
+        self,
+        trainer: "TorchTrainer",
+        model: TorchModel[TorchModelOutputType],
+    ) -> TrainingState[TorchModelOutputType]:
+        optimizer = trainer._optimizer_factory.setup(model)
+        lrscheduler = trainer._lrscheduler_factory.setup(optimizer) if trainer._lrscheduler_factory else None
+        return TrainingState(epoch=0, step=0, model=model, optimizer=optimizer, lrscheduler=lrscheduler)
+
+    def zero_grad(self, trainer: "TorchTrainer", state: TrainingState[TorchModelOutputType]) -> None:
+        state.optimizer.zero_grad()
+
+    def train_forwrad(
+        self,
+        trainer: "TorchTrainer",
+        state: TrainingState[TorchModelOutputType],
+        inputs: Mapping[str, Any],
+        device: torch.device,
+    ) -> TorchModelOutputType:
+        inputs = move_to_device(inputs, device)
+        output = cast(TorchModelOutputType, state.model(**inputs))
+        return output
+
+    def eval_forward(
+        self,
+        trainer: "TorchTrainer",
+        state: TrainingState[TorchModelOutputType],
+        inputs: Mapping[str, Any],
+        device: torch.device,
+    ) -> TorchModelOutputType:
+        inputs = move_to_device(inputs, device)
+        with torch.inference_mode():
+            output = cast(TorchModelOutputType, state.model(**inputs))
+        return output
+
+    def step(self, trainer: "TorchTrainer", state: TrainingState, loss: torch.FloatTensor) -> None:
+        loss.backward()  # type: ignore[no-untyped-call]
+        if trainer._max_grad_norm is not None:
+            torch.nn.utils.clip_grad_norm_(state.model.parameters(), trainer._max_grad_norm)
+        state.optimizer.step()
 
 
 class TorchTrainer:
@@ -85,11 +130,14 @@ class TorchTrainer:
         *,
         max_epochs: int = 10,
         batch_size: Optional[int] = None,
+        grad_accum: Optional[int] = None,
         learning_rate: Optional[float] = None,
+        max_grad_norm: Optional[float] = None,
         train_dataloader: Optional[DataLoader] = None,
         valid_dataloader: Optional[DataLoader] = None,
         optimizer_factory: Optional[OptimizerFactory] = None,
         lrscheduler_factory: Optional[LRSchedulerFactory] = None,
+        training_engine: Optional[TrainingEngine] = None,
         callbacks: Optional[Sequence[Callback]] = None,
         devices: Optional[Union[int, str, Sequence[Union[int, str]]]] = None,
     ) -> None:
@@ -107,19 +155,21 @@ class TorchTrainer:
             warnings.warn("batch_size is ignored when valid_dataloader is provided")
         if learning_rate is not None and optimizer_factory is not None:
             warnings.warn("learning_rate is ignored when optimizer_factory is provided")
-        if devices is not None and not isinstance(devices, (int, str)) and len(devices) > 1:
-            raise ValueError("Currently, only a single device is supported")
 
         learning_rate = learning_rate or 1e-3
         available_dataloader = train_dataloader or valid_dataloader
         batch_size = batch_size or (available_dataloader._batch_size if available_dataloader else 32)
+        grad_accum = grad_accum or 1
         devices = [devices] if isinstance(devices, (int, str)) else devices
 
+        self._max_grad_norm = max_grad_norm
         self._train_dataloader = train_dataloader or DataLoader(batch_size=batch_size, shuffle=True)
         self._valid_dataloader = valid_dataloader or DataLoader(batch_size=batch_size, shuffle=False)
         self._optimizer_factory = optimizer_factory or AdamFactory(lr=learning_rate)
         self._lrscheduler_factory = lrscheduler_factory
+        self._training_engine = training_engine or TrainingEngine()
         self._max_epochs = max_epochs
+        self._grad_accum = grad_accum
         self._callbacks = callbacks or []
         self._devices = [torch.device(device) for device in devices] if devices else [torch.device("cpu")]
 
@@ -147,13 +197,13 @@ class TorchTrainer:
 
     def train(
         self,
-        model: TorchModel[Inference],
+        model: TorchModel[TorchModelOutputType],
         train: Sequence[Instance],
         valid: Optional[Sequence[Instance]] = None,
         *,
         metric: Optional[Metric[Inference]] = None,
         resources: Optional[Mapping[str, Any]] = None,
-    ) -> TrainingState:
+    ) -> TrainingState[TorchModelOutputType]:
         """Runs the training/validation loop with the given model and training data.
 
         Args:
@@ -168,8 +218,13 @@ class TorchTrainer:
 
         if self._devices is not None:
             if len(self._devices) > 1:
-                raise ValueError("Currently, only a single device is supported")
-            model = model.to(device=self._devices[0])
+                assert all(device.index is not None for device in self._devices), "Device indices must be specified"
+                model = torch.nn.DataParallel(  # type: ignore[assignment]
+                    model,
+                    device_ids=[device.index for device in self._devices if device.index is not None],
+                )
+            else:
+                model = model.to(device=self._devices[0])
 
         if valid is not None and self._valid_dataloader is None:
             raise ValueError("valid_dataloader is required when valid is not None")
@@ -178,16 +233,7 @@ class TorchTrainer:
         resources = resources or {}
 
         device = model.get_device()
-        optimizer = self._optimizer_factory.setup(model)
-        lrscheduler = self._lrscheduler_factory.setup(optimizer) if self._lrscheduler_factory else None
-
-        state = TrainingState(
-            epoch=0,
-            step=0,
-            model=model,
-            optimizer=optimizer,
-            lrscheduler=lrscheduler,
-        )
+        state = self._training_engine.create_state(self, model)
 
         metrics: Dict[str, float] = {}
 
@@ -234,21 +280,30 @@ class TorchTrainer:
                     ) as batchbar:
                         num_train_batches = 0
                         total_train_loss = 0.0
-                        for batch in batchbar:
-                            batch = move_to_device(batch, device)
+                        for micro_batches in batched_iterator(batchbar, self._grad_accum):
+                            self._training_engine.zero_grad(self, state)
 
-                            output = model(**batch)
-                            loss = output.loss
+                            loss: torch.FloatTensor = 0.0  # type: ignore[assignment]
+                            batch_inputs: List[Mapping[str, Any]] = []
+                            batch_outputs: List[TorchModelOutputType] = []
+                            for inputs in micro_batches:
+                                output = self._training_engine.train_forwrad(self, state, inputs, device)
 
-                            optimizer.zero_grad()
-                            loss.backward()
-                            optimizer.step()
+                                assert output.loss is not None
+                                if torch.isnan(output.loss):
+                                    raise ValueError("nan loss encountered")
+
+                                loss = cast(torch.FloatTensor, loss + output.loss)
+                                batch_inputs.append(inputs)
+                                batch_outputs.append(output)
+                                metric.update(output.inference)
+
+                            loss = cast(torch.FloatTensor, loss / self._grad_accum)
+                            self._training_engine.step(self, state, loss)
 
                             state.step += 1
                             num_train_batches += 1
                             total_train_loss += loss.item()
-
-                            metric.update(output.inference)
 
                             batch_train_metrics = self._get_metrics(
                                 training_state=state,
@@ -263,8 +318,8 @@ class TorchTrainer:
                                 callback.on_batch(
                                     trainer=self,
                                     training_state=state,
-                                    batch_inputs=batch,
-                                    batch_outputs=output,
+                                    batch_inputs=batch_inputs,
+                                    batch_outputs=batch_outputs,
                                     batch_metrics=batch_train_metrics,
                                     is_training=True,
                                     resources=resources,
@@ -298,7 +353,7 @@ class TorchTrainer:
                         model.eval()
                         metric.reset()
                         valid_dataloader = self._valid_dataloader(valid)
-                        with torch.no_grad(), ProgressBar(
+                        with ProgressBar(
                             valid_dataloader,
                             desc=validbar_desc,
                             template=batchbar_template,
@@ -308,20 +363,18 @@ class TorchTrainer:
 
                             num_valid_batches = 0
                             total_valid_loss = 0.0
-                            for batch in batchbar:
-                                batch = move_to_device(batch, device)
-
-                                output = model(**batch)
-                                loss = output.loss
+                            for inputs in batchbar:
+                                output = self._training_engine.eval_forward(self, state, inputs, device)
+                                assert output.loss is not None
 
                                 num_valid_batches += 1
-                                total_valid_loss += loss.item()
+                                total_valid_loss += output.loss.item()
 
                                 metric.update(output.inference)
 
                                 batch_valid_metrics = self._get_metrics(
                                     training_state=state,
-                                    total_loss=loss.item(),
+                                    total_loss=output.loss.item(),
                                     num_batches=1,
                                     metric=metric,
                                     reset=False,
@@ -332,8 +385,8 @@ class TorchTrainer:
                                     callback.on_batch(
                                         trainer=self,
                                         training_state=state,
-                                        batch_inputs=batch,
-                                        batch_outputs=output,
+                                        batch_inputs=[inputs],
+                                        batch_outputs=[output],
                                         batch_metrics=batch_valid_metrics,
                                         is_training=False,
                                         resources=resources,
@@ -365,8 +418,8 @@ class TorchTrainer:
                             )
                         )
 
-                    if lrscheduler is not None:
-                        lrscheduler.step()
+                    if state.lrscheduler is not None:
+                        state.lrscheduler.step()
 
                     logger.info(
                         f"Epoch {epoch}/{self._max_epochs} - "
@@ -386,6 +439,9 @@ class TorchTrainer:
             logger.info("Training stopped early!")
         except KeyboardInterrupt:
             logger.info("Training interrupted!")
+
+        if isinstance(state.model, torch.nn.DataParallel):
+            state.model = state.model.module  # type: ignore[assignment]
 
         for callback in self._callbacks:
             callback.on_end(
