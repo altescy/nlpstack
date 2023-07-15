@@ -1,12 +1,13 @@
 import dataclasses
 import warnings
 from logging import getLogger
-from typing import Any, Dict, Generic, Mapping, Optional, Sequence, TypeVar, Union, cast
+from typing import Any, Dict, Generic, List, Mapping, Optional, Sequence, TypeVar, Union, cast
 
 import torch
 
 from nlpstack.common import ProgressBar
 from nlpstack.data import DataLoader, Instance
+from nlpstack.data.util import batched_iterator
 from nlpstack.evaluation import EmptyMetric, Metric
 from nlpstack.torch.model import TorchModel, TorchModelOutput
 from nlpstack.torch.training.callbacks import Callback, StopEarly
@@ -68,38 +69,37 @@ class TrainingEngine:
         lrscheduler = trainer._lrscheduler_factory.setup(optimizer) if trainer._lrscheduler_factory else None
         return TrainingState(epoch=0, step=0, model=model, optimizer=optimizer, lrscheduler=lrscheduler)
 
-    def train_step(
-        self,
-        state: TrainingState[TorchModelOutputType],
-        inputs: Mapping[str, Any],
-        device: torch.device,
-    ) -> TorchModelOutputType:
-        state.model.train()
+    def zero_grad(self, trainer: "TorchTrainer", state: TrainingState[TorchModelOutputType]) -> None:
         state.optimizer.zero_grad()
 
-        inputs = move_to_device(inputs, device)
-        output = cast(TorchModelOutputType, state.model(**inputs))
-
-        assert output.loss is not None
-
-        output.loss.backward()  # type: ignore[no-untyped-call]
-        state.optimizer.step()
-        state.step += 1
-
-        return output
-
-    def eval_step(
+    def train_forwrad(
         self,
+        trainer: "TorchTrainer",
         state: TrainingState[TorchModelOutputType],
         inputs: Mapping[str, Any],
         device: torch.device,
     ) -> TorchModelOutputType:
-        state.model.eval()
-
         inputs = move_to_device(inputs, device)
         output = cast(TorchModelOutputType, state.model(**inputs))
-
         return output
+
+    def eval_forward(
+        self,
+        trainer: "TorchTrainer",
+        state: TrainingState[TorchModelOutputType],
+        inputs: Mapping[str, Any],
+        device: torch.device,
+    ) -> TorchModelOutputType:
+        inputs = move_to_device(inputs, device)
+        with torch.inference_mode():
+            output = cast(TorchModelOutputType, state.model(**inputs))
+        return output
+
+    def step(self, trainer: "TorchTrainer", state: TrainingState, loss: torch.FloatTensor) -> None:
+        loss.backward()  # type: ignore[no-untyped-call]
+        if trainer._max_grad_norm is not None:
+            torch.nn.utils.clip_grad_norm_(state.model.parameters(), trainer._max_grad_norm)
+        state.optimizer.step()
 
 
 class TorchTrainer:
@@ -130,7 +130,9 @@ class TorchTrainer:
         *,
         max_epochs: int = 10,
         batch_size: Optional[int] = None,
+        grad_accum: Optional[int] = None,
         learning_rate: Optional[float] = None,
+        max_grad_norm: Optional[float] = None,
         train_dataloader: Optional[DataLoader] = None,
         valid_dataloader: Optional[DataLoader] = None,
         optimizer_factory: Optional[OptimizerFactory] = None,
@@ -157,14 +159,17 @@ class TorchTrainer:
         learning_rate = learning_rate or 1e-3
         available_dataloader = train_dataloader or valid_dataloader
         batch_size = batch_size or (available_dataloader._batch_size if available_dataloader else 32)
+        grad_accum = grad_accum or 1
         devices = [devices] if isinstance(devices, (int, str)) else devices
 
+        self._max_grad_norm = max_grad_norm
         self._train_dataloader = train_dataloader or DataLoader(batch_size=batch_size, shuffle=True)
         self._valid_dataloader = valid_dataloader or DataLoader(batch_size=batch_size, shuffle=False)
         self._optimizer_factory = optimizer_factory or AdamFactory(lr=learning_rate)
         self._lrscheduler_factory = lrscheduler_factory
         self._training_engine = training_engine or TrainingEngine()
         self._max_epochs = max_epochs
+        self._grad_accum = grad_accum
         self._callbacks = callbacks or []
         self._devices = [torch.device(device) for device in devices] if devices else [torch.device("cpu")]
 
@@ -275,18 +280,34 @@ class TorchTrainer:
                     ) as batchbar:
                         num_train_batches = 0
                         total_train_loss = 0.0
-                        for batch in batchbar:
-                            output = self._training_engine.train_step(state, batch, device)
-                            assert output.loss is not None
+                        for micro_batches in batched_iterator(batchbar, self._grad_accum):
+                            self._training_engine.zero_grad(self, state)
 
+                            loss: torch.FloatTensor = 0.0  # type: ignore[assignment]
+                            batch_inputs: List[Mapping[str, Any]] = []
+                            batch_outputs: List[TorchModelOutputType] = []
+                            for inputs in micro_batches:
+                                output = self._training_engine.train_forwrad(self, state, inputs, device)
+
+                                assert output.loss is not None
+                                if torch.isnan(output.loss):
+                                    raise ValueError("nan loss encountered")
+
+                                loss = cast(torch.FloatTensor, loss + output.loss)
+                                batch_inputs.append(inputs)
+                                batch_outputs.append(output)
+                                metric.update(output.inference)
+
+                            loss = cast(torch.FloatTensor, loss / self._grad_accum)
+                            self._training_engine.step(self, state, loss)
+
+                            state.step += 1
                             num_train_batches += 1
-                            total_train_loss += output.loss.item()
-
-                            metric.update(output.inference)
+                            total_train_loss += loss.item()
 
                             batch_train_metrics = self._get_metrics(
                                 training_state=state,
-                                total_loss=output.loss.item(),
+                                total_loss=loss.item(),
                                 num_batches=1,
                                 metric=metric,
                                 reset=False,
@@ -297,8 +318,8 @@ class TorchTrainer:
                                 callback.on_batch(
                                     trainer=self,
                                     training_state=state,
-                                    batch_inputs=batch,
-                                    batch_outputs=output,
+                                    batch_inputs=batch_inputs,
+                                    batch_outputs=batch_outputs,
                                     batch_metrics=batch_train_metrics,
                                     is_training=True,
                                     resources=resources,
@@ -332,7 +353,7 @@ class TorchTrainer:
                         model.eval()
                         metric.reset()
                         valid_dataloader = self._valid_dataloader(valid)
-                        with torch.no_grad(), ProgressBar(
+                        with ProgressBar(
                             valid_dataloader,
                             desc=validbar_desc,
                             template=batchbar_template,
@@ -342,8 +363,8 @@ class TorchTrainer:
 
                             num_valid_batches = 0
                             total_valid_loss = 0.0
-                            for batch in batchbar:
-                                output = self._training_engine.eval_step(state, batch, device)
+                            for inputs in batchbar:
+                                output = self._training_engine.eval_forward(self, state, inputs, device)
                                 assert output.loss is not None
 
                                 num_valid_batches += 1
@@ -364,8 +385,8 @@ class TorchTrainer:
                                     callback.on_batch(
                                         trainer=self,
                                         training_state=state,
-                                        batch_inputs=batch,
-                                        batch_outputs=output,
+                                        batch_inputs=[inputs],
+                                        batch_outputs=[output],
                                         batch_metrics=batch_valid_metrics,
                                         is_training=False,
                                         resources=resources,
