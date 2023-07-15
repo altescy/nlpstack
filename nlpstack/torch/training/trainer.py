@@ -10,7 +10,7 @@ from nlpstack.data import DataLoader, Instance
 from nlpstack.evaluation import EmptyMetric, Metric
 from nlpstack.torch.model import TorchModel
 from nlpstack.torch.training.callbacks import Callback, StopEarly
-from nlpstack.torch.training.optimizers import AdamFactory, LRSchedulerFactory, OptimizerFactory
+from nlpstack.torch.training.optimizers import AdamFactory, LRScheduler, LRSchedulerFactory, Optimizer, OptimizerFactory
 from nlpstack.torch.util import move_to_device
 
 logger = getLogger(__name__)
@@ -36,8 +36,8 @@ class TrainingState:
     epoch: int
     step: int
     model: TorchModel
-    optimizer: torch.optim.Optimizer
-    lrscheduler: Optional[torch.optim.lr_scheduler.LRScheduler] = None
+    optimizer: Optimizer
+    lrscheduler: Optional[LRScheduler] = None
 
     def state_dict(self) -> Dict[str, Any]:
         return {
