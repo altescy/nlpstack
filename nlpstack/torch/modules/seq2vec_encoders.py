@@ -22,18 +22,24 @@ class BagOfEmbeddings(Seq2VecEncoder):
     def __init__(
         self,
         input_dim: int,
-        pooling: Literal["mean", "max", "sum"] = "mean",
+        pooling: Literal["mean", "max", "sum", "hier"] = "mean",
+        window_size: Optional[int] = None,
     ) -> None:
+        if pooling not in ("mean", "max", "sum", "hier"):
+            raise ValueError(f"pooling must be one of 'mean', 'max', 'sum', or 'hier', got {pooling}")
+        if pooling == "hier" and window_size is None:
+            raise ValueError("window_size must be specified when pooling is 'hier'")
+
         super().__init__()
         self._input_dim = input_dim
         self._pooling = pooling
+        self._window_size = window_size
 
     def forward(self, inputs: torch.FloatTensor, mask: Optional[torch.BoolTensor] = None) -> torch.FloatTensor:
         if mask is None:
-            mask = cast(torch.BoolTensor, torch.ones_like(inputs[..., 0], dtype=torch.bool))
-
+            mask = cast(torch.BoolTensor, inputs.new_ones(inputs.size()[:-1], dtype=torch.bool))
         mask = cast(torch.BoolTensor, mask.unsqueeze(-1))
-        return masked_pool(inputs, mask, self._pooling)
+        return masked_pool(inputs, mask, self._pooling, window_size=self._window_size)
 
     def get_input_dim(self) -> int:
         return self._input_dim
