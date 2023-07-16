@@ -23,7 +23,7 @@ class BagOfEmbeddings(Seq2VecEncoder):
         self,
         input_dim: int,
         pooling: Literal["mean", "max", "sum", "hier"] = "mean",
-        window_size: int = 5,
+        window_size: Optional[int] = None,
     ) -> None:
         if pooling not in ("mean", "max", "sum", "hier"):
             raise ValueError(f"pooling must be one of 'mean', 'max', 'sum', or 'hier', got {pooling}")
