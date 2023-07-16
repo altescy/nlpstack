@@ -124,6 +124,7 @@ def masked_pool(
     method: Literal["mean", "max", "sum", "hier"] = "mean",
     dim: int = 1,
     keepdim: bool = False,
+    window_size: Optional[int] = None,
 ) -> TensorType:
     if mask is None:
         mask = cast(torch.BoolTensor, inputs.new_ones(inputs.size()).bool())
@@ -134,6 +135,20 @@ def masked_pool(
         return masked_max(inputs, mask, dim=dim, keepdim=keepdim)
     if method == "sum":
         return cast(TensorType, replace_masked_values(inputs, mask, 0.0).sum(dim=dim, keepdim=keepdim))
+    if method == "hier":
+        if window_size is None:
+            raise ValueError("window_size must be specified for hier pooling")
+        if inputs.size(1) <= window_size:
+            return masked_mean(inputs, mask, dim=dim, keepdim=keepdim)
+        inputs = cast(
+            TensorType,
+            torch.nn.functional.avg_pool1d(inputs.transpose(1, 2), window_size).transpose(1, 2),
+        )
+        mask = cast(
+            torch.BoolTensor,
+            torch.nn.functional.max_pool1d(mask.float().transpose(1, 2), window_size).transpose(1, 2).bool(),
+        )
+        return masked_mean(inputs, mask, dim=dim, keepdim=keepdim)
 
     raise ValueError(f"Invalid pooling method: {method}")
 

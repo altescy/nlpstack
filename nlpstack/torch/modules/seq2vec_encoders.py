@@ -1,18 +1,10 @@
 from typing import Callable, List, Literal, Optional, Sequence, Union, cast
 
 import torch
-import torch.nn.functional as F
 
 from nlpstack.torch.modules.feedforward import FeedForward
 from nlpstack.torch.modules.time_distributed import TimeDistributed
-from nlpstack.torch.util import (
-    combine_tensors,
-    masked_max,
-    masked_mean,
-    masked_pool,
-    masked_softmax,
-    min_value_of_dtype,
-)
+from nlpstack.torch.util import combine_tensors, masked_mean, masked_pool, masked_softmax, min_value_of_dtype
 
 
 class Seq2VecEncoder(torch.nn.Module):
@@ -30,54 +22,30 @@ class BagOfEmbeddings(Seq2VecEncoder):
     def __init__(
         self,
         input_dim: int,
-        pooling: Literal["mean", "max", "sum"] = "mean",
+        pooling: Literal["mean", "max", "sum", "hier"] = "mean",
+        window_size: Optional[int] = None,
     ) -> None:
+        if pooling not in ("mean", "max", "sum", "hier"):
+            raise ValueError(f"pooling must be one of 'mean', 'max', 'sum', or 'hier', got {pooling}")
+        if pooling == "hier" and window_size is None:
+            raise ValueError("window_size must be specified when pooling is 'hier'")
+
         super().__init__()
         self._input_dim = input_dim
         self._pooling = pooling
+        self._window_size = window_size
 
     def forward(self, inputs: torch.FloatTensor, mask: Optional[torch.BoolTensor] = None) -> torch.FloatTensor:
         if mask is None:
-            mask = cast(torch.BoolTensor, torch.ones_like(inputs[..., 0], dtype=torch.bool))
-
+            mask = cast(torch.BoolTensor, inputs.new_ones(inputs.size()[:-1], dtype=torch.bool))
         mask = cast(torch.BoolTensor, mask.unsqueeze(-1))
-        return masked_pool(inputs, mask, self._pooling)
+        return masked_pool(inputs, mask, self._pooling, window_size=self._window_size)
 
     def get_input_dim(self) -> int:
         return self._input_dim
 
     def get_output_dim(self) -> int:
         return self._input_dim
-
-
-class SwemSeq2VecEncoder(Seq2VecEncoder):
-    def __init__(
-        self,
-        input_dim: int,
-        window_size: int = 3,
-    ) -> None:
-        super().__init__()
-        self._input_dim = input_dim
-        self._window_size = window_size
-
-    def forward(self, inputs: torch.FloatTensor, mask: Optional[torch.BoolTensor] = None) -> torch.FloatTensor:
-        max_length = inputs.shape[1]
-        if mask is None:
-            mask = cast(torch.BoolTensor, inputs.new_ones(inputs.shape[:2], dtype=torch.bool))
-
-        mask = cast(torch.BoolTensor, mask.unsqueeze(-1))
-        inputs = cast(torch.FloatTensor, inputs * mask)
-        if max_length >= self._window_size:
-            inputs = cast(
-                torch.FloatTensor,
-                F.adaptive_avg_pool1d(inputs.permute(0, 2, 1), self._window_size).permute(0, 2, 1),
-            )
-            mask = cast(
-                torch.BoolTensor,
-                F.max_pool1d(mask.float().permute(0, 2, 1), self._window_size).permute(0, 2, 1).bool(),
-            )
-
-        return masked_max(inputs, mask, dim=1)
 
 
 class TokenPooler(Seq2VecEncoder):
