@@ -5,6 +5,20 @@ from typing import List, NamedTuple, Optional, Union
 import minato
 import numpy
 
+from nlpstack.common import cached_property
+from nlpstack.transformers import cache as transformers_cache
+
+try:
+    import transformers
+except ModuleNotFoundError:
+    transformers = None
+
+
+try:
+    import spacy
+except ModuleNotFoundError:
+    spacy = None  # type: ignore[assignment]
+
 
 class Token(NamedTuple):
     surface: str
@@ -30,9 +44,13 @@ class CharacterTokenizer(Tokenizer):
 
 class SpacyTokenizer(Tokenizer):
     def __init__(self, lang: str) -> None:
-        import spacy
+        self._lang = lang
 
-        self.nlp = spacy.load(lang)
+    @cached_property
+    def nlp(self) -> "spacy.language.Language":
+        if spacy is None:
+            raise ModuleNotFoundError("spacy is not installed.")
+        return spacy.load(self._lang)
 
     def tokenize(self, text: str) -> List[Token]:
         doc = self.nlp(text)
@@ -49,13 +67,17 @@ class SpacyTokenizer(Tokenizer):
 
 class PretrainedTransformerTokenizer(Tokenizer):
     def __init__(self, pretrained_model_name: Union[str, PathLike]) -> None:
-        from transformers import AutoTokenizer
+        self._pretrained_model_name = pretrained_model_name
 
+    @cached_property
+    def tokenizer(self) -> "transformers.PreTrainedTokenizer":
+        if transformers is None:
+            raise ModuleNotFoundError("transformers is not installed.")
+        pretrained_model_name = self._pretrained_model_name
         with suppress(FileNotFoundError):
             pretrained_model_name = minato.cached_path(pretrained_model_name)
-
-        self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name)
+        return transformers_cache.get_pretrained_tokenizer(pretrained_model_name)
 
     def tokenize(self, text: str) -> List[Token]:
-        tokens = self.tokenizer.tokenize(text)
+        tokens = self.tokenizer.tokenize(text)  # type: ignore
         return [Token(t) for t in tokens]
