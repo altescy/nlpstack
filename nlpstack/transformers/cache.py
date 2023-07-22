@@ -41,3 +41,10 @@ def get_pretrained_tokenizer(
     if spec not in _model_cache:
         _tokenizer_cache[spec] = transformers.AutoTokenizer.from_pretrained(pretrained_model_name_or_path)
     return _tokenizer_cache[spec]
+
+
+def clear() -> None:
+    global _model_cache
+    global _tokenizer_cache
+    _model_cache.clear()
+    _tokenizer_cache.clear()
