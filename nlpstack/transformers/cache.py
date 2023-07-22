@@ -1,3 +1,4 @@
+from logging import getLogger
 from os import PathLike
 from typing import Dict, NamedTuple, Union
 
@@ -5,6 +6,9 @@ try:
     import transformers
 except ModuleNotFoundError:
     transformers = None
+
+
+logger = getLogger(__name__)
 
 
 class _ModelSpec(NamedTuple):
@@ -26,7 +30,9 @@ def get_pretrained_model(
     if transformers is None:
         raise ModuleNotFoundError("transformers is not installed.")
     spec = _ModelSpec(str(pretrained_model_name_or_path))
-    if spec not in _model_cache:
+    if spec in _model_cache:
+        logger.debug(f"Found cached model: {spec}")
+    else:
         _model_cache[spec] = transformers.AutoModel.from_pretrained(pretrained_model_name_or_path)
     return _model_cache[spec]
 
@@ -38,7 +44,9 @@ def get_pretrained_tokenizer(
     if transformers is None:
         raise ModuleNotFoundError("transformers is not installed.")
     spec = _TokenizerSpec(str(pretrained_model_name_or_path))
-    if spec not in _model_cache:
+    if spec in _model_cache:
+        logger.debug(f"Found cached tokenizer: {spec}")
+    else:
         _tokenizer_cache[spec] = transformers.AutoTokenizer.from_pretrained(pretrained_model_name_or_path)
     return _tokenizer_cache[spec]
 
