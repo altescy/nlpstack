@@ -1,4 +1,3 @@
-import functools
 from contextlib import suppress
 from os import PathLike
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, Union
@@ -6,13 +5,21 @@ from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tupl
 import minato
 import numpy
 
+from nlpstack.common import cached_property
 from nlpstack.data.tokenizers import Token
 from nlpstack.data.vocabulary import Vocabulary
+from nlpstack.transformers import cache as transformers_cache
 
 try:
     import fasttext
 except ModuleNotFoundError:
     fasttext = None
+
+
+try:
+    import transformers
+except ModuleNotFoundError:
+    transformers = None
 
 
 class TokenIndexer:
@@ -143,8 +150,7 @@ class PretrainedFasttextIndexer(TokenIndexer):
         self._feature_name = feature_name
         self._namespace = namespace
 
-    @property
-    @functools.lru_cache
+    @cached_property
     def fasttext(self) -> "fasttext.FastText":
         if fasttext is None:
             raise ModuleNotFoundError("Please install fasttext.")
@@ -164,7 +170,7 @@ class PretrainedFasttextIndexer(TokenIndexer):
 
     def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> Dict[str, Any]:
         return {
-            "embeddings": numpy.array([self.fasttext[self._get_token_feature(token)] for token in tokens]),  # type: ignore[index]
+            "embeddings": numpy.array([self.fasttext[self._get_token_feature(token)] for token in tokens]),
             "mask": numpy.array([True] * len(tokens), dtype=bool),
         }
 
@@ -177,25 +183,29 @@ class PretrainedTransformerIndexer(TokenIndexer):
         tokenize_subwords: bool = False,
         add_special_tokens: bool = False,
     ) -> None:
-        from transformers import AutoTokenizer
-
         if tokenize_subwords and add_special_tokens:
             raise ValueError("Currently, tokenize_subwords and add_special_tokens cannot be True at the same time.")
-
-        with suppress(FileNotFoundError):
-            pretrained_model_name = minato.cached_path(pretrained_model_name)
 
         self._namespace = namespace
         self._tokenize_subwords = tokenize_subwords
         self._add_special_tokens = add_special_tokens
-        self._tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name)
+        self._pretrained_model_name = pretrained_model_name
+
+    @cached_property
+    def tokenizer(self) -> "transformers.PreTrainedTokenizer":
+        if transformers is None:
+            raise ModuleNotFoundError("transformers is not installed.")
+        pretrained_model_name = self._pretrained_model_name
+        with suppress(FileNotFoundError):
+            pretrained_model_name = minato.cached_path(pretrained_model_name)
+        return transformers_cache.get_pretrained_tokenizer(pretrained_model_name)
 
     def build_vocab(self, vocab: Vocabulary, documents: Iterable[Sequence[Token]]) -> None:
         if self._namespace is not None:
             raise ValueError("Currently, PretrainedTransformerIndexer does not support building vocabulary.")
 
     def get_pad_index(self, vocab: Vocabulary) -> int:
-        return int(self._tokenizer.pad_token_id)
+        return int(self.tokenizer.pad_token_id)
 
     def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> Dict[str, Any]:
         if self._tokenize_subwords:
@@ -207,8 +217,8 @@ class PretrainedTransformerIndexer(TokenIndexer):
         type_ids: List[int] = []
         mask: List[bool] = []
 
-        tokenized = self._tokenizer.prepare_for_model(
-            self._tokenizer.convert_tokens_to_ids([token.surface for token in tokens]),
+        tokenized = self.tokenizer.prepare_for_model(
+            self.tokenizer.convert_tokens_to_ids([token.surface for token in tokens]),
             add_special_tokens=self._add_special_tokens,
         )
 
@@ -230,7 +240,7 @@ class PretrainedTransformerIndexer(TokenIndexer):
         mask: List[bool] = []
 
         for token in tokens:
-            subwords = self._tokenizer.encode_plus(
+            subwords = self.tokenizer.encode_plus(
                 token.surface,
                 add_special_tokens=False,
                 return_tensors=None,
