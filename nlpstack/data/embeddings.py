@@ -1,5 +1,5 @@
 from os import PathLike
-from typing import Any, Iterator, List, Mapping, Union, cast
+from typing import Any, Iterator, List, Literal, Mapping, Optional, Union, cast
 
 import minato
 import numpy
@@ -27,6 +27,14 @@ class WordEmbedding:
 
 
 class MinhashWordEmbedding(WordEmbedding):
+    """Compute minhash vector of character n-grams.
+
+    Args:
+        num_features: The number of features of the embedding.
+        num_hashes: The number of hashes to use.
+        ngram_size: The size of the character n-grams to use.
+    """
+
     def __init__(
         self,
         num_features: int,
@@ -54,8 +62,21 @@ class MinhashWordEmbedding(WordEmbedding):
             embedding[value % self._num_features] += 1.0
         return embedding
 
+    def get_output_dim(self) -> int:
+        return self._num_features
+
 
 class PretrainedWordEmbedding(WordEmbedding):
+    """Load a word embedding file.
+
+    Args:
+        filename: The path to the word embedding file.
+        unknown_vector: The vector to use for unknown words. If None, unknown words will raise a KeyError. If "zero",
+            unknown words will be represented by a vector of all zeros. If "mean", unknown words will be represented
+            by the mean of all known word vectors. If a numpy.ndarray, unknown words will be represented by the given
+            vector.
+    """
+
     @staticmethod
     def _read_embeddings_file(filename: Union[str, PathLike]) -> Mapping[str, numpy.ndarray]:
         with minato.open(filename, decompress="auto") as txtfile:
@@ -65,11 +86,30 @@ class PretrainedWordEmbedding(WordEmbedding):
         ), "All embeddings must have the same dimension."
         return embeddings
 
-    def __init__(self, filename: Union[str, PathLike]) -> None:
+    def __init__(
+        self,
+        filename: Union[str, PathLike],
+        unknown_vector: Optional[Union[Literal["zero", "mean"], numpy.ndarray]] = None,
+    ) -> None:
         self._embeddings = self._read_embeddings_file(filename)
+        self._unknown_vector: Optional[numpy.ndarray] = None
+        if unknown_vector == "zero":
+            self._unknown_vector = numpy.zeros(self.get_output_dim(), dtype=float)
+        elif unknown_vector == "mean":
+            self._unknown_vector = numpy.mean(numpy.asarray(self._embeddings.values()), axis=0)
+        elif isinstance(unknown_vector, numpy.ndarray):
+            self._unknown_vector = unknown_vector
+        elif unknown_vector is not None:
+            raise ValueError(
+                f"unknown_vector must be one of 'zero', 'mean', or a numpy.ndarray, but got {unknown_vector}"
+            )
 
     def __getitem__(self, word: str) -> numpy.ndarray:
-        return self._embeddings[word]
+        if word in self._embeddings:
+            return self._embeddings[word]
+        if self._unknown_vector is not None:
+            return self._unknown_vector
+        raise KeyError(word)
 
     def __contains__(self, word: str) -> bool:
         return word in self._embeddings
@@ -79,6 +119,16 @@ class PretrainedWordEmbedding(WordEmbedding):
 
 
 class PretrainedFasttextEmbedding(WordEmbedding):
+    """Word embedding model of pretrained fastText.
+
+    Args:
+        filename : Path to the pretrained fastText model.
+        allow_unknown_words : If False, raise `KeyError` when the word is not in the model. Defaults to `True`.
+
+    Attributes:
+        fasttext : The pretrained fastText model.
+    """
+
     def __init__(self, filename: Union[str, PathLike], allow_unknown_words: bool = True) -> None:
         if fasttext is None:
             raise ModuleNotFoundError("fasttext is not installed")
@@ -94,7 +144,11 @@ class PretrainedFasttextEmbedding(WordEmbedding):
         return fasttext.load_model(str(pretrained_filename))
 
     def __getitem__(self, word: str) -> numpy.ndarray:
-        return cast(numpy.ndarray, self.fasttext.get_word_vector(word))
+        if word in self.fasttext:
+            return cast(numpy.ndarray, self.fasttext[word])
+        if self._allow_unknown_words:
+            return cast(numpy.ndarray, self.fasttext[word])
+        raise KeyError(word)
 
     def __contains__(self, word: str) -> bool:
         return self._allow_unknown_words or (word in self.fasttext)

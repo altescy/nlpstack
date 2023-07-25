@@ -1,13 +1,14 @@
 import numpy
 
 from nlpstack.data import Token, Vocabulary
-from nlpstack.data.indexers import PretrainedFasttextIndexer
+from nlpstack.data.embeddings import PretrainedFasttextEmbedding
+from nlpstack.data.indexers import PretrainedEmbeddingIndexer
 
 
 def test_pretrained_fasttext_indexer() -> None:
-    indexer = PretrainedFasttextIndexer("tests/fixtures/models/fasttext.bin")
+    indexer = PretrainedEmbeddingIndexer(PretrainedFasttextEmbedding("tests/fixtures/models/fasttext.bin"))
     tokens = [Token("Hello"), Token("World")]
-    # Currently, PretrainedFasttextIndexer does not use vocab.
+    # Currently, PretrainedEmbeddingIndexer does not use vocab.
     output = indexer(tokens, Vocabulary())
 
     assert set(output.keys()) == {"embeddings", "mask"}
