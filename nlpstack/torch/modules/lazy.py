@@ -60,9 +60,13 @@ class LazyEmbedding(torch.nn.modules.lazy.LazyModuleMixin, torch.nn.Embedding):
         )
         self.weight = torch.nn.UninitializedParameter()
 
-    def reset_parameters(self) -> None:
+    def reset_parameters(self, weight: Optional[torch.Tensor] = None) -> None:
         if not self.has_uninitialized_params() and self.num_embeddings != 0:
-            super().reset_parameters()
+            if weight is None:
+                torch.nn.init.xavier_uniform_(self.weight)
+            else:
+                self.weight.copy_(weight)
+            self._fill_padding_idx_with_zero()
 
     def initialize_parameters(
         self,
@@ -72,8 +76,9 @@ class LazyEmbedding(torch.nn.modules.lazy.LazyModuleMixin, torch.nn.Embedding):
         if self.has_uninitialized_params():
             num_embeddings = kwargs.get("num_embeddings", 0)
             padding_idx = kwargs.get("padding_idx", None)
+            weight = kwargs.get("weight", None)
             with torch.no_grad():
                 self.num_embeddings = num_embeddings
                 self.padding_idx = padding_idx
                 self.weight.materialize((self.num_embeddings, self.embedding_dim))
-                self.reset_parameters()
+                self.reset_parameters(weight)

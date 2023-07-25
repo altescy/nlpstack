@@ -3,9 +3,11 @@ from os import PathLike
 from typing import Any, Optional, Union, cast
 
 import minato
+import numpy
 import torch
 
 from nlpstack.data import Vocabulary
+from nlpstack.data.embeddings import WordEmbedding
 from nlpstack.torch.modules.lazy import LazyEmbedding
 from nlpstack.torch.modules.scalarmix import ScalarMix
 from nlpstack.torch.modules.seq2vec_encoders import BagOfEmbeddings, Seq2VecEncoder
@@ -42,6 +44,7 @@ class Embedding(TokenEmbedder):
         scale_grad_by_freq: bool = False,
         sparse: bool = False,
         namespace: str = "tokens",
+        pretraind_embedding: Optional[WordEmbedding] = None,
     ) -> None:
         super().__init__()
         self._embedding = LazyEmbedding(
@@ -52,11 +55,31 @@ class Embedding(TokenEmbedder):
             sparse=sparse,
         )
         self._namespace = namespace
+        self._pretrained_embedding = pretraind_embedding
 
     def setup(self, *args: Any, vocab: Vocabulary, **kwargs: Any) -> None:
+        num_embeddings = vocab.get_vocab_size(self._namespace)
+        weight: Optional[torch.Tensor] = None
+        if self._pretrained_embedding is not None:
+            all_tokens = set(vocab.get_token_to_index(self._namespace).keys())
+            all_embeddings = numpy.asarray(
+                [self._pretrained_embedding[token] for token in all_tokens if token in self._pretrained_embedding]
+            )
+            embeddings_mean = float(numpy.mean(all_embeddings))
+            embeddings_std = float(numpy.std(all_embeddings))
+            weight = torch.FloatTensor(num_embeddings, self._embedding.embedding_dim)
+            torch.nn.init.normal_(weight, embeddings_mean, embeddings_std)
+            for token, index in vocab.get_token_to_index(self._namespace).items():
+                if token in self._pretrained_embedding:
+                    weight[index] = torch.FloatTensor(self._pretrained_embedding[token])
+            self._pretrained_embedding = None
+        else:
+            weight = None
+
         self._embedding.initialize_parameters(
             num_embeddings=vocab.get_vocab_size(self._namespace),
             padding_idx=vocab.get_pad_index(self._namespace),
+            weight=weight,
         )
 
     def forward(self, token_ids: torch.LongTensor, **kwargs: Any) -> torch.FloatTensor:

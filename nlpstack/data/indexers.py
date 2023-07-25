@@ -6,6 +6,7 @@ import minato
 import numpy
 
 from nlpstack.common import cached_property
+from nlpstack.data.embeddings import WordEmbedding
 from nlpstack.data.tokenizers import Token
 from nlpstack.data.vocabulary import Vocabulary
 from nlpstack.transformers import cache as transformers_cache
@@ -139,23 +140,16 @@ class TokenVectorIndexer(TokenIndexer):
         }
 
 
-class PretrainedFasttextIndexer(TokenIndexer):
+class PretrainedEmbeddingIndexer(TokenIndexer):
     def __init__(
         self,
-        pretraind_filename: Union[str, PathLike],
+        embedding: WordEmbedding,
         feature_name: str = "surface",
         namespace: Optional[str] = None,
     ) -> None:
-        self._pretraind_filename = pretraind_filename
+        self._embedding = embedding
         self._feature_name = feature_name
         self._namespace = namespace
-
-    @cached_property
-    def fasttext(self) -> "fasttext.FastText":
-        if fasttext is None:
-            raise ModuleNotFoundError("Please install fasttext.")
-        pretrained_filename = minato.cached_path(self._pretraind_filename)
-        return fasttext.load_model(str(pretrained_filename))
 
     def _get_token_feature(self, token: Token) -> str:
         feature = str(getattr(token, self._feature_name))
@@ -170,7 +164,7 @@ class PretrainedFasttextIndexer(TokenIndexer):
 
     def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> Dict[str, Any]:
         return {
-            "embeddings": numpy.array([self.fasttext[self._get_token_feature(token)] for token in tokens]),
+            "embeddings": numpy.array([self._embedding[self._get_token_feature(token)] for token in tokens]),
             "mask": numpy.array([True] * len(tokens), dtype=bool),
         }
 
