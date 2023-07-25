@@ -1,5 +1,5 @@
 from os import PathLike
-from typing import Dict, Union, cast
+from typing import Any, Dict, Union, cast
 
 import minato
 import numpy
@@ -13,6 +13,9 @@ except ModuleNotFoundError:
 
 
 class WordEmbedding:
+    def setup(self, *args: Any, **kwargs: Any) -> None:
+        pass
+
     def __getitem__(self, word: str) -> numpy.ndarray:
         raise NotImplementedError
 
