@@ -16,7 +16,8 @@ class CountEmbedder(torch.nn.Module):
 
     def setup(self, *args: Any, vocab: Vocabulary, **kwargs: Any) -> None:
         self._vocab_size = vocab.get_vocab_size(self._token_namespace)
-        self._oov_index = vocab.get_oov_index(self._token_namespace)
+        if self._ignore_oov:
+            self._oov_index = vocab.get_oov_index(self._token_namespace)
 
     def _get_token_ids(self, text: Mapping[str, Mapping[str, torch.Tensor]]) -> torch.Tensor:
         for text_field in text.values():
