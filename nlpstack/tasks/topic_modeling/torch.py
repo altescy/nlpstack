@@ -1,6 +1,6 @@
 import dataclasses
 from logging import getLogger
-from typing import Any, Literal, Mapping, Optional, Union, cast
+from typing import Any, Literal, Mapping, Optional, Sequence, Union, cast
 
 import torch
 import torch.nn.functional as F
@@ -23,32 +23,34 @@ class TorchProdLDAOutput:
 
 class TorchProdLDA(TorchModel[TopicModelingInference]):
     class HiddenToLogNormal(torch.nn.Module):
-        def __init__(self, hidden_size: int, num_topics: int) -> None:
+        def __init__(self, hidden_dim: int, num_topics: int) -> None:
             super().__init__()
-            self.fcmu = torch.nn.Linear(hidden_size, num_topics)
-            self.fclv = torch.nn.Linear(hidden_size, num_topics)
-            self.bnmu = torch.nn.BatchNorm1d(num_topics)
-            self.bnlv = torch.nn.BatchNorm1d(num_topics)
+            self.fcmu = torch.nn.Linear(hidden_dim, num_topics)
+            self.fclv = torch.nn.Linear(hidden_dim, num_topics)
+            self.bnmu = torch.nn.BatchNorm1d(num_topics, affine=False)
+            self.bnlv = torch.nn.BatchNorm1d(num_topics, affine=False)
 
         def forward(self, hidden: torch.Tensor) -> torch.distributions.LogNormal:
             mu = self.bnmu(self.fcmu(hidden))
             lv = self.bnlv(self.fclv(hidden))
-            return torch.distributions.LogNormal(mu, (0.5 * lv).exp())  # type: ignore[no-untyped-call]
+            sigma = torch.exp(torch.clamp(0.5 * lv, -50, 50))
+            return torch.distributions.LogNormal(mu, sigma)  # type: ignore[no-untyped-call]
 
     class HiddenToDirichlet(torch.nn.Module):
-        def __init__(self, hidden_size: int, num_topics: int) -> None:
+        def __init__(self, hidden_dim: int, num_topics: int) -> None:
             super().__init__()
-            self.fc = torch.nn.Linear(hidden_size, num_topics)
-            self.bn = torch.nn.BatchNorm1d(num_topics)
+            self.fc = torch.nn.Linear(hidden_dim, num_topics)
+            self.bn = torch.nn.BatchNorm1d(num_topics, affine=False)
 
         def forward(self, hidden: torch.Tensor) -> torch.distributions.Dirichlet:
-            alphas = self.bn(self.fc(hidden)).exp().cpu()
+            alphas = torch.clamp(self.bn(self.fc(hidden)), -50, 50).exp()
             return torch.distributions.Dirichlet(alphas)  # type: ignore[no-untyped-call]
 
     def __init__(
         self,
         num_topics: int,
         hidden_dim: int,
+        alpha: float = 0.02,
         dropout: Optional[float] = 0.0,
         prior: Literal["dirichlet", "lognormal"] = "dirichlet",
         token_namespace: str = "tokens",
@@ -68,14 +70,15 @@ class TorchProdLDA(TorchModel[TopicModelingInference]):
             torch.nn.Softplus(),
             torch.nn.Dropout(dropout),
         )
-        self._decoder = LazyLinearOutput(num_topics)
         self._projector = (
             TorchProdLDA.HiddenToDirichlet(hidden_dim, num_topics)
             if prior == "dirichlet"
             else TorchProdLDA.HiddenToLogNormal(hidden_dim, num_topics)
         )
-        self._batchnorm = torch.nn.LazyBatchNorm1d()
+        self._decoder = LazyLinearOutput(num_topics, bias=False)
+        self._batchnorm = torch.nn.LazyBatchNorm1d(affine=False)
         self._dropout = torch.nn.Dropout(dropout)
+        self._alpha = alpha
         self._token_namespace = token_namespace
 
     def standard_prior_like(
@@ -86,7 +89,7 @@ class TorchProdLDA(TorchModel[TopicModelingInference]):
             scale = torch.ones_like(posterior.scale)
             return torch.distributions.LogNormal(loc, scale)  # type: ignore[no-untyped-call]
         if isinstance(posterior, torch.distributions.Dirichlet):
-            alphas = torch.ones_like(posterior.concentration)
+            alphas = self._alpha * torch.ones_like(posterior.concentration)
             return torch.distributions.Dirichlet(alphas)  # type: ignore[no-untyped-call]
         raise ValueError(f"Unknown posterior type {type(posterior)}")
 
@@ -103,6 +106,7 @@ class TorchProdLDA(TorchModel[TopicModelingInference]):
     def forward(  # type: ignore[override]
         self,
         text: Mapping[str, Mapping[str, torch.Tensor]],
+        metadata: Optional[Sequence[Mapping[str, Any]]] = None,
         *args: Any,
     ) -> TorchProdLDAOutput:
         embedding = self._embedder(text)
@@ -113,20 +117,20 @@ class TorchProdLDA(TorchModel[TopicModelingInference]):
             topic_distribution = posterior.rsample().to(embedding.device)
         else:
             topic_distribution = posterior.mean.to(embedding.device)
-        topic_distribution = topic_distribution / topic_distribution.sum(dim=1, keepdim=True)
 
-        output = F.log_softmax(self._batchnorm(self._decoder(topic_distribution)))
+        output = F.log_softmax(self._batchnorm(self._decoder(self._dropout(topic_distribution))), dim=1)
 
         prior = self.standard_prior_like(posterior)
         nll = -torch.sum(embedding * output)
-        kld = torch.distributions.kl_divergence(posterior, prior).sum().to(embedding.device)
-        ppl = torch.exp(nll / embedding.sum())
+        kld = torch.sum(torch.distributions.kl_divergence(posterior, prior).to(embedding.device))
+        ppl = torch.exp(nll / (1e-6 + embedding.sum()))
 
         loss = cast(torch.FloatTensor, (nll + kld) / embedding.size(0))
         inference = TopicModelingInference(
             topic_distribution=topic_distribution.detach().cpu().numpy(),
             token_counts=embedding.detach().cpu().numpy(),
             perplexity=float(ppl.detach().cpu().item()),
+            metadata=metadata,
         )
 
         return TorchProdLDAOutput(inference=inference, loss=loss)
