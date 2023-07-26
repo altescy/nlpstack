@@ -7,6 +7,7 @@ from nlpstack.torch.modules.seq2seq_encoders import (
     FeedForwardSeq2SeqEncoder,
     GruSeq2SeqEncoder,
     LstmSeq2SeqEncoder,
+    MLPMixer,
     PassThroughSeq2SeqEncoder,
     ResidualSeq2SeqEncoder,
     RnnSeq2SeqEncoder,
@@ -33,6 +34,8 @@ from nlpstack.torch.modules.seq2seq_encoders import (
         ),
         WindowConcatEncoder(6, 2, output_dim=6),
         ResidualSeq2SeqEncoder(LstmSeq2SeqEncoder(6, 3, 1, bidirectional=True)),
+        MLPMixer(6, 2, max_length=4),  # for short sequence
+        MLPMixer(6, 2, max_length=16),  # for long sequence
     ],
 )
 def test_seq2seq_encoder(seq2seq_encoder: Seq2SeqEncoder) -> None:

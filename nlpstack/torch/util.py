@@ -576,3 +576,23 @@ def viterbi_decode(
         return viterbi_paths[0], viterbi_scores[0]
 
     return viterbi_paths, viterbi_scores
+
+
+def convert_to_toeplitz(inputs: torch.Tensor) -> torch.Tensor:
+    if inputs.dim() != 1:
+        raise ValueError(f"Number of dimensions of inputs must be equal to 1 (actual={inputs.dim()}).")
+
+    num_elements = inputs.size(0)
+    if num_elements % 2 != 1:
+        raise ValueError(f"Size of inputs must be an odd number. (actual={num_elements})")
+
+    n = (num_elements + 1) // 2
+    r = num_elements // 2
+
+    output = torch.nn.functional.pad(inputs, (0, n))
+    output = output.tile(n)
+    output = output[:-n]
+    output = output.reshape(n, -1)
+    output = output[:, r:-r]
+
+    return output
