@@ -468,3 +468,93 @@ class MLPMixer(Seq2SeqEncoder):
             h = dropout(layer(h, m))
         output = unfold(h, sequence_length)
         return output
+
+
+class HyperMixer(Seq2SeqEncoder):
+    class TokenMixer(torch.nn.Module):
+        def __init__(self, input_dim: int, hidden_dim: int) -> None:
+            super().__init__()
+            self._feedforward = torch.nn.Sequential(
+                torch.nn.Linear(input_dim, hidden_dim),
+                torch.nn.GELU(),
+                torch.nn.Linear(hidden_dim, hidden_dim),
+            )
+
+        def forward(self, inputs: torch.FloatTensor, mask: torch.Tensor) -> torch.FloatTensor:
+            inputs = cast(torch.FloatTensor, inputs * mask.unsqueeze(-1))
+
+            # Shape: (batch_size, max_length, hidden_dim)
+            W1 = self._compute_weights(inputs)
+            # Shape: (batch_size, hidden_dim, max_length)
+            W2 = W1.transpose(1, 2)
+
+            # Shape: (batch_size, hidden_dim, embedding_dim)
+            output = torch.bmm(W2, inputs)
+            output = F.gelu(output)
+            # Shape: (batch_size, max_length, embedding_dim)
+            output = torch.bmm(W1, output)
+
+            return cast(torch.FloatTensor, output)
+
+        def _compute_weights(self, inputs: torch.FloatTensor) -> torch.FloatTensor:
+            output = add_positional_features(inputs)
+            output = self._feedforward(output)
+            return output
+
+    class HyperMixerLayer(torch.nn.Module):
+        def __init__(self, input_dim: int, hidden_dim: int) -> None:
+            super().__init__()
+            self._layer_norm_1 = torch.nn.LayerNorm(input_dim)
+            self._layer_norm_2 = torch.nn.LayerNorm(input_dim)
+            self._token_mixer = HyperMixer.TokenMixer(input_dim, hidden_dim)
+            self._feedforward = torch.nn.Sequential(
+                torch.nn.Linear(input_dim, hidden_dim),
+                torch.nn.GELU(),
+                torch.nn.Linear(hidden_dim, input_dim),
+            )
+
+        def forward(
+            self,
+            inputs: torch.Tensor,
+            mask: Optional[torch.Tensor] = None,
+        ) -> torch.Tensor:
+            res1 = inputs
+            output = self._layer_norm_1(inputs)
+
+            output = self._token_mixer(output, mask)
+            output = output + res1
+
+            res2 = output
+            output = self._layer_norm_2(output)
+
+            output = self._feedforward(output)
+            output = output + res2
+
+            return cast(torch.Tensor, output)
+
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_dim: int,
+        num_layers: int,
+        dropout: float = 0.0,
+    ) -> None:
+        super().__init__()
+        self._input_dim = input_dim
+        self._layers = torch.nn.ModuleList(
+            [HyperMixer.HyperMixerLayer(input_dim, hidden_dim) for _ in range(num_layers)]
+        )
+        self._dropouts = torch.nn.ModuleList([torch.nn.Dropout(p=dropout) for _ in range(num_layers)])
+
+    def get_input_dim(self) -> int:
+        return self._input_dim
+
+    def get_output_dim(self) -> int:
+        return self._input_dim
+
+    def forward(self, inputs: torch.FloatTensor, mask: torch.BoolTensor) -> torch.FloatTensor:
+        h = inputs
+        m = mask.float()
+        for layer, dropout in zip(self._layers, self._dropouts):
+            h = dropout(layer(h, m))
+        return h
