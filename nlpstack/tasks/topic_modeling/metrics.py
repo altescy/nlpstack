@@ -30,6 +30,11 @@ class Perplexity(Metric[TopicModelingInference]):
 
 
 class NPMI(Metric[TopicModelingInference]):
+    """Normalized Pointwise Mutual Information (NPMI) metric.
+
+    https://aclanthology.org/E14-1056/
+    """
+
     def __init__(self, top_n: int = 10) -> None:
         self._top_n = top_n
         self._topic_word_counts: Optional[numpy.ndarray] = None
