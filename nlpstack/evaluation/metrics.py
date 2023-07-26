@@ -16,6 +16,10 @@ class Metric(Generic[Inference]):
     def reset(self) -> None:
         raise NotImplementedError
 
+    def __getstate__(self) -> Dict[str, Any]:
+        self.reset()
+        return self.__dict__
+
 
 class MultiMetrics(Metric[Inference]):
     def __init__(

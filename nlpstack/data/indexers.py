@@ -38,12 +38,22 @@ class TokenIndexer:
 
 
 class SingleIdTokenIndexer(TokenIndexer):
-    def __init__(self, namespace: str = "tokens", feature_name: str = "surface") -> None:
+    def __init__(
+        self,
+        namespace: str = "tokens",
+        feature_name: str = "surface",
+        lowercase: bool = False,
+    ) -> None:
         self._namespace = namespace
         self._feature_name = feature_name
+        self._lowercase = lowercase
 
     def _get_token_feature(self, token: Token) -> str:
-        feature = str(getattr(token, self._feature_name))
+        feature = getattr(token, self._feature_name)
+        if not isinstance(feature, str):
+            raise ValueError(f"token.{self._feature_name} must be str, but got {type(feature)}")
+        if self._lowercase:
+            feature = feature.lower()
         return feature
 
     def build_vocab(self, vocab: Vocabulary, documents: Iterable[Sequence[Token]]) -> None:
@@ -76,14 +86,20 @@ class TokenCharactersIndexer(TokenIndexer):
         self,
         namespace: str = "token_characters",
         feature_name: str = "surface",
+        lowercase: bool = False,
         min_padding_length: int = 0,
     ) -> None:
         self._namespace = namespace
         self._feature_name = feature_name
+        self._lowercase = lowercase
         self._min_padding_length = min_padding_length
 
     def _get_token_feature(self, token: Token) -> str:
-        feature = str(getattr(token, self._feature_name))
+        feature = getattr(token, self._feature_name)
+        if not isinstance(feature, str):
+            raise ValueError(f"token.{self._feature_name} must be str, but got {type(feature)}")
+        if self._lowercase:
+            feature = feature.lower()
         return feature
 
     def build_vocab(self, vocab: Vocabulary, documents: Iterable[Sequence[Token]]) -> None:
@@ -145,14 +161,20 @@ class PretrainedEmbeddingIndexer(TokenIndexer):
         self,
         embedding: WordEmbedding,
         feature_name: str = "surface",
+        lowercase: bool = False,
         namespace: Optional[str] = None,
     ) -> None:
         self._embedding = embedding
         self._feature_name = feature_name
+        self._lowercase = lowercase
         self._namespace = namespace
 
     def _get_token_feature(self, token: Token) -> str:
-        feature = str(getattr(token, self._feature_name))
+        feature = getattr(token, self._feature_name)
+        if not isinstance(feature, str):
+            raise ValueError(f"token.{self._feature_name} must be str, but got {type(feature)}")
+        if self._lowercase:
+            feature = feature.lower()
         return feature
 
     def build_vocab(self, vocab: Vocabulary, documents: Iterable[Sequence[Token]]) -> None:
