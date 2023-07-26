@@ -4,7 +4,7 @@ from typing import Any, Iterator, List, Literal, Mapping, Optional, Union, cast
 import minato
 import numpy
 
-from nlpstack.common import cached_property, murmurhash3
+from nlpstack.common import FileBackendMapping, cached_property, murmurhash3
 
 try:
     import fasttext
@@ -62,6 +62,9 @@ class MinhashWordEmbedding(WordEmbedding):
             embedding[value % self._num_features] += 1.0
         return embedding
 
+    def __contains__(self, word: str) -> bool:
+        return True
+
     def get_output_dim(self) -> int:
         return self._num_features
 
@@ -79,8 +82,11 @@ class PretrainedWordEmbedding(WordEmbedding):
 
     @staticmethod
     def _read_embeddings_file(filename: Union[str, PathLike]) -> Mapping[str, numpy.ndarray]:
+        embeddings = FileBackendMapping[str, numpy.ndarray]()
         with minato.open(filename, decompress="auto") as txtfile:
-            embeddings = {line.split()[0]: numpy.array(line.split()[1:], dtype=float) for line in txtfile}
+            for line in txtfile:
+                key, *values = line.rstrip().split()
+                embeddings[key] = numpy.asarray(values, dtype=float)
         assert (
             len(set(len(embedding) for embedding in embeddings.values())) == 1
         ), "All embeddings must have the same dimension."
@@ -91,7 +97,7 @@ class PretrainedWordEmbedding(WordEmbedding):
         filename: Union[str, PathLike],
         unknown_vector: Optional[Union[Literal["zero", "mean"], numpy.ndarray]] = None,
     ) -> None:
-        self._embeddings = self._read_embeddings_file(filename)
+        self._filename = filename
         self._unknown_vector: Optional[numpy.ndarray] = None
         if unknown_vector == "zero":
             self._unknown_vector = numpy.zeros(self.get_output_dim(), dtype=float)
@@ -104,9 +110,15 @@ class PretrainedWordEmbedding(WordEmbedding):
                 f"unknown_vector must be one of 'zero', 'mean', or a numpy.ndarray, but got {unknown_vector}"
             )
 
+        self._embeddings  # load the embeddings file
+
+    @cached_property
+    def _embeddings(self) -> Mapping[str, numpy.ndarray]:
+        return self._read_embeddings_file(self._filename)
+
     def __getitem__(self, word: str) -> numpy.ndarray:
         if word in self._embeddings:
-            return self._embeddings[word]
+            return cast(numpy.ndarray, self._embeddings[word])
         if self._unknown_vector is not None:
             return self._unknown_vector
         raise KeyError(word)
