@@ -691,7 +691,7 @@ class GatedCnnSeq2SeqEncoder(Seq2SeqEncoder):
             out = transposed_embeddings
             for block in blocks:
                 out = block(out.masked_fill(mask_for_fill, 0.0))
-                outputs.append(out)
+            outputs.append(out)
 
         output = cast(torch.FloatTensor, torch.cat(outputs, dim=1).transpose(1, 2))
         if self._projection:
