@@ -1,5 +1,6 @@
+import math
 from contextlib import suppress
-from typing import Callable, Literal, Optional, Sequence, Tuple, Union, cast
+from typing import Callable, List, Literal, NamedTuple, Optional, Sequence, Tuple, Union, cast
 
 import torch
 import torch.nn.functional as F
@@ -558,3 +559,141 @@ class HyperMixer(Seq2SeqEncoder):
         for layer, dropout in zip(self._layers, self._dropouts):
             h = dropout(layer(h, m))
         return h
+
+
+class GatedCnnSeq2SeqEncoder(Seq2SeqEncoder):
+    """
+    https://arxiv.org/abs/1612.08083
+    https://arxiv.org/abs/1705.03122
+    """
+
+    class Layer(NamedTuple):
+        kernel_size: int
+        output_dim: int
+        dilation: int = 1
+
+    class ResidualBlock(torch.nn.Module):
+        def __init__(
+            self,
+            input_dim: int,
+            layers: Sequence["GatedCnnSeq2SeqEncoder.Layer"],
+            direction: Literal["forward", "backward"],
+            do_weight_norm: bool = True,
+            dropout: float = 0.0,
+        ) -> None:
+            super().__init__()
+
+            self.dropout = dropout
+            self._convolutions = torch.nn.ModuleList()
+            last_dim = input_dim
+            for k, layer in enumerate(layers):
+                if layer.dilation == 1:
+                    conv = torch.nn.Conv1d(
+                        in_channels=last_dim,
+                        out_channels=layer.output_dim * 2,
+                        kernel_size=layer.kernel_size,
+                        stride=1,
+                        padding=layer[0] - 1,
+                        bias=True,
+                    )
+                else:
+                    assert layer.kernel_size == 2, "only support kernel = 2 for now"
+                    conv = torch.nn.Conv1d(
+                        in_channels=last_dim,
+                        out_channels=layer.output_dim * 2,
+                        kernel_size=layer.kernel_size,
+                        stride=1,
+                        padding=layer.dilation,
+                        dilation=layer.dilation,
+                        bias=True,
+                    )
+
+                if k == 0:
+                    conv_dropout = dropout
+                else:
+                    conv_dropout = 0.0
+                std = math.sqrt((4 * (1.0 - conv_dropout)) / (layer.kernel_size * last_dim))
+
+                conv.weight.data.normal_(0, std=std)
+                if conv.bias is not None:
+                    conv.bias.data.zero_()
+
+                if do_weight_norm:
+                    conv = torch.nn.utils.weight_norm(conv, name="weight", dim=0)
+
+                self._convolutions.append(conv)
+                last_dim = layer.output_dim
+
+            assert last_dim == input_dim
+
+            if direction not in ("forward", "backward"):
+                raise ValueError(f"invalid direction: {direction}")
+            self._direction = direction
+
+        def forward(self, inputs: torch.Tensor) -> torch.Tensor:
+            output = inputs
+            sequence_length = inputs.size(2)
+            for k, convolution in enumerate(self._convolutions):
+                if k == 0 and self.dropout > 0:
+                    output = torch.nn.functional.dropout(output, self.dropout, self.training)
+
+                conv_out = convolution(output)
+
+                dims_to_remove = conv_out.size(2) - sequence_length
+                if dims_to_remove > 0:
+                    if self._direction == "forward":
+                        conv_out = conv_out.narrow(2, 0, sequence_length)
+                    else:
+                        conv_out = conv_out.narrow(2, dims_to_remove, sequence_length)
+
+                output = torch.nn.functional.glu(conv_out, dim=1)
+
+            return (output + inputs) * math.sqrt(0.5)
+
+    def __init__(
+        self,
+        input_dim: int,
+        layers: Sequence[Sequence["GatedCnnSeq2SeqEncoder.Layer"]],
+        output_dim: Optional[int] = None,
+        dropout: float = 0.0,
+    ) -> None:
+        super().__init__()
+
+        self._forward_residual_blocks = torch.nn.ModuleList()
+        self._backward_residual_blocks = torch.nn.ModuleList()
+        self._input_dim = input_dim
+        self._output_dim = output_dim or input_dim * 2
+
+        for layer in layers:
+            self._forward_residual_blocks.append(
+                GatedCnnSeq2SeqEncoder.ResidualBlock(input_dim, layer, "forward", dropout=dropout)
+            )
+            self._backward_residual_blocks.append(
+                GatedCnnSeq2SeqEncoder.ResidualBlock(input_dim, layer, "backward", dropout=dropout)
+            )
+
+        self._projection: Optional[torch.nn.Linear] = None
+        if output_dim:
+            self._projection = torch.nn.Linear(input_dim * 2, output_dim)
+
+    def get_input_dim(self) -> int:
+        return self._input_dim
+
+    def get_output_dim(self) -> int:
+        return self._output_dim
+
+    def forward(self, inputs: torch.FloatTensor, mask: torch.BoolTensor) -> torch.FloatTensor:
+        transposed_embeddings = torch.transpose(inputs, 1, 2)
+        mask_for_fill = ~mask.unsqueeze(1)
+
+        outputs: List[torch.Tensor] = []
+        for k, blocks in enumerate([self._forward_residual_blocks, self._backward_residual_blocks]):
+            out = transposed_embeddings
+            for block in blocks:
+                out = block(out.masked_fill(mask_for_fill, 0.0))
+                outputs.append(out)
+
+        output = cast(torch.FloatTensor, torch.cat(outputs, dim=1).transpose(1, 2))
+        if self._projection:
+            output = self._projection(output)
+        return output
