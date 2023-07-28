@@ -43,11 +43,13 @@ class RuneWorkflow(Workflow):
         self,
         config_filename: str,
         archive_filename: str,
+        *,
+        overrides: Optional[str] = None,
     ) -> None:
         """train a model and save archive"""
 
         logger.info("Loading config from %s", config_filename)
-        config = load_jsonnet(minato.cached_path(config_filename))
+        config = load_jsonnet(minato.cached_path(config_filename), overrides=overrides)
         rune_config = coltbuilder(config, RuneConfig)
 
         if rune_config.model is None:
@@ -86,10 +88,11 @@ class RuneWorkflow(Workflow):
         *,
         input_filename: str,
         output_filename: str,
+        overrides: Optional[str] = None,
     ) -> None:
         """predict with a model and output results into a file"""
 
-        config = load_jsonnet(minato.cached_path(config_filename))
+        config = load_jsonnet(minato.cached_path(config_filename), overrides=overrides)
         rune_config = coltbuilder(config, RuneConfig)
 
         if rune_config.reader is None:
@@ -118,10 +121,11 @@ class RuneWorkflow(Workflow):
         *,
         input_filename: str,
         output_filename: Optional[str] = None,
+        overrides: Optional[str] = None,
     ) -> None:
         """evaluate a model and output metrics"""
 
-        config = load_jsonnet(minato.cached_path(config_filename))
+        config = load_jsonnet(minato.cached_path(config_filename), overrides=overrides)
         rune_config = coltbuilder(config, RuneConfig)
 
         if rune_config.reader is None:
@@ -153,6 +157,7 @@ class RuneWorkflow(Workflow):
         host: str = "localhost",
         port: int = 8080,
         config_filename: Optional[str] = None,
+        overrides: Optional[str] = None,
     ) -> None:
         from http.server import HTTPServer
 
@@ -166,7 +171,7 @@ class RuneWorkflow(Workflow):
             exit(1)
 
         if config_filename is not None:
-            config = load_jsonnet(minato.cached_path(config_filename))
+            config = load_jsonnet(minato.cached_path(config_filename), overrides=overrides)
             rune_config = coltbuilder(config, RuneConfig)
             model.setup("prediction", **coltbuilder(rune_config.predictor or {}))
 
@@ -190,13 +195,14 @@ class RuneMlflowWorkflow(Workflow):
         config_filename: str,
         *,
         run_name: Optional[str] = None,
+        overrides: Optional[str] = None,
     ) -> None:
         """train a model and save archive with mlflow"""
 
         import mlflow
 
         logger.info("Loading config from %s", config_filename)
-        config = load_jsonnet(minato.cached_path(config_filename))
+        config = load_jsonnet(minato.cached_path(config_filename), overrides=overrides)
         rune_config = coltbuilder(config, RuneConfig)
 
         if rune_config.model is None:
@@ -245,6 +251,7 @@ class RuneMlflowWorkflow(Workflow):
         timeout: Optional[float] = None,
         resume: bool = False,
         optuna_config_filename: str = "optuna.jsonnet",
+        overrides: Optional[str] = None,
     ) -> None:
         """tune hyper-parameters with optuna and save archive with mlflow"""
 
@@ -294,7 +301,7 @@ class RuneMlflowWorkflow(Workflow):
                 value = suggest(key, **params)
                 ext_vars[key] = str(value)
 
-            config = load_jsonnet(minato.cached_path(config_filename), ext_vars=ext_vars)
+            config = load_jsonnet(minato.cached_path(config_filename), ext_vars=ext_vars, overrides=overrides)
             rune_config = coltbuilder(config, RuneConfig)
 
             if rune_config.model is None:
@@ -427,11 +434,12 @@ class RuneMlflowWorkflow(Workflow):
         input_filename: str,
         metric_prefix: Optional[str] = None,
         run_id: Optional[str] = None,
+        overrides: Optional[str] = None,
     ) -> None:
         """evaluate a model and output metrics"""
         import mlflow
 
-        config = load_jsonnet(minato.cached_path(config_filename))
+        config = load_jsonnet(minato.cached_path(config_filename), overrides=overrides)
         rune_config = coltbuilder(config, RuneConfig)
 
         if rune_config.reader is None:
