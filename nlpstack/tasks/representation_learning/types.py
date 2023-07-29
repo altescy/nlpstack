@@ -20,5 +20,5 @@ class RepresentationLearningInference:
 
 @dataclasses.dataclass
 class RepresentationLearningPrediction:
-    embedding: numpy.ndarray
+    embedding: Sequence[float]
     metadata: Optional[Mapping[str, Any]] = None

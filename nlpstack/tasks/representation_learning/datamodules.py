@@ -75,7 +75,7 @@ class RepresentationLearningDataModule(
         self, inference: RepresentationLearningInference
     ) -> Iterator[RepresentationLearningPrediction]:
         for embedding in inference.embeddings:
-            yield RepresentationLearningPrediction(embedding)
+            yield RepresentationLearningPrediction(embedding.tolist())
 
     def read_dataset(
         self,
