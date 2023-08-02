@@ -1,13 +1,13 @@
 import dataclasses
 from contextlib import suppress
 from os import PathLike
-from typing import Callable, Generic, Literal, Optional, Tuple, TypeVar, Union
+from typing import Callable, Generic, Literal, Optional, Tuple, TypeVar, Union, cast
 
 import minato
 import torch
 
 from nlpstack.torch.modules.transformer import CausalTransformerDecoder, CausalTransformerDecoderLayer
-from nlpstack.torch.util import add_positional_features
+from nlpstack.torch.util import add_positional_features, masked_softmax, weighted_sum
 
 Seq2SeqDecoderState = TypeVar("Seq2SeqDecoderState")
 
@@ -164,6 +164,14 @@ class LstmSeq2SeqDecoder(Seq2SeqDecoder["LstmSeq2SeqDecoder.State"]):
         memory_mask: Optional[torch.BoolTensor] = None,
         last_state: Optional["LstmSeq2SeqDecoder.State"] = None,
     ) -> Tuple[torch.Tensor, "LstmSeq2SeqDecoder.State"]:
+        if self._use_cross_attention:
+            if memory is None:
+                raise ValueError("memory is required when use_cross_attention is True")
+            memory_mask = cast(
+                torch.BoolTensor, memory_mask if memory_mask is not None else memory.new_ones(memory.shape[:2]).bool()
+            )
+            attention_weight = masked_softmax(torch.bmm(inputs, memory.transpose(1, 2)), memory_mask)
+            inputs = weighted_sum(memory, attention_weight)
         last_state = last_state or self.get_initial_state(inputs, memory, inputs_mask, memory_mask)
         if self.training:
             output, (hidden, cell) = self._decoder(inputs, (last_state.hidden, last_state.cell))
@@ -189,7 +197,7 @@ class LstmSeq2SeqDecoder(Seq2SeqDecoder["LstmSeq2SeqDecoder.State"]):
                 hidden=torch.zeros((self._num_layers, batch_size, self._hidden_dim), device=inputs.device),
                 cell=torch.zeros((self._num_layers, batch_size, self._hidden_dim), device=inputs.device),
             )
-        if self._use_cross_attention:
+        if not self._use_cross_attention:
             raise ValueError("memory is given but use_cross_attention is False")
         assert self._init_state_projection is not None
         last_token_indices = (

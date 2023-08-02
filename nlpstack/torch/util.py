@@ -269,6 +269,21 @@ def masked_softmax(
     return cast(TensorType, result)
 
 
+def weighted_sum(matrix: TensorType, attention: torch.Tensor) -> TensorType:
+    if attention.dim() == 2 and matrix.dim() == 3:
+        return cast(TensorType, attention.unsqueeze(1).bmm(matrix).squeeze(1))
+    if attention.dim() == 3 and matrix.dim() == 3:
+        return cast(TensorType, attention.bmm(matrix))
+    if matrix.dim() - 1 < attention.dim():
+        expanded_size = list(matrix.size())
+        for i in range(attention.dim() - matrix.dim() + 1):
+            matrix = cast(TensorType, matrix.unsqueeze(1))
+            expanded_size.insert(i + 1, attention.size(i + 1))
+        matrix = cast(TensorType, matrix.expand(*expanded_size))
+    intermediate = attention.unsqueeze(-1).expand_as(matrix) * matrix
+    return cast(TensorType, intermediate.sum(dim=-2))
+
+
 def _get_combination(combination: str, tensors: Sequence[TensorType]) -> TensorType:
     if combination.isdigit():
         index = int(combination) - 1
