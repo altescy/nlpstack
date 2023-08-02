@@ -177,6 +177,7 @@ class CausalTransformerDecoder(torch.nn.Module):
                 output,
                 memory,
                 memory_mask=memory_mask,
+                tgt_key_padding_mask=tgt_key_padding_mask,
                 memory_is_causal=memory_is_causal,
                 cache=cache[i - 1] if cache is not None and i > 0 else None,
             )
