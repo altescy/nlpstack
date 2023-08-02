@@ -1,6 +1,9 @@
 import dataclasses
+from contextlib import suppress
+from os import PathLike
 from typing import Callable, Generic, Literal, Optional, Tuple, TypeVar, Union
 
+import minato
 import torch
 
 from nlpstack.torch.modules.transformer import CausalTransformerDecoder, CausalTransformerDecoderLayer
@@ -41,7 +44,7 @@ class Seq2SeqDecoder(torch.nn.Module, Generic[Seq2SeqDecoderState]):
 class TransformerSeq2SeqDecoder(Seq2SeqDecoder["TransformerSeq2SeqDecoder.State"]):
     @dataclasses.dataclass
     class State:
-        cache: Optional[torch.Tensor]
+        cache: Optional[torch.Tensor] = None
 
     def __init__(
         self,
@@ -121,7 +124,7 @@ class TransformerSeq2SeqDecoder(Seq2SeqDecoder["TransformerSeq2SeqDecoder.State"
         inputs_mask: Optional[torch.BoolTensor] = None,
         memory_mask: Optional[torch.BoolTensor] = None,
     ) -> "TransformerSeq2SeqDecoder.State":
-        return TransformerSeq2SeqDecoder.State(cache=None)
+        return TransformerSeq2SeqDecoder.State()
 
     def get_input_dim(self) -> int:
         return self._input_dim
@@ -204,3 +207,77 @@ class LstmSeq2SeqDecoder(Seq2SeqDecoder["LstmSeq2SeqDecoder.State"]):
 
     def get_output_dim(self) -> int:
         return self._hidden_dim
+
+
+class PretrainedTransformerSeq2SeqDecoder(Seq2SeqDecoder["PretrainedTransformerSeq2SeqDecoder.State"]):
+    @dataclasses.dataclass
+    class State:
+        past_key_values: Optional[Tuple[Tuple[torch.Tensor, ...], ...]] = None
+
+    def __init__(
+        self,
+        pretrained_model_name: Union[str, PathLike],
+        eval_mode: bool = False,
+        train_parameters: bool = True,
+        submodule: Optional[str] = None,
+    ) -> None:
+        from transformers import AutoModel
+
+        with suppress(FileNotFoundError):
+            pretrained_model_name = minato.cached_path(pretrained_model_name)
+
+        super().__init__()
+        self._model = AutoModel.from_pretrained(pretrained_model_name)
+        if submodule:
+            self._model = getattr(self._model, submodule)
+
+        self.eval_mode = eval_mode
+        if eval_mode:
+            self._model.eval()
+
+        if not train_parameters:
+            for param in self._model.parameters():
+                param.requires_grad = False
+
+    def train(self, mode: bool = True) -> "PretrainedTransformerSeq2SeqDecoder":
+        self.training = mode
+        for name, module in self.named_children():
+            if self.eval_mode and name == "_model":
+                module.eval()
+            else:
+                module.train(mode)
+        return self
+
+    def forward(
+        self,
+        inputs: torch.Tensor,
+        memory: Optional[torch.Tensor] = None,
+        inputs_mask: Optional[torch.BoolTensor] = None,
+        memory_mask: Optional[torch.BoolTensor] = None,
+        last_state: Optional["PretrainedTransformerSeq2SeqDecoder.State"] = None,
+    ) -> Tuple[torch.Tensor, "PretrainedTransformerSeq2SeqDecoder.State"]:
+        last_state = last_state or self.get_initial_state(inputs, memory, inputs_mask, memory_mask)
+        output = self._model(
+            inputs_embeds=inputs,
+            attention_mask=inputs_mask,
+            encoder_hidden_states=memory,
+            encoder_attention_mask=memory_mask,
+            past_key_values=last_state.past_key_values,
+            use_cache=not self.training,
+        )
+        return output.last_hidden_state, PretrainedTransformerSeq2SeqDecoder.State(output.past_key_values)
+
+    def get_initial_state(
+        self,
+        inputs: torch.Tensor,
+        memory: Optional[torch.Tensor] = None,
+        inputs_mask: Optional[torch.BoolTensor] = None,
+        memory_mask: Optional[torch.BoolTensor] = None,
+    ) -> "PretrainedTransformerSeq2SeqDecoder.State":
+        return PretrainedTransformerSeq2SeqDecoder.State()
+
+    def get_input_dim(self) -> int:
+        return int(self._model.config.hidden_size)
+
+    def get_output_dim(self) -> int:
+        return int(self._model.config.hidden_size)
