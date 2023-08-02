@@ -89,6 +89,103 @@ def logsumexp(tensor: torch.Tensor, dim: int = -1, keepdim: bool = False) -> tor
     return cast(torch.Tensor, max_score + (stable_vec.exp().sum(dim, keepdim=keepdim)).log())
 
 
+def sequence_cross_entropy_with_logits(
+    logits: torch.FloatTensor,
+    targets: torch.LongTensor,
+    weights: Union[torch.FloatTensor, torch.BoolTensor],
+    average: Literal["token", "batch", "none"] = "batch",
+    label_smoothing: Optional[float] = None,
+    gamma: Optional[float] = None,
+    alpha: Optional[Union[float, List[float], torch.FloatTensor]] = None,
+) -> torch.FloatTensor:
+    if average not in {"none", "token", "batch"}:
+        raise ValueError(f"Got average f{average}, expected one of 'none', 'token', or 'batch'")
+
+    # make sure weights are float
+    weights = weights.to(logits.dtype)  # type: ignore[assignment]
+    # sum all dim except batch
+    non_batch_dims = tuple(range(1, len(weights.shape)))
+    # shape : (batch_size,)
+    weights_batch_sum = weights.sum(dim=non_batch_dims)
+    # shape : (batch * sequence_length, num_classes)
+    logits_flat = logits.view(-1, logits.size(-1))
+    # shape : (batch * sequence_length, num_classes)
+    log_probs_flat = torch.nn.functional.log_softmax(logits_flat, dim=-1)
+    # shape : (batch * max_len, 1)
+    targets_flat = targets.view(-1, 1).long()
+    # focal loss coefficient
+    if gamma:
+        # shape : (batch * sequence_length, num_classes)
+        probs_flat = log_probs_flat.exp()
+        # shape : (batch * sequence_length,)
+        probs_flat = torch.gather(probs_flat, dim=1, index=targets_flat)
+        # shape : (batch * sequence_length,)
+        focal_factor = (1.0 - probs_flat) ** gamma
+        # shape : (batch, sequence_length)
+        focal_factor = focal_factor.view(*targets.size())
+        weights = weights * focal_factor
+
+    if alpha is not None:
+        # shape : () / (num_classes,)
+        if isinstance(alpha, (float, int)):
+            # shape : (2,)
+            alpha_factor = torch.tensor([1.0 - float(alpha), float(alpha)], dtype=weights.dtype, device=weights.device)
+
+        elif isinstance(alpha, (list, numpy.ndarray, torch.Tensor)):
+            # shape : (c,)
+            alpha_factor = torch.tensor(alpha, dtype=weights.dtype, device=weights.device)
+
+            if not alpha_factor.size():
+                # shape : (1,)
+                alpha_factor = alpha_factor.view(1)
+                # shape : (2,)
+                alpha_factor = torch.cat([1 - alpha_factor, alpha_factor])
+        else:
+            raise TypeError(
+                ("alpha must be float, list of float, or torch.FloatTensor, {} provided.").format(type(alpha))
+            )
+        # shape : (batch, max_len)
+        alpha_factor = torch.gather(alpha_factor, dim=0, index=targets_flat.view(-1)).view(*targets.size())
+        weights = weights * alpha_factor  # type: ignore[assignment]
+
+    if label_smoothing is not None and label_smoothing > 0.0:
+        num_classes = logits.size(-1)
+        smoothing_value = label_smoothing / num_classes
+        # Fill all the correct indices with 1 - smoothing value.
+        smoothed_targets = torch.full_like(log_probs_flat, smoothing_value).scatter_(
+            -1, targets_flat, 1.0 - label_smoothing + smoothing_value
+        )
+        negative_log_likelihood_flat = -log_probs_flat * smoothed_targets
+        negative_log_likelihood_flat = negative_log_likelihood_flat.sum(-1, keepdim=True)
+    else:
+        # Shape : (batch * sequence_length, 1)
+        negative_log_likelihood_flat = -torch.gather(log_probs_flat, dim=1, index=targets_flat)
+    # Shape : (batch, sequence_length)
+    negative_log_likelihood = negative_log_likelihood_flat.view(*targets.size())
+    # Shape : (batch, sequence_length)
+    negative_log_likelihood = negative_log_likelihood * weights
+
+    if average == "batch":
+        # Shape : (batch_size,)
+        per_batch_loss = negative_log_likelihood.sum(non_batch_dims) / (
+            weights_batch_sum + tiny_value_of_dtype(negative_log_likelihood.dtype)
+        )
+        num_non_empty_sequences = (weights_batch_sum > 0).sum() + tiny_value_of_dtype(negative_log_likelihood.dtype)
+        return cast(torch.FloatTensor, per_batch_loss.sum() / num_non_empty_sequences)
+    elif average == "token":
+        return cast(
+            torch.FloatTensor,
+            negative_log_likelihood.sum()
+            / (weights_batch_sum.sum() + tiny_value_of_dtype(negative_log_likelihood.dtype)),
+        )
+    else:
+        # shape : (batch_size,)
+        per_batch_loss = negative_log_likelihood.sum(non_batch_dims) / (
+            weights_batch_sum + tiny_value_of_dtype(negative_log_likelihood.dtype)
+        )
+        return cast(torch.FloatTensor, per_batch_loss)
+
+
 def replace_masked_values(tensor: TensorType, mask: torch.BoolTensor, replace_with: float) -> TensorType:
     if tensor.dim() != mask.dim():
         raise ValueError("tensor.dim() (%d) != mask.dim() (%d)" % (tensor.dim(), mask.dim()))
