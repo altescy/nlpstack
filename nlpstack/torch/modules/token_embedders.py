@@ -57,6 +57,10 @@ class Embedding(TokenEmbedder):
         self._namespace = namespace
         self._pretrained_embedding = pretraind_embedding
 
+    @property
+    def weight(self) -> torch.FloatTensor:
+        return cast(torch.FloatTensor, self._embedding.weight)
+
     def setup(self, *args: Any, vocab: Vocabulary, **kwargs: Any) -> None:
         num_embeddings = vocab.get_vocab_size(self._namespace)
         weight: Optional[torch.Tensor] = None
