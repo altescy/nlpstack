@@ -31,6 +31,13 @@ def get_mask_from_text(text: Mapping[str, Mapping[str, torch.Tensor]]) -> torch.
     raise ValueError("No mask found in text")
 
 
+def get_token_ids_from_text(text: Mapping[str, Mapping[str, torch.Tensor]]) -> torch.LongTensor:
+    for inputs in text.values():
+        if "token_ids" in inputs:
+            return cast(torch.LongTensor, inputs["token_ids"].long())
+    raise ValueError("No token_ids found in text")
+
+
 def int_to_device(device: Union[int, torch.device]) -> torch.device:
     if isinstance(device, torch.device):
         return device
