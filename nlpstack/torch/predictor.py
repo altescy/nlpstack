@@ -41,6 +41,7 @@ class TorchPredictor(Generic[Example, Inference, Prediction]):
     def infer(
         self,
         examples: Iterable[Example],
+        use_forward: bool = False,
         **kwargs: Any,
     ) -> Iterator[Inference]:
         if len(self._devices) > 1:
@@ -53,7 +54,11 @@ class TorchPredictor(Generic[Example, Inference, Prediction]):
             for batched_examples in batched(examples, self._batch_size):
                 instances = [self.datamodule.build_instance(example) for example in batched_examples]
                 batch = move_to_device(collator(instances), device)
-                yield self.model.infer(**batch, **kwargs)
+                if use_forward:
+                    inference = self.model.forward(**batch, **kwargs).inference
+                else:
+                    inference = self.model.infer(**batch, **kwargs)
+                yield inference
 
     def predict(
         self,
