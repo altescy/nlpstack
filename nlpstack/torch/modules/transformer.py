@@ -7,6 +7,10 @@ import torch.nn.functional as F
 class CausalTransformerDecoderLayer(torch.nn.Module):
     __constants__ = ["batch_first", "norm_first"]
 
+    @staticmethod
+    def generate_square_subsequent_mask(sz: int, device: torch.device) -> torch.Tensor:
+        return torch.triu(torch.full((sz, sz), float("-inf"), device=device), diagonal=1)
+
     def __init__(
         self,
         d_model: int,
@@ -91,11 +95,12 @@ class CausalTransformerDecoderLayer(torch.nn.Module):
     def _sa_block(self, x: torch.Tensor, cache: Optional[torch.Tensor] = None) -> torch.Tensor:
         q = x
         k = v = x if cache is None else torch.cat([cache, x], dim=1 if self.batch_first else 0)
+        attn_mask = self.generate_square_subsequent_mask(k.size(1), k.device)[-x.size(1) :]
         x = self.self_attn(
             q,
             k,
             v,
-            is_causal=True,
+            attn_mask=attn_mask,
             need_weights=False,
         )[0]
         return cast(torch.Tensor, self.dropout1(x))
@@ -171,20 +176,20 @@ class CausalTransformerDecoder(torch.nn.Module):
                 )
             return output, None
 
-        new_token_cache: List[torch.Tensor] = []
-        for i, layer in enumerate(self.layers):
+        new_token_cache: List[torch.Tensor] = [
+            output if cache is None else torch.cat([cache[0], output], dim=sequence_dim)
+        ]
+        for i, layer in enumerate(self.layers, start=1):
             output = layer(
                 output,
                 memory,
                 memory_mask=memory_mask,
                 tgt_key_padding_mask=tgt_key_padding_mask,
+                memory_key_padding_mask=memory_key_padding_mask,
                 memory_is_causal=memory_is_causal,
-                cache=cache[i - 1] if cache is not None and i > 0 else None,
+                cache=None if cache is None else cache[i - 1],
             )
-            if cache is not None:
-                new_token_cache.append(torch.cat([cache[i], output], dim=sequence_dim))
-            else:
-                new_token_cache.append(output)
+            new_token_cache.append(output if cache is None else torch.cat([cache[i], output], dim=sequence_dim))
 
         new_cache = torch.stack(new_token_cache, dim=0)
 
