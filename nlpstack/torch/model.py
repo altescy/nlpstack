@@ -22,6 +22,7 @@ class TorchModel(torch.nn.Module, Generic[Inference]):
     def forward(self, *args: Any, **kwargs: Any) -> TorchModelOutput[Inference]:
         raise NotImplementedError
 
+    @torch.no_grad()
     def infer(self, *args: Any, **kwargs: Any) -> Inference:
         return self.forward(*args, **kwargs).inference
 
