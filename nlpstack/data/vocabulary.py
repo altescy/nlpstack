@@ -221,7 +221,7 @@ class Vocabulary:
         self._index_to_token[namespace] = {}
         self._token_to_count[namespace] = {}
 
-        for token in self._special_tokens.get(namespace, set()):
+        for token in sorted(self._special_tokens.get(namespace, set())):
             index = len(self._token_to_index[namespace])
             self._token_to_index[namespace][token] = index
             self._index_to_token[namespace][index] = token
@@ -247,7 +247,7 @@ class Vocabulary:
 
         self._num_documents[namespace] = num_documents
 
-        for token in token_count:
+        for token in sorted(token_count):
             if token in ignored_tokens:
                 continue
             count = token_count[token]
