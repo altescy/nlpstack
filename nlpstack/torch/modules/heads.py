@@ -89,6 +89,15 @@ class LanguageModelingHead(Head):
             with torch.no_grad():
                 self._projection.weight.copy_(weight)
 
+    def get_input_dim(self) -> int:
+        return self._projection.in_features
+
+    def get_output_dim(self) -> int:
+        return self._projection.out_features
+
+    def forward(self, inputs: torch.FloatTensor) -> torch.FloatTensor:
+        return cast(torch.FloatTensor, self._projection(inputs))
+
 
 class PretrainedTransformerHead(Head):
     def __init__(
