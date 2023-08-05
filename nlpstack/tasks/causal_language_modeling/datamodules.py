@@ -30,10 +30,14 @@ class CausalLanguageModelingDataModule(
         self._tokenizer = tokenizer or WhitespaceTokenizer()
         self._token_indexers = token_indexers or {"tokens": SingleIdTokenIndexer()}
         self._namespace = namespace
+        self._generation_mode = False
 
     @property
     def vocab(self) -> Vocabulary:
         return self._vocab
+
+    def generation_mode(self, mode: bool = True) -> None:
+        self._generation_mode = mode
 
     def _tokenize(self, dataset: Iterable[CausalLanguageModelingExample]) -> Sequence[CausalLanguageModelingExample]:
         if not dataset:
@@ -61,17 +65,25 @@ class CausalLanguageModelingDataModule(
     def build_instance(self, example: CausalLanguageModelingExample) -> Instance:
         text = example.text
         metadata = example.metadata
+        labels: Optional[Sequence[Token]] = None
 
         if isinstance(text, str):
             text = self._tokenizer.tokenize(text)
 
         if self._vocab.has_bos_token(self._namespace):
             text = [Token(self._vocab.get_bos_token(self._namespace))] + list(text)
-        if self._vocab.has_eos_token(self._namespace):
-            text = list(text) + [Token(self._vocab.get_eos_token(self._namespace))]
+
+        if not self._generation_mode:
+            if self._vocab.has_eos_token(self._namespace):
+                text = list(text) + [Token(self._vocab.get_eos_token(self._namespace))]
+            labels = text[1:]
+            text = text[:-1]
 
         fields: Dict[str, Field] = {}
         fields["text"] = TextField(text, self.vocab, self._token_indexers)
+
+        if labels is not None:
+            fields["labels"] = TextField(labels, self.vocab, self._token_indexers)
 
         if metadata:
             fields["metadata"] = MetadataField(metadata)

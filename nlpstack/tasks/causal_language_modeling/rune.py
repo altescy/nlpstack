@@ -5,7 +5,7 @@ from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Set, Union
 from nlpstack.data import DataLoader, Vocabulary
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
-from nlpstack.rune import RuneForTorch
+from nlpstack.rune import RuneForTorch, SetupMode
 from nlpstack.torch.modules.seq2seq_decoders import LstmSeq2SeqDecoder
 from nlpstack.torch.modules.token_embedders import Embedding
 from nlpstack.torch.training import TorchTrainer
@@ -146,10 +146,15 @@ class CausalLanguageModel(
             **kwargs,
         )
 
-    def evaluate(
-        self,
-        dataset: Iterable[CausalLanguageModelingExample],
-        **kwargs: Any,
-    ) -> Mapping[str, float]:
-        inferences = self.predictor.infer(dataset, use_forward=True, **kwargs)
-        return self.evaluator.evaluate(inferences, **kwargs)
+    def setup(self, mode: SetupMode, **kwargs: Any) -> None:
+        super().setup(mode=mode, **kwargs)
+
+        assert isinstance(self.datamodule, CausalLanguageModelingDataModule)
+        if mode == "training":
+            self.datamodule.generation_mode(False)
+        elif mode == "evaluation":
+            self.datamodule.generation_mode(False)
+        elif mode == "prediction":
+            self.datamodule.generation_mode(True)
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
