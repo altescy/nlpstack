@@ -66,5 +66,5 @@ class SklearnEstimatorForRune(
 
     def compute_metrics(self, X: InputsX, y: InputsY, **kwargs: Any) -> Mapping[str, float]:
         dataset = self.input_builder(X, y)
-        self._run.setup("evaluation", **kwargs)
+        self._rune.setup("evaluation", **kwargs)
         return self._rune.evaluate(dataset, **kwargs)
