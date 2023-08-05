@@ -6,7 +6,7 @@ import torch
 import torch.nn.functional as F
 
 from nlpstack.torch.model import TorchModel
-from nlpstack.torch.modules.lazy import LazyLinearOutput
+from nlpstack.torch.modules.heads import LanguageModelingHead
 from nlpstack.torch.modules.seq2seq_decoders import Seq2SeqDecoder
 from nlpstack.torch.modules.token_embedders import Embedding
 from nlpstack.torch.util import get_mask_from_text, get_token_ids_from_text
@@ -26,15 +26,15 @@ class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference]):
         self,
         embedder: Embedding,
         decoder: Seq2SeqDecoder,
+        lmhead: Optional[LanguageModelingHead] = None,
         dropout: Optional[float] = None,
-        tie_embeddings: bool = False,
         ignore_padding_loss: bool = True,
         token_namespace: str = "tokens",
     ) -> None:
         super().__init__()
         self._embedder = embedder
         self._decoder = decoder
-        self._head = LazyLinearOutput(decoder.get_output_dim()) if not tie_embeddings else None
+        self._lmhead = lmhead
         self._dropout = torch.nn.Dropout(dropout) if dropout is not None else None
         self._ignore_padding_loss = ignore_padding_loss
         self._loss = torch.nn.CrossEntropyLoss(reduction="sum")
@@ -48,9 +48,6 @@ class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference]):
         **kwargs: Any,
     ) -> None:
         super().setup(*args, datamodule=datamodule, vocab=datamodule.vocab, **kwargs)
-        if self._head is not None:
-            vocab_size = datamodule.vocab.get_vocab_size(self._token_namespace)
-            self._head.initialize_parameters(out_features=vocab_size)
         if datamodule.vocab.has_eos_token(self._token_namespace):
             self._eos_index = datamodule.vocab.get_eos_index(self._token_namespace)
         else:
@@ -59,8 +56,8 @@ class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference]):
     def _compute_logits(self, inputs: torch.FloatTensor) -> torch.FloatTensor:
         if self._dropout:
             inputs = self._dropout(inputs)
-        if self._head is not None:
-            return cast(torch.FloatTensor, self._head(inputs))
+        if self._lmhead is not None:
+            return cast(torch.FloatTensor, self._lmhead(inputs))
         return cast(torch.FloatTensor, F.linear(inputs, self._embedder.weight))
 
     def forward(  # type: ignore[override]

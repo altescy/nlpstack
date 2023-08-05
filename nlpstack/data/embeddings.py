@@ -189,6 +189,9 @@ class PretrainedFasttextWordEmbedding(WordEmbedding):
     def get_output_dim(self) -> int:
         return int(self.fasttext.get_dimension())
 
+    def extend_vocab(self, vocab: Vocabulary, namespace: str) -> None:
+        vocab.extend_vocab(namespace, self.fasttext.get_words())
+
 
 class PretrainedTransformerWordEmbedding(WordEmbedding):
     """Word embedding model of pretrained transformer.

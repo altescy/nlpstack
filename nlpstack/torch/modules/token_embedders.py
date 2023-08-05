@@ -46,6 +46,7 @@ class Embedding(TokenEmbedder):
         namespace: str = "tokens",
         pretraind_embedding: Optional[WordEmbedding] = None,
         extend_vocab: bool = False,
+        freeze: bool = True,
     ) -> None:
         if extend_vocab and not pretraind_embedding:
             raise ValueError("extend_vocab is only available when pretraind_embedding is given")
@@ -56,6 +57,7 @@ class Embedding(TokenEmbedder):
             norm_type=norm_type,
             scale_grad_by_freq=scale_grad_by_freq,
             sparse=sparse,
+            freeze=not freeze,
         )
         self._namespace = namespace
         self._pretrained_embedding = pretraind_embedding
@@ -68,7 +70,7 @@ class Embedding(TokenEmbedder):
     def setup(self, *args: Any, vocab: Vocabulary, **kwargs: Any) -> None:
         weight: Optional[torch.Tensor] = None
         if self._pretrained_embedding is not None:
-            if self._expand_vocab:
+            if self._extend_vocab:
                 self._pretrained_embedding.extend_vocab(vocab, self._namespace)
             all_tokens = set(vocab.get_token_to_index(self._namespace).keys())
             all_embeddings = numpy.asarray(
@@ -82,8 +84,6 @@ class Embedding(TokenEmbedder):
                 if token in self._pretrained_embedding:
                     weight[index] = torch.FloatTensor(self._pretrained_embedding[token])
             self._pretrained_embedding = None
-        else:
-            weight = None
         self._embedding.initialize_parameters(
             num_embeddings=vocab.get_vocab_size(self._namespace),
             padding_idx=vocab.get_pad_index(self._namespace),

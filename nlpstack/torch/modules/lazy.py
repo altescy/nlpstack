@@ -48,6 +48,7 @@ class LazyEmbedding(torch.nn.modules.lazy.LazyModuleMixin, torch.nn.Embedding):
         norm_type: float = 2.0,
         scale_grad_by_freq: bool = False,
         sparse: bool = False,
+        freeze: bool = False,
     ) -> None:
         super().__init__(
             num_embeddings=0,
@@ -58,7 +59,7 @@ class LazyEmbedding(torch.nn.modules.lazy.LazyModuleMixin, torch.nn.Embedding):
             scale_grad_by_freq=scale_grad_by_freq,
             sparse=sparse,
         )
-        self.weight = torch.nn.UninitializedParameter()
+        self.weight = torch.nn.UninitializedParameter(requires_grad=not freeze)
 
     def reset_parameters(self, weight: Optional[torch.Tensor] = None) -> None:
         if not self.has_uninitialized_params() and self.num_embeddings != 0:
