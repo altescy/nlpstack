@@ -149,7 +149,7 @@ class RuneHandler(SimpleHTTPRequestHandler, Generic[Example, Prediction]):
                     if not isinstance(body, dict):
                         raise ValueError("Body must be a JSON object")
                     inputs = body.pop("inputs")
-                    kwargs = body
+                    kwargs = body.pop("params", {})
                     example = coltbuilder(inputs, self._input_class)
                 except (json.JSONDecodeError, ValueError, ConfigurationError, KeyError):
                     self._handle_error_response(400, "Bad Request")

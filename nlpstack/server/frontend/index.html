@@ -32,6 +32,7 @@
   }
   .left {
     width: 50%;
+    height: fit-content;
     border: 1px solid #ccc;
     border-radius: 0.25rem;
     margin-right: 1rem;
@@ -58,6 +59,14 @@
     padding: 1rem;
     margin: 0 auto;
     text-align: left;
+  }
+  .param-form {
+    width: 100%;
+    margin: 1rem 0;
+    cursor: pointer;
+  }
+  textarea {
+    width: 100%;
   }
   pre {
     width: 100%;
@@ -276,6 +285,19 @@
       return container;
     }
 
+    function generateParamForm(id) {
+      const container = document.createElement('details');
+      container.className = 'param-form';
+      const summary = document.createElement('summary');
+      summary.textContent = 'Prediction Params';
+      container.appendChild(summary);
+      const textarea = document.createElement('textarea');
+      textarea.id = id;
+      textarea.textContent = '{}';
+      container.appendChild(textarea);
+      return container;
+    }
+
     function parseFormValue(value, type) {
       if (type === 'number') {
         return parseInt(value);
@@ -288,8 +310,10 @@
 
     function generateForm(schema, formId) {
       const form = document.getElementById(formId);
+      const paramForm = generateParamForm("params");
 
       form.appendChild(generateInputs(schema));
+      form.appendChild(paramForm);
 
       // Create and append submit button
       const submit = document.createElement('input');
@@ -314,10 +338,11 @@
         }
 
         object = unflatten(object);
+        params = JSON.parse(document.getElementById("params").value || '{}');
 
         const prediction_request = new Request("/predict", {
           method: 'POST',
-          body: JSON.stringify({inputs: object}),
+          body: JSON.stringify({inputs: object, params: params}),
           headers: {
             'Content-Type': 'application/json'
           }
