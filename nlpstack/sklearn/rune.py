@@ -49,6 +49,7 @@ class SklearnEstimatorForRune(
         valid_dataset: Optional[Sequence[Example]] = None
         if X_valid is not None and y_valid is not None:
             valid_dataset = FileBackendSequence.from_iterable(self.input_builder(X_valid, y_valid))
+        self._rune.setup("training", **kwargs)
         self._rune.train(train_dataset, valid_dataset, resources, **kwargs)
         return self
 
@@ -60,8 +61,10 @@ class SklearnEstimatorForRune(
 
     def generate_predictions(self, X: InputsX, **kwargs: Any) -> Iterator[Prediction]:
         dataset = self.input_builder(X, None)
+        self._rune.setup("prediction", **kwargs)
         yield from self._rune.predict(dataset, **kwargs)
 
     def compute_metrics(self, X: InputsX, y: InputsY, **kwargs: Any) -> Mapping[str, float]:
         dataset = self.input_builder(X, y)
+        self._rune.setup("evaluation", **kwargs)
         return self._rune.evaluate(dataset, **kwargs)

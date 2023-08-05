@@ -203,6 +203,37 @@ class Vocabulary:
             raise KeyError(f"Namespace {namespace} not found.")
         return self._eos_token.get(namespace) in self._token_to_index[namespace]
 
+    def extend_vocab(self, namespace: str, tokens: Iterable[str]) -> None:
+        """
+        Add extra tokens to the vocabulary namespace.
+        This method does not update token counts, just adds new tokens to the vocabulary.
+        """
+        if namespace not in self._token_to_index:
+            raise KeyError(f"Namespace {namespace} not found.")
+        new_tokens = (
+            set(tokens) - set(self._token_to_index[namespace].keys()) - set(self._ignored_tokens.get(namespace, set()))
+        )
+        for token in sorted(new_tokens):
+            index = len(self._index_to_token[namespace])
+            self._index_to_token[namespace][index] = token
+            self._token_to_index[namespace][token] = index
+
+    def is_extended_token(self, namespace: str, token: str) -> bool:
+        if namespace not in self._token_to_index:
+            raise KeyError(f"Namespace {namespace} not found.")
+        return (
+            token in self._token_to_index[namespace]
+            and token not in self._special_tokens
+            and token not in self._token_to_count[namespace]
+        )
+
+    def is_extended_index(self, namespace: str, index: int) -> bool:
+        if namespace not in self._index_to_token:
+            raise KeyError(f"Namespace {namespace} not found.")
+        return index in self._index_to_token[namespace] and self.is_extended_token(
+            namespace, self._index_to_token[namespace][index]
+        )
+
     def clear(self, namespace: str) -> None:
         if namespace not in self._index_to_token:
             raise KeyError(f"Namespace {namespace} not found.")
@@ -221,7 +252,7 @@ class Vocabulary:
         self._index_to_token[namespace] = {}
         self._token_to_count[namespace] = {}
 
-        for token in self._special_tokens.get(namespace, set()):
+        for token in sorted(self._special_tokens.get(namespace, set())):
             index = len(self._token_to_index[namespace])
             self._token_to_index[namespace][token] = index
             self._index_to_token[namespace][index] = token
@@ -247,7 +278,7 @@ class Vocabulary:
 
         self._num_documents[namespace] = num_documents
 
-        for token in token_count:
+        for token in sorted(token_count):
             if token in ignored_tokens:
                 continue
             count = token_count[token]

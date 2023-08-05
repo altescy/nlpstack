@@ -170,10 +170,16 @@ class RuneWorkflow(Workflow):
             print("Given file is not a rune archive")
             exit(1)
 
+        rune_config: Optional[RuneConfig] = None
         if config_filename is not None:
             config = load_jsonnet(minato.cached_path(config_filename), overrides=overrides)
             rune_config = coltbuilder(config, RuneConfig)
-            model.setup("prediction", **coltbuilder(rune_config.predictor or {}))
+
+        predicotr_config: Optional[Mapping[str, Any]] = None
+        if rune_config is not None:
+            predicotr_config = rune_config.predictor
+
+        model.setup("prediction", **coltbuilder(predicotr_config or {}))
 
         server = HTTPServer(
             (host, port),

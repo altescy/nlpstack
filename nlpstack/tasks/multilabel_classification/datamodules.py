@@ -45,9 +45,18 @@ class MultilabelClassificationDataModule(
     def label_namespace(self) -> str:
         return self._label_namespace
 
-    def _tokenize(
-        self, dataset: Iterable[MultilabelClassificationExample]
-    ) -> Sequence[MultilabelClassificationExample]:
+    def setup(
+        self,
+        *args: Any,
+        dataset: Optional[Sequence[MultilabelClassificationExample]] = None,
+        **kwargs: Any,
+    ) -> None:
+        if dataset:
+            logger.info("Tokenizing dataset and building vocabulary...")
+            dataset = self.tokenize(ProgressBar(dataset, desc="Tokenizing dataset"))
+            self._build_vocab(dataset)
+
+    def tokenize(self, dataset: Iterable[MultilabelClassificationExample]) -> Sequence[MultilabelClassificationExample]:
         if not dataset:
             return []
 
@@ -119,17 +128,7 @@ class MultilabelClassificationDataModule(
                 metadata=inference.metadata[i] if inference.metadata is not None else None,
             )
 
-    def read_dataset(
-        self,
-        dataset: Iterable[MultilabelClassificationExample],
-        is_training: bool = False,
-        **kwargs: Any,
-    ) -> Iterator[Instance]:
-        if is_training:
-            logger.info("Tokenizing dataset and building vocabulary...")
-            dataset = self._tokenize(ProgressBar(dataset, desc="Tokenizing dataset"))
-            self._build_vocab(dataset)
-
+    def read_dataset(self, dataset: Iterable[MultilabelClassificationExample], **kwargs: Any) -> Iterator[Instance]:
         logger.info("Building instances...")
         for example in ProgressBar(dataset, desc="Building instances"):
             yield self.build_instance(example)

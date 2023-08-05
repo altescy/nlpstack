@@ -44,8 +44,12 @@ class Embedding(TokenEmbedder):
         scale_grad_by_freq: bool = False,
         sparse: bool = False,
         namespace: str = "tokens",
-        pretraind_embedding: Optional[WordEmbedding] = None,
+        pretrained_embedding: Optional[WordEmbedding] = None,
+        extend_vocab: bool = False,
+        freeze: bool = True,
     ) -> None:
+        if extend_vocab and not pretrained_embedding:
+            raise ValueError("extend_vocab is only available when pretrained_embedding is given")
         super().__init__()
         self._embedding = LazyEmbedding(
             embedding_dim=embedding_dim,
@@ -53,29 +57,33 @@ class Embedding(TokenEmbedder):
             norm_type=norm_type,
             scale_grad_by_freq=scale_grad_by_freq,
             sparse=sparse,
+            freeze=not freeze,
         )
         self._namespace = namespace
-        self._pretrained_embedding = pretraind_embedding
+        self._pretrained_embedding = pretrained_embedding
+        self._extend_vocab = extend_vocab
+
+    @property
+    def weight(self) -> torch.FloatTensor:
+        return cast(torch.FloatTensor, self._embedding.weight)
 
     def setup(self, *args: Any, vocab: Vocabulary, **kwargs: Any) -> None:
-        num_embeddings = vocab.get_vocab_size(self._namespace)
         weight: Optional[torch.Tensor] = None
         if self._pretrained_embedding is not None:
+            if self._extend_vocab:
+                self._pretrained_embedding.extend_vocab(vocab, self._namespace)
             all_tokens = set(vocab.get_token_to_index(self._namespace).keys())
             all_embeddings = numpy.asarray(
                 [self._pretrained_embedding[token] for token in all_tokens if token in self._pretrained_embedding]
             )
             embeddings_mean = float(numpy.mean(all_embeddings))
             embeddings_std = float(numpy.std(all_embeddings))
-            weight = torch.FloatTensor(num_embeddings, self._embedding.embedding_dim)
+            weight = torch.FloatTensor(vocab.get_vocab_size(self._namespace), self._embedding.embedding_dim)
             torch.nn.init.normal_(weight, embeddings_mean, embeddings_std)
             for token, index in vocab.get_token_to_index(self._namespace).items():
                 if token in self._pretrained_embedding:
                     weight[index] = torch.FloatTensor(self._pretrained_embedding[token])
             self._pretrained_embedding = None
-        else:
-            weight = None
-
         self._embedding.initialize_parameters(
             num_embeddings=vocab.get_vocab_size(self._namespace),
             padding_idx=vocab.get_pad_index(self._namespace),

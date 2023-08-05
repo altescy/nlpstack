@@ -1,3 +1,6 @@
+import warnings
+from contextlib import suppress
+from logging import getLogger
 from os import PathLike
 from typing import Any, Iterator, List, Literal, Mapping, Optional, Union, cast
 
@@ -5,11 +8,21 @@ import minato
 import numpy
 
 from nlpstack.common import FileBackendMapping, cached_property, murmurhash3
+from nlpstack.data import Vocabulary
+from nlpstack.transformers import cache as transformers_cache
 
 try:
     import fasttext
 except ModuleNotFoundError:
     fasttext = None
+
+try:
+    import transformers
+except ModuleNotFoundError:
+    transformers = None
+
+
+logger = getLogger(__name__)
 
 
 class WordEmbedding:
@@ -24,6 +37,9 @@ class WordEmbedding:
 
     def get_output_dim(self) -> int:
         raise NotImplementedError
+
+    def extend_vocab(self, vocab: Vocabulary, namespace: str) -> None:
+        warnings.warn(f"extend_vocab is not implemented for {self.__class__.__name__}")
 
 
 class MinhashWordEmbedding(WordEmbedding):
@@ -129,8 +145,11 @@ class PretrainedWordEmbedding(WordEmbedding):
     def get_output_dim(self) -> int:
         return len(next(iter(self._embeddings.values())))
 
+    def extend_vocab(self, vocab: Vocabulary, namespace: str) -> None:
+        vocab.extend_vocab(namespace, self._embeddings.keys())
 
-class PretrainedFasttextEmbedding(WordEmbedding):
+
+class PretrainedFasttextWordEmbedding(WordEmbedding):
     """Word embedding model of pretrained fastText.
 
     Args:
@@ -147,6 +166,8 @@ class PretrainedFasttextEmbedding(WordEmbedding):
 
         self._filename = filename
         self._allow_unknown_words = allow_unknown_words
+
+        self.fasttext  # load the fasttext model
 
     @cached_property
     def fasttext(self) -> "fasttext.FastText":
@@ -167,3 +188,69 @@ class PretrainedFasttextEmbedding(WordEmbedding):
 
     def get_output_dim(self) -> int:
         return int(self.fasttext.get_dimension())
+
+    def extend_vocab(self, vocab: Vocabulary, namespace: str) -> None:
+        vocab.extend_vocab(namespace, self.fasttext.get_words())
+
+
+class PretrainedTransformerWordEmbedding(WordEmbedding):
+    """Word embedding model of pretrained transformer.
+
+    Args:
+        pretrained_model_name: Path to the pretrained transformer model.
+        embedding_layer: Specify the embedding layer to use. Defaults to `input`.
+        submodule: Specify the submodule to use. Defaults to `None`.
+    """
+
+    def __init__(
+        self,
+        pretrained_model_name: Union[str, PathLike],
+        embedding_layer: Literal["input", "output"] = "input",
+        submodule: Optional[str] = None,
+    ) -> None:
+        if embedding_layer not in ("input", "output"):
+            raise ValueError(f"embedding_layer must be one of 'input' or 'output', but got {embedding_layer}")
+
+        self._pretrained_model_name = pretrained_model_name
+        self._embedding_layer = embedding_layer
+        self._submodule = submodule
+
+        self.tokenizer  # load the tokenizer
+        self.model  # load the model
+
+    @cached_property
+    def tokenizer(self) -> "transformers.PreTrainedTokenizer":
+        pretrained_model_name = self._pretrained_model_name
+        with suppress(FileNotFoundError):
+            pretrained_model_name = minato.cached_path(pretrained_model_name)
+        return transformers_cache.get_pretrained_tokenizer(pretrained_model_name)
+
+    @cached_property
+    def model(self) -> "transformers.PreTrainedModel":
+        pretrained_model_name = self._pretrained_model_name
+        with suppress(FileNotFoundError):
+            pretrained_model_name = minato.cached_path(pretrained_model_name)
+        model = transformers_cache.get_pretrained_model(
+            pretrained_model_name, with_head=self._embedding_layer == "output"
+        )
+        if self._submodule is not None:
+            model = getattr(model, self._submodule)
+        return model
+
+    def __getitem__(self, word: str) -> numpy.ndarray:
+        if word not in self.tokenizer.vocab:
+            raise KeyError(word)
+        index = self.tokenizer.vocab[word]
+        if self._embedding_layer == "input":
+            embeddings = self.model.get_input_embeddings()
+        elif self._embedding_layer == "output":
+            embeddings = self.model.get_output_embeddings()
+        else:
+            raise ValueError(f"embedding_layer must be one of 'input' or 'output', but got {self._embedding_layer}")
+        return cast(numpy.ndarray, embeddings.weight.data[index].detach().numpy())
+
+    def __contains__(self, word: str) -> bool:
+        return word in self.tokenizer.vocab
+
+    def extend_vocab(self, vocab: Vocabulary, namespace: str) -> None:
+        vocab.extend_vocab(namespace, self.tokenizer.vocab.keys())

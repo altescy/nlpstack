@@ -1,5 +1,5 @@
 import itertools
-from typing import Iterable, Iterator, List, TypeVar
+from typing import Callable, Iterable, Iterator, List, TypeVar
 
 T = TypeVar("T")
 
@@ -36,3 +36,12 @@ def batched_iterator(
             yield itertools.chain([next(iterator)], consume(batch_size - 1))
         except StopIteration:
             break
+
+
+def iter_with_callback(
+    iterable: Iterable[T],
+    callback: Callable[[T], None],
+) -> Iterator[T]:
+    for item in iterable:
+        yield item
+        callback(item)

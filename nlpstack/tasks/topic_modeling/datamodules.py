@@ -6,6 +6,7 @@ from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
+from nlpstack.data.util import iter_with_callback
 
 from .types import TopicModelingExample, TopicModelingInference, TopicModelingPrediction
 
@@ -33,7 +34,20 @@ class TopicModelingDataModule(
     def vocab(self) -> Vocabulary:
         return self._vocab
 
-    def _tokenize(self, dataset: Iterable[TopicModelingExample]) -> Sequence[TopicModelingExample]:
+    def setup(
+        self,
+        *args: Any,
+        dataset: Optional[Sequence[TopicModelingExample]] = None,
+        **kwargs: Any,
+    ) -> None:
+        if dataset:
+            with ProgressBar[int](len(dataset) * 2) as progress:
+                progress.set_description("Tokenizing dataset")
+                dataset = self.tokenize(iter_with_callback(dataset, lambda _: progress.update()))
+                progress.set_description("Building vocab    ")
+                self._build_vocab(iter_with_callback(dataset, lambda _: progress.update()))
+
+    def tokenize(self, dataset: Iterable[TopicModelingExample]) -> Sequence[TopicModelingExample]:
         if not dataset:
             return []
 
@@ -47,7 +61,7 @@ class TopicModelingDataModule(
 
         return FileBackendSequence.from_iterable(tokenized_document_generator())
 
-    def _build_vocab(self, dataset: Sequence[TopicModelingExample]) -> None:
+    def _build_vocab(self, dataset: Iterable[TopicModelingExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
             for example in dataset:
                 assert not isinstance(example.text, str), "Dataset must be tokenized."
@@ -75,17 +89,7 @@ class TopicModelingDataModule(
         for topic_distribution in inference.topic_distribution:
             yield TopicModelingPrediction(topic_distribution.tolist())
 
-    def read_dataset(
-        self,
-        dataset: Iterable[TopicModelingExample],
-        is_training: bool = False,
-        **kwargs: Any,
-    ) -> Iterator[Instance]:
-        if is_training:
-            logger.info("Tokenizing dataset and building vocabulary...")
-            dataset = self._tokenize(ProgressBar(dataset, desc="Tokenizing dataset"))
-            self._build_vocab(dataset)
-
+    def read_dataset(self, dataset: Iterable[TopicModelingExample], **kwargs: Any) -> Iterator[Instance]:
         logger.info("Building instances...")
         for example in ProgressBar(dataset, desc="Building instances"):
             yield self.build_instance(example)

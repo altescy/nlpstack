@@ -53,7 +53,8 @@ class TorchPredictor(Generic[Example, Inference, Prediction]):
             for batched_examples in batched(examples, self._batch_size):
                 instances = [self.datamodule.build_instance(example) for example in batched_examples]
                 batch = move_to_device(collator(instances), device)
-                yield self.model.infer(**batch, **kwargs)
+                inference = self.model.infer(**batch, **kwargs)
+                yield inference
 
     def predict(
         self,

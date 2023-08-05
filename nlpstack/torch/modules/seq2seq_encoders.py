@@ -1,7 +1,9 @@
 import math
 from contextlib import suppress
+from os import PathLike
 from typing import Callable, List, Literal, NamedTuple, Optional, Sequence, Tuple, Union, cast
 
+import minato
 import torch
 import torch.nn.functional as F
 
@@ -697,3 +699,54 @@ class GatedCnnSeq2SeqEncoder(Seq2SeqEncoder):
         if self._projection:
             output = self._projection(output)
         return output
+
+
+class PretrainedTransformerSeq2SeqEncoder(Seq2SeqEncoder):
+    def __init__(
+        self,
+        pretrained_model_name: Union[str, PathLike],
+        eval_mode: bool = False,
+        train_parameters: bool = True,
+        submodule: Optional[str] = None,
+        load_weights: bool = True,
+    ) -> None:
+        from transformers import AutoConfig, AutoModel
+
+        with suppress(FileNotFoundError):
+            pretrained_model_name = minato.cached_path(pretrained_model_name)
+
+        super().__init__()
+        if load_weights:
+            self._model = AutoModel.from_pretrained(pretrained_model_name)
+        else:
+            self._model = AutoModel.from_config(AutoConfig.from_pretrained(pretrained_model_name))
+
+        if submodule:
+            self._model = getattr(self._model, submodule)
+
+        self.eval_mode = eval_mode
+        if eval_mode:
+            self._model.eval()
+
+        if not train_parameters:
+            for param in self._model.parameters():
+                param.requires_grad = False
+
+    def train(self, mode: bool = True) -> "PretrainedTransformerSeq2SeqEncoder":
+        self.training = mode
+        for name, module in self.named_children():
+            if self.eval_mode and name == "_model":
+                module.eval()
+            else:
+                module.train(mode)
+        return self
+
+    def get_input_dim(self) -> int:
+        return int(self._model.config.hidden_size)
+
+    def get_output_dim(self) -> int:
+        return int(self._model.config.hidden_size)
+
+    def forward(self, inputs: torch.FloatTensor, mask: torch.BoolTensor) -> torch.FloatTensor:
+        output = self._model(inputs_embeds=inputs, attention_mask=mask)
+        return cast(torch.FloatTensor, output.last_hidden_state)
