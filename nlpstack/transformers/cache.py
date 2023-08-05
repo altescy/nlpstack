@@ -13,6 +13,7 @@ logger = getLogger(__name__)
 
 class _ModelSpec(NamedTuple):
     model_name: str
+    with_head: bool
 
 
 class _TokenizerSpec(NamedTuple):
@@ -25,15 +26,19 @@ _tokenizer_cache: Dict[_TokenizerSpec, "transformers.PreTrainedTokenizer"] = {}
 
 def get_pretrained_model(
     pretrained_model_name_or_path: Union[str, PathLike],
+    with_head: bool = False,
 ) -> "transformers.PretrainedModel":
     global _model_cache
     if transformers is None:
         raise ModuleNotFoundError("transformers is not installed.")
-    spec = _ModelSpec(str(pretrained_model_name_or_path))
+    spec = _ModelSpec(str(pretrained_model_name_or_path), with_head)
     if spec in _model_cache:
         logger.debug(f"Found cached model: {spec}")
     else:
-        _model_cache[spec] = transformers.AutoModel.from_pretrained(pretrained_model_name_or_path)
+        if with_head:
+            _model_cache[spec] = transformers.AutoModelWithLMHead.from_pretrained(pretrained_model_name_or_path)
+        else:
+            _model_cache[spec] = transformers.AutoModel.from_pretrained(pretrained_model_name_or_path)
     return _model_cache[spec]
 
 
@@ -44,7 +49,7 @@ def get_pretrained_tokenizer(
     if transformers is None:
         raise ModuleNotFoundError("transformers is not installed.")
     spec = _TokenizerSpec(str(pretrained_model_name_or_path))
-    if spec in _model_cache:
+    if spec in _tokenizer_cache:
         logger.debug(f"Found cached tokenizer: {spec}")
     else:
         _tokenizer_cache[spec] = transformers.AutoTokenizer.from_pretrained(pretrained_model_name_or_path)

@@ -230,7 +230,9 @@ class PretrainedTransformerWordEmbedding(WordEmbedding):
         pretrained_model_name = self._pretrained_model_name
         with suppress(FileNotFoundError):
             pretrained_model_name = minato.cached_path(pretrained_model_name)
-        model = transformers_cache.get_pretrained_model(pretrained_model_name)
+        model = transformers_cache.get_pretrained_model(
+            pretrained_model_name, with_head=self._embedding_layer == "output"
+        )
         if self._submodule is not None:
             model = getattr(model, self._submodule)
         return model
