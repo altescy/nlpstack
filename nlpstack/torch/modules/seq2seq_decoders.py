@@ -6,6 +6,7 @@ from typing import Callable, Generic, Literal, Optional, Tuple, TypeVar, Union, 
 import minato
 import torch
 
+from nlpstack.torch.modules.seq2vec_encoders import Seq2VecEncoder
 from nlpstack.torch.modules.transformer import CausalTransformerDecoder, CausalTransformerDecoderLayer
 from nlpstack.torch.util import add_positional_features, masked_softmax, weighted_sum
 
@@ -147,6 +148,7 @@ class LstmSeq2SeqDecoder(Seq2SeqDecoder["LstmSeq2SeqDecoder.State"]):
         bias: bool = True,
         dropout: float = 0.1,
         use_cross_attention: bool = False,
+        initial_state_encoder: Optional[Seq2VecEncoder] = None,
     ) -> None:
         super().__init__()
         self._input_dim = input_dim
@@ -154,7 +156,14 @@ class LstmSeq2SeqDecoder(Seq2SeqDecoder["LstmSeq2SeqDecoder.State"]):
         self._num_layers = num_layers
         self._use_cross_attention = use_cross_attention
         self._decoder = torch.nn.LSTM(input_dim, hidden_dim, num_layers, bias=bias, dropout=dropout, batch_first=True)  # type: ignore[no-untyped-call]
-        self._init_state_projection = torch.nn.LazyLinear(num_layers * hidden_dim) if use_cross_attention else None
+        self._initial_state_encoder = (
+            torch.nn.Sequential(
+                initial_state_encoder,
+                torch.nn.Linear(initial_state_encoder.get_output_dim(), hidden_dim * num_layers),
+            )
+            if initial_state_encoder is not None
+            else None
+        )
 
     def forward(
         self,
@@ -173,15 +182,8 @@ class LstmSeq2SeqDecoder(Seq2SeqDecoder["LstmSeq2SeqDecoder.State"]):
             attention_weight = masked_softmax(torch.bmm(inputs, memory.transpose(1, 2)), memory_mask)
             inputs = weighted_sum(memory, attention_weight)
         last_state = last_state or self.get_initial_state(inputs, memory, inputs_mask, memory_mask)
-        if self.training:
-            output, (hidden, cell) = self._decoder(inputs, (last_state.hidden, last_state.cell))
-            return output, LstmSeq2SeqDecoder.State(hidden, cell)
-        outputs = []
-        for last_embedding in inputs.unbind(dim=1):
-            output, (hidden, cell) = self._decoder(last_embedding.unsqueeze(1), (last_state.hidden, last_state.cell))
-            last_state = LstmSeq2SeqDecoder.State(hidden=hidden, cell=cell)
-            outputs.append(output)
-        return torch.cat(outputs, dim=1), last_state
+        output, (hidden, cell) = self._decoder(inputs, (last_state.hidden, last_state.cell))
+        return output, LstmSeq2SeqDecoder.State(hidden, cell)
 
     def get_initial_state(
         self,
@@ -191,22 +193,15 @@ class LstmSeq2SeqDecoder(Seq2SeqDecoder["LstmSeq2SeqDecoder.State"]):
         memory_mask: Optional[torch.BoolTensor] = None,
     ) -> "LstmSeq2SeqDecoder.State":
         batch_size = inputs.size(0)
-        sequence_length = inputs.size(1)
-        if memory is None:
+        if memory is None or self._initial_state_encoder is None:
             return LstmSeq2SeqDecoder.State(
                 hidden=torch.zeros((self._num_layers, batch_size, self._hidden_dim), device=inputs.device),
                 cell=torch.zeros((self._num_layers, batch_size, self._hidden_dim), device=inputs.device),
             )
-        if not self._use_cross_attention:
+        if memory is not None and not self._use_cross_attention:
             raise ValueError("memory is given but use_cross_attention is False")
-        assert self._init_state_projection is not None
-        last_token_indices = (
-            memory_mask.sum(dim=1) - 1 if memory_mask is not None else torch.full((batch_size,), sequence_length - 1)
-        ).long()
         return LstmSeq2SeqDecoder.State(
-            hidden=self._init_state_projection(memory[torch.arange(batch_size), last_token_indices])
-            .view(batch_size, self._num_layers, self._hidden_dim)
-            .transpose(0, 1),
+            hidden=self._initial_state_encoder(memory, memory_mask),
             cell=torch.zeros((self._num_layers, batch_size, self._hidden_dim), device=inputs.device),
         )
 
