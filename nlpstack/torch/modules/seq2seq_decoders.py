@@ -223,14 +223,19 @@ class PretrainedTransformerSeq2SeqDecoder(Seq2SeqDecoder["PretrainedTransformerS
         eval_mode: bool = False,
         train_parameters: bool = True,
         submodule: Optional[str] = None,
+        load_weights: bool = True,
     ) -> None:
-        from transformers import AutoModel
+        from transformers import AutoConfig, AutoModel
 
         with suppress(FileNotFoundError):
             pretrained_model_name = minato.cached_path(pretrained_model_name)
 
         super().__init__()
-        self._model = AutoModel.from_pretrained(pretrained_model_name)
+        if load_weights:
+            self._model = AutoModel.from_pretrained(pretrained_model_name)
+        else:
+            self._model = AutoModel.from_config(AutoConfig.from_pretrained(pretrained_model_name))
+
         if submodule:
             self._model = getattr(self._model, submodule)
 
