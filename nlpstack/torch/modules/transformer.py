@@ -7,10 +7,6 @@ import torch.nn.functional as F
 class CausalTransformerDecoderLayer(torch.nn.Module):
     __constants__ = ["batch_first", "norm_first"]
 
-    @staticmethod
-    def generate_square_subsequent_mask(sz: int, device: torch.device) -> torch.Tensor:
-        return torch.triu(torch.full((sz, sz), float("-inf"), device=device), diagonal=1)
-
     def __init__(
         self,
         d_model: int,
@@ -74,7 +70,7 @@ class CausalTransformerDecoderLayer(torch.nn.Module):
     ) -> torch.Tensor:
         x = tgt
         if self.norm_first:
-            x = x + self._sa_block(self.norm1(x), cache=cache)
+            x = x + self._sa_block(self.norm1(x), tgt_mask, cache)
             if memory is not None:
                 if not self.use_cross_attention:
                     raise ValueError("memory is not None but use_cross_attention is False")
@@ -82,7 +78,7 @@ class CausalTransformerDecoderLayer(torch.nn.Module):
                 x = x + self._mha_block(self.norm2(x), memory, memory_mask, memory_key_padding_mask, memory_is_causal)
             x = x + self._ff_block(self.norm3(x))
         else:
-            x = self.norm1(x + self._sa_block(x, cache=cache))
+            x = self.norm1(x + self._sa_block(x, tgt_mask, cache))
             if memory is not None:
                 if not self.use_cross_attention:
                     raise ValueError("memory is not None but use_cross_attention is False")
@@ -92,20 +88,30 @@ class CausalTransformerDecoderLayer(torch.nn.Module):
 
         return x
 
-    def _sa_block(self, x: torch.Tensor, cache: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def _sa_block(
+        self,
+        x: torch.Tensor,
+        attn_mask: Optional[torch.Tensor] = None,
+        cache: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        sequence_dim = 1 if self.batch_first else 0
         q = x
-        k = v = x if cache is None else torch.cat([cache, x], dim=1 if self.batch_first else 0)
-        attn_mask = self.generate_square_subsequent_mask(k.size(1), k.device)[-x.size(1) :]
+        if cache is None:
+            k = v = q
+        else:
+            k = v = torch.cat([cache, q], dim=sequence_dim)
+            if attn_mask is None:
+                attn_mask = generate_square_subsequent_mask(k.size(sequence_dim), device=k.device)
         x = self.self_attn(
             q,
             k,
             v,
             attn_mask=attn_mask,
+            is_causal=attn_mask is None,
             need_weights=False,
         )[0]
         return cast(torch.Tensor, self.dropout1(x))
 
-    # multihead attention block
     def _mha_block(
         self,
         x: torch.Tensor,
@@ -176,6 +182,11 @@ class CausalTransformerDecoder(torch.nn.Module):
                 )
             return output, None
 
+        tgt_mask: Optional[torch.Tensor] = None
+        if cache is not None:
+            key_length = output.size(sequence_dim) + cache.size(1 + sequence_dim)
+            tgt_mask = generate_square_subsequent_mask(key_length, output.device)[-output.size(sequence_dim) :]
+
         new_token_cache: List[torch.Tensor] = [
             output if cache is None else torch.cat([cache[0], output], dim=sequence_dim)
         ]
@@ -183,6 +194,7 @@ class CausalTransformerDecoder(torch.nn.Module):
             output = layer(
                 output,
                 memory,
+                tgt_mask=tgt_mask,
                 memory_mask=memory_mask,
                 tgt_key_padding_mask=tgt_key_padding_mask,
                 memory_key_padding_mask=memory_key_padding_mask,
@@ -194,3 +206,7 @@ class CausalTransformerDecoder(torch.nn.Module):
         new_cache = torch.stack(new_token_cache, dim=0)
 
         return output, new_cache
+
+
+def generate_square_subsequent_mask(sz: int, device: torch.device) -> torch.Tensor:
+    return torch.triu(torch.full((sz, sz), float("-inf"), device=device), diagonal=1)
