@@ -44,12 +44,12 @@ class Embedding(TokenEmbedder):
         scale_grad_by_freq: bool = False,
         sparse: bool = False,
         namespace: str = "tokens",
-        pretraind_embedding: Optional[WordEmbedding] = None,
+        pretrained_embedding: Optional[WordEmbedding] = None,
         extend_vocab: bool = False,
         freeze: bool = True,
     ) -> None:
-        if extend_vocab and not pretraind_embedding:
-            raise ValueError("extend_vocab is only available when pretraind_embedding is given")
+        if extend_vocab and not pretrained_embedding:
+            raise ValueError("extend_vocab is only available when pretrained_embedding is given")
         super().__init__()
         self._embedding = LazyEmbedding(
             embedding_dim=embedding_dim,
@@ -60,7 +60,7 @@ class Embedding(TokenEmbedder):
             freeze=not freeze,
         )
         self._namespace = namespace
-        self._pretrained_embedding = pretraind_embedding
+        self._pretrained_embedding = pretrained_embedding
         self._extend_vocab = extend_vocab
 
     @property
