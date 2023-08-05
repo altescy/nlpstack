@@ -89,20 +89,22 @@ class RuneForTorch(
             set_random_seed(self.random_seed)
 
         logger.info("Setup datamodule...")
-        self.datamodule.setup(**self.kwargs, **kwargs)
+        self.datamodule.setup(dataset=train_dataset, **self.kwargs, **kwargs)
+
+        logger.info("Setup model...")
+        self.model.setup(datamodule=self.datamodule, **self.kwargs, **kwargs)
+
+        logger.info("Setup metric...")
+        self.metric.setup(datamodule=self.datamodule, **self.kwargs, **kwargs)
 
         logger.info("Reading training dataset...")
         train_instances: Sequence[Instance] = FileBackendSequence.from_iterable(
-            self.datamodule.read_dataset(train_dataset, is_training=True)
+            self.datamodule.read_dataset(train_dataset)
         )
         valid_instances: Optional[Sequence[Instance]] = None
         if valid_dataset is not None:
             logger.info("Reading validation dataset...")
             valid_instances = FileBackendSequence.from_iterable(self.datamodule.read_dataset(valid_dataset))
-
-        logger.info("Setup model...")
-        self.model.setup(datamodule=self.datamodule, **self.kwargs, **kwargs)
-        self.metric.setup(datamodule=self.datamodule, **self.kwargs, **kwargs)
 
         logger.info("Start training...")
         self.trainer.train(

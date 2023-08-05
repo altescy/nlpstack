@@ -6,6 +6,7 @@ from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
+from nlpstack.data.util import iter_with_callback
 
 from .types import CausalLanguageModelingExample, CausalLanguageModelingInference, CausalLanguageModelingPrediction
 
@@ -36,10 +37,23 @@ class CausalLanguageModelingDataModule(
     def vocab(self) -> Vocabulary:
         return self._vocab
 
-    def generation_mode(self, mode: bool = True) -> None:
-        self._generation_mode = mode
+    def setup(
+        self,
+        *args: Any,
+        dataset: Optional[Sequence[CausalLanguageModelingExample]] = None,
+        generation_mode: Optional[bool] = None,
+        **kwargs: Any,
+    ) -> None:
+        if dataset:
+            with ProgressBar[int](len(dataset) * 2) as progress:
+                progress.set_description("Tokenizing dataset")
+                dataset = self.tokenize(iter_with_callback(dataset, lambda _: progress.update()))
+                progress.set_description("Building vocab    ")
+                self._build_vocab(iter_with_callback(dataset, lambda _: progress.update()))
+        if generation_mode is not None:
+            self._generation_mode = generation_mode
 
-    def _tokenize(self, dataset: Iterable[CausalLanguageModelingExample]) -> Sequence[CausalLanguageModelingExample]:
+    def tokenize(self, dataset: Iterable[CausalLanguageModelingExample]) -> Sequence[CausalLanguageModelingExample]:
         if not dataset:
             return []
 
@@ -53,7 +67,7 @@ class CausalLanguageModelingDataModule(
 
         return FileBackendSequence.from_iterable(tokenized_document_generator())
 
-    def _build_vocab(self, dataset: Sequence[CausalLanguageModelingExample]) -> None:
+    def _build_vocab(self, dataset: Iterable[CausalLanguageModelingExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
             for example in dataset:
                 assert not isinstance(example.text, str), "Dataset must be tokenized."
@@ -115,11 +129,6 @@ class CausalLanguageModelingDataModule(
         is_training: bool = False,
         **kwargs: Any,
     ) -> Iterator[Instance]:
-        if is_training:
-            logger.info("Tokenizing dataset and building vocabulary...")
-            dataset = self._tokenize(ProgressBar(dataset, desc="Tokenizing dataset"))
-            self._build_vocab(dataset)
-
         logger.info("Building instances...")
         for example in ProgressBar(dataset, desc="Building instances"):
             yield self.build_instance(example)

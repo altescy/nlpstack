@@ -1,6 +1,6 @@
 import warnings
 from logging import getLogger
-from typing import Any, Dict, Iterable, Mapping, Optional, Sequence, Set, Union
+from typing import Any, Dict, Mapping, Optional, Sequence, Set, Union
 
 from nlpstack.data import DataLoader, Vocabulary
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
@@ -149,12 +149,11 @@ class CausalLanguageModel(
     def setup(self, mode: SetupMode, **kwargs: Any) -> None:
         super().setup(mode=mode, **kwargs)
 
-        assert isinstance(self.datamodule, CausalLanguageModelingDataModule)
         if mode == "training":
-            self.datamodule.generation_mode(False)
+            self.datamodule.setup(generation_mode=False)
         elif mode == "evaluation":
-            self.datamodule.generation_mode(False)
+            self.datamodule.setup(generation_mode=False)
         elif mode == "prediction":
-            self.datamodule.generation_mode(True)
+            self.datamodule.setup(generation_mode=True)
         else:
             raise ValueError(f"Unknown mode: {mode}")

@@ -17,10 +17,5 @@ class DataModule(Generic[Example, Inference, Prediction]):
     def build_predictions(self, inference: Inference) -> Iterator[Prediction]:
         raise NotImplementedError
 
-    def read_dataset(
-        self,
-        dataset: Iterable[Example],
-        is_training: bool = False,
-        **kwargs: Any,
-    ) -> Iterator[Instance]:
+    def read_dataset(self, dataset: Iterable[Example], **kwargs: Any) -> Iterator[Instance]:
         raise NotImplementedError

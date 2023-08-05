@@ -41,7 +41,18 @@ class SequenceLabelingDataModule(
     def label_namespace(self) -> str:
         return self._label_namespace
 
-    def _tokenize(self, dataset: Iterable[SequenceLabelingExample]) -> Sequence[SequenceLabelingExample]:
+    def setup(
+        self,
+        *args: Any,
+        dataset: Optional[Sequence[SequenceLabelingExample]] = None,
+        **kwargs: Any,
+    ) -> None:
+        if dataset:
+            logger.info("Tokenizing dataset and building vocabulary...")
+            dataset = self.tokenize(ProgressBar(dataset, desc="Tokenizing dataset"))
+            self._build_vocab(dataset)
+
+    def tokenize(self, dataset: Iterable[SequenceLabelingExample]) -> Sequence[SequenceLabelingExample]:
         if not dataset:
             return []
 
@@ -132,17 +143,7 @@ class SequenceLabelingDataModule(
             metadata = None if _nlpstack_metadata["metadata_is_none"] else _metadata
             yield SequenceLabelingPrediction(tokens=tokens, top_labels=top_labels, metadata=metadata)
 
-    def read_dataset(
-        self,
-        dataset: Iterable[SequenceLabelingExample],
-        is_training: bool = False,
-        **kwargs: Any,
-    ) -> Iterator[Instance]:
-        if is_training:
-            logger.info("Tokenizing dataset and building vocabulary...")
-            dataset = self._tokenize(ProgressBar(dataset, desc="Tokenizing dataset"))
-            self._build_vocab(dataset)
-
+    def read_dataset(self, dataset: Iterable[SequenceLabelingExample], **kwargs: Any) -> Iterator[Instance]:
         logger.info("Building instances...")
         for example in ProgressBar(dataset, desc="Building instances"):
             yield self.build_instance(example)
