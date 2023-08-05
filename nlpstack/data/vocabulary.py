@@ -210,7 +210,9 @@ class Vocabulary:
         """
         if namespace not in self._token_to_index:
             raise KeyError(f"Namespace {namespace} not found.")
-        new_tokens = set(tokens) - set(self._token_to_index[namespace].keys()) - set(self._ignored_tokens[namespace])
+        new_tokens = (
+            set(tokens) - set(self._token_to_index[namespace].keys()) - set(self._ignored_tokens.get(namespace, set()))
+        )
         for token in sorted(new_tokens):
             index = len(self._index_to_token[namespace])
             self._index_to_token[namespace][index] = token
