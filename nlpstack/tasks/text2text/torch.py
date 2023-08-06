@@ -93,12 +93,60 @@ class TorchText2Text(TorchModel[Text2TextInference]):
         memory = self._encoder(source_embeddings, source_mask)
 
         loss: Optional[torch.FloatTensor] = None
-        if target is None:
-            target_token_ids = torch.full(
-                (source_embeddings.size(0), 1),
-                self._target_bos_index,
-                dtype=torch.long,
-                device=source_embeddings.device,
+        inference = Text2TextInference(
+            pred_token_ids=self._target_bos_index * numpy.ones((len(source_token_ids), 1, 1), dtype=int),
+            pred_mask=numpy.ones((len(source_token_ids), 1), dtype=bool),
+            metadata=metadata,
+        )
+
+        if target is not None:
+            target_token_ids = get_token_ids_from_text(target)
+            target_mask = get_mask_from_text(target)
+
+            target_inputs = target_token_ids[:, :-1].contiguous()
+            target_labels = target_token_ids[:, 1:].contiguous()
+            target_inputs_mask = target_mask[:, :-1].contiguous()
+            target_labels_mask = target_mask[:, 1:].contiguous()
+
+            target_embeddings = (self._target_embedder or self._source_embedder)(target_inputs)
+            output, _ = self._decoder(
+                inputs=target_embeddings,
+                memory=memory,
+                inputs_mask=target_inputs_mask,
+                memory_mask=source_mask,
+            )
+            logits = self._compute_logits(output)
+
+            if self._ignore_padding_loss:
+                target_labels = cast(torch.LongTensor, target_labels.masked_fill(~target_labels_mask, -100))
+
+            loss = self._loss(logits.view(-1, logits.size(2)), target_labels.view(-1))
+            perplexity = (
+                F.log_softmax(logits, dim=2)
+                .gather(dim=2, index=target_labels.masked_fill(~target_labels_mask, 0).unsqueeze(2))
+                .squeeze(2)
+                .masked_select(target_labels_mask)
+                .mean()
+                .neg()
+                .exp()
+                .item()
+            )
+
+            inference.pred_token_ids = logits.argmax(dim=2).unsqueeze(1).detach().cpu().numpy()
+            inference.pred_mask = target_labels_mask.unsqueeze(1).detach().cpu().numpy()
+            inference.gold_token_ids = target_labels.detach().cpu().numpy()
+            inference.gold_mask = target_labels_mask.detach().cpu().numpy()
+            inference.perplexity = perplexity
+
+        if not self.training:
+            target_token_ids = cast(
+                torch.LongTensor,
+                torch.full(
+                    (source_embeddings.size(0), 1),
+                    self._target_bos_index,
+                    dtype=torch.long,
+                    device=source_embeddings.device,
+                ),
             )
             target_mask = cast(torch.BoolTensor, torch.ones_like(target_token_ids).bool())
             target_embeddings = (self._target_embedder or self._source_embedder)(target_token_ids)
@@ -133,51 +181,8 @@ class TorchText2Text(TorchModel[Text2TextInference]):
                 if self._target_eos_index
                 else pred_token_ids != self._target_eos_index
             )
-            inference = Text2TextInference(
-                pred_token_ids=pred_token_ids,
-                pred_mask=pred_mask,
-                metadata=metadata,
-            )
-        else:
-            target_token_ids = get_token_ids_from_text(target)
-            target_mask = get_mask_from_text(target)
 
-            target_inputs = target_token_ids[:, :-1].contiguous()
-            target_labels = target_token_ids[:, 1:].contiguous()
-            target_inputs_mask = target_mask[:, :-1].contiguous()
-            target_labels_mask = target_mask[:, 1:].contiguous()
-
-            target_embeddings = (self._target_embedder or self._source_embedder)(target_inputs)
-            output, _ = self._decoder(
-                inputs=target_embeddings,
-                memory=memory,
-                inputs_mask=target_inputs_mask,
-                memory_mask=source_mask,
-            )
-            logits = self._compute_logits(output)
-
-            if self._ignore_padding_loss:
-                target_labels = cast(torch.LongTensor, target_labels.masked_fill(~target_labels_mask, -100))
-
-            loss = self._loss(logits.view(-1, logits.size(2)), target_labels.view(-1))
-            perplexity = (
-                F.log_softmax(logits, dim=2)
-                .gather(dim=2, index=target_labels.masked_fill(~target_labels_mask, 0).unsqueeze(2))
-                .squeeze(2)
-                .masked_select(target_labels_mask)
-                .mean()
-                .neg()
-                .exp()
-                .item()
-            )
-
-            inference = Text2TextInference(
-                pred_token_ids=logits.argmax(dim=2).unsqueeze(1).detach().cpu().numpy(),
-                pred_mask=target_labels_mask.unsqueeze(1).detach().cpu().numpy(),
-                gold_token_ids=target_labels.detach().cpu().numpy(),
-                gold_mask=target_labels_mask.detach().cpu().numpy(),
-                perplexity=perplexity,
-                metadata=metadata,
-            )
+            inference.pred_token_ids = pred_token_ids
+            inference.pred_mask = pred_mask
 
         return TorchText2TextOutput(inference=inference, loss=loss)

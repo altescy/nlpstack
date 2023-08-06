@@ -37,7 +37,5 @@ model = Text2Text(
 )
 model.train(dataset)
 
-for example, prediction in zip(
-    dataset[:10], model.predict((Text2TextExample(example.source) for example in dataset[:10]), top_k=5)
-):
+for example, prediction in zip(dataset[:10], model.predict(dataset[:10], top_k=5)):
     print(f"{example.source} -> {''.join(prediction.tokens)} ({example.target})")
