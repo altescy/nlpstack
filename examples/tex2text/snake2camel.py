@@ -4,6 +4,7 @@ import string
 from typing import List
 
 from nlpstack.data.tokenizers import CharacterTokenizer
+from nlpstack.tasks.text2text.metrics import BLEU, Perplexity
 from nlpstack.tasks.text2text.sklearn import Text2Text
 from nlpstack.tasks.text2text.types import Text2TextExample
 
@@ -34,6 +35,7 @@ model = Text2Text(
     batch_size=32,
     max_epochs=30,
     learning_rate=1e-2,
+    metric=[Perplexity(), BLEU()],
 )
 model.train(dataset)
 

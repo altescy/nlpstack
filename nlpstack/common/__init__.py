@@ -1,3 +1,4 @@
+from nlpstack.common.bleu import BLEU  # noqa: F401
 from nlpstack.common.cacheutil import cached_property  # noqa: F401
 from nlpstack.common.filebackend import FileBackendMapping, FileBackendSequence  # noqa: F401
 from nlpstack.common.hashutil import hash_object, murmurhash3  # noqa: F401
