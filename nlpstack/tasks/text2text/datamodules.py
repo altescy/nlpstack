@@ -1,0 +1,155 @@
+import itertools
+from logging import getLogger
+from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
+
+from nlpstack.common import FileBackendSequence, ProgressBar
+from nlpstack.data import DataModule, Instance, Token, Vocabulary
+from nlpstack.data.fields import Field, MetadataField, TextField
+from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
+from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
+
+from .types import Text2TextExample, Text2TextInference, Text2TextPrediction
+
+logger = getLogger(__name__)
+
+
+class Text2TextDataModule(
+    DataModule[
+        Text2TextExample,
+        Text2TextInference,
+        Text2TextPrediction,
+    ]
+):
+    def __init__(
+        self,
+        vocab: Vocabulary,
+        source_tokenizer: Optional[Tokenizer] = None,
+        target_tokenizer: Optional[Tokenizer] = None,
+        source_token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
+        target_token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
+        source_namespace: str = "tokens",
+        target_namespace: str = "tokens",
+    ) -> None:
+        self._vocab = vocab
+        self._source_tokenizer = source_tokenizer or WhitespaceTokenizer()
+        self._target_tokenizer = target_tokenizer or self._source_tokenizer
+        self._source_token_indexers = source_token_indexers or {"tokens": SingleIdTokenIndexer()}
+        self._target_token_indexers = target_token_indexers or self._source_token_indexers
+        self._source_namespace = source_namespace
+        self._target_namespace = target_namespace
+
+    @property
+    def vocab(self) -> Vocabulary:
+        return self._vocab
+
+    def setup(
+        self,
+        *args: Any,
+        dataset: Optional[Sequence[Text2TextExample]] = None,
+        **kwargs: Any,
+    ) -> None:
+        if dataset:
+            logger.info("Tokenizing dataset and building vocabulary...")
+            dataset = self.tokenize(ProgressBar(dataset, desc="Tokenizing dataset"))
+            self._build_vocab(dataset)
+
+    def tokenize(self, dataset: Iterable[Text2TextExample]) -> Sequence[Text2TextExample]:
+        if not dataset:
+            return []
+
+        def tokenized_document_generator() -> Iterator[Text2TextExample]:
+            for example in dataset:
+                if isinstance(example.source, str):
+                    tokenized_source = self._source_tokenizer.tokenize(example.source)
+                else:
+                    tokenized_source = list(example.source)
+                if example.target is not None:
+                    if isinstance(example.target, str):
+                        tokenized_target = self._target_tokenizer.tokenize(example.target)
+                    else:
+                        tokenized_target = list(example.target)
+                else:
+                    tokenized_target = None
+                yield Text2TextExample(source=tokenized_source, target=tokenized_target)
+
+        return FileBackendSequence.from_iterable(tokenized_document_generator())
+
+    def _build_vocab(self, dataset: Iterable[Text2TextExample]) -> None:
+        def source_iterator() -> Iterator[Sequence[Token]]:
+            for example in dataset:
+                assert not isinstance(example.source, str), "Dataset must be tokenized."
+                yield example.source
+
+        def target_iterator() -> Iterator[Sequence[Token]]:
+            for example in dataset:
+                assert example.target is not None
+                assert not isinstance(example.target, str), "Dataset must be tokenized."
+                yield example.target
+
+        if self._source_token_indexers is self._target_token_indexers:
+            for name, token_indexer in self._source_token_indexers.items():
+                token_indexer.build_vocab(
+                    self._vocab,
+                    itertools.chain(source_iterator(), target_iterator()),
+                )
+        else:
+            for name, token_indexer in self._source_token_indexers.items():
+                token_indexer.build_vocab(self.vocab, source_iterator())
+            for name, token_indexer in self._target_token_indexers.items():
+                token_indexer.build_vocab(self.vocab, target_iterator())
+
+    def build_instance(self, example: Text2TextExample) -> Instance:
+        source = example.source
+        target = example.target
+        metadata = example.metadata
+
+        if isinstance(source, str):
+            source = self._source_tokenizer.tokenize(source)
+        if self._vocab.has_bos_token(self._source_namespace):
+            source = [Token(self._vocab.get_bos_token(self._source_namespace))] + list(source)
+        if self._vocab.has_eos_token(self._source_namespace):
+            source = list(source) + [Token(self._vocab.get_eos_token(self._source_namespace))]
+
+        fields: Dict[str, Field] = {}
+        fields["source"] = TextField(source, self.vocab, self._source_token_indexers)
+
+        if target is not None:
+            if isinstance(target, str):
+                target = self._target_tokenizer.tokenize(target)
+            if self._vocab.has_bos_token(self._target_namespace):
+                target = [Token(self._vocab.get_bos_token(self._target_namespace))] + list(target)
+            if self._vocab.has_eos_token(self._target_namespace):
+                target = list(target) + [Token(self._vocab.get_eos_token(self._target_namespace))]
+            fields["target"] = TextField(target, self.vocab, self._target_token_indexers)
+
+        if metadata:
+            fields["metadata"] = MetadataField(metadata)
+
+        return Instance(**fields)
+
+    def build_predictions(self, inference: Text2TextInference) -> Iterator[Text2TextPrediction]:
+        token_indices_to_ignore = {self._vocab.get_pad_index(self._target_namespace)}
+        if self._vocab.has_bos_token(self._target_namespace):
+            token_indices_to_ignore.add(self._vocab.get_bos_index(self._target_namespace))
+        if self._vocab.has_eos_token(self._target_namespace):
+            token_indices_to_ignore.add(self._vocab.get_eos_index(self._target_namespace))
+        for top_token_ids in inference.pred_token_ids.tolist():
+            top_tokens = [
+                [
+                    self.vocab.get_token_by_index(self._target_namespace, token_id)
+                    for token_id in token_ids
+                    if token_id not in token_indices_to_ignore
+                ]
+                for token_ids in top_token_ids
+            ]
+            yield Text2TextPrediction(top_tokens)
+
+    def read_dataset(
+        self,
+        dataset: Iterable[Text2TextExample],
+        is_training: bool = False,
+        **kwargs: Any,
+    ) -> Iterator[Instance]:
+        logger.info("Building instances...")
+        for example in ProgressBar(dataset, desc="Building instances"):
+            yield self.build_instance(example)
