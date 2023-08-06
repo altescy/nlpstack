@@ -1,26 +1,20 @@
-nlpstack.torch.training package
-===============================
+training
+========
 
-nlpstack.torch.training.callbacks module
-----------------------------------------
+Submodules
+----------
 
-.. automodule:: nlpstack.torch.training.callbacks
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. toctree::
+   :maxdepth: 6
 
-nlpstack.torch.training.optimizers module
------------------------------------------
+   nlpstack.torch.training.callbacks
+   nlpstack.torch.training.optimizers
+   nlpstack.torch.training.trainer
 
-.. automodule:: nlpstack.torch.training.optimizers
-   :members:
-   :undoc-members:
-   :show-inheritance:
+Module contents
+---------------
 
-nlpstack.torch.training.trainer module
---------------------------------------
-
-.. automodule:: nlpstack.torch.training.trainer
+.. automodule:: nlpstack.torch.training
    :members:
    :undoc-members:
    :show-inheritance:

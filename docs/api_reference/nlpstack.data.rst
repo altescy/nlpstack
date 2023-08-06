@@ -1,39 +1,21 @@
 nlpstack.data package
 =====================
 
-nlpstack.data.fields module
----------------------------
+Submodules
+----------
 
-.. automodule:: nlpstack.data.fields
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. toctree::
+   :maxdepth: 6
 
-nlpstack.data.token\_indexers module
-------------------------------------
+   nlpstack.data.datamodule
+   nlpstack.data.embeddings
+   nlpstack.data.fields
+   nlpstack.data.indexers
+   nlpstack.data.tokenizers
+   nlpstack.data.util
+   nlpstack.data.vocabulary
 
-.. automodule:: nlpstack.data.token_indexers
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-nlpstack.data.tokenizers module
--------------------------------
-
-.. automodule:: nlpstack.data.tokenizers
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-nlpstack.data.vocabulary module
--------------------------------
-
-.. automodule:: nlpstack.data.vocabulary
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-nlpstack.data
+Module contents
 ---------------
 
 .. automodule:: nlpstack.data

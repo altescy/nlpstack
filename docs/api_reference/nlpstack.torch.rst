@@ -1,26 +1,30 @@
 nlpstack.torch package
 ======================
 
-.. toctree::
-   :maxdepth: 4
+Subpackages
+-----------
 
-   nlpstack.torch.metrics
-   nlpstack.torch.models
+.. toctree::
+   :maxdepth: 6
+
    nlpstack.torch.modules
    nlpstack.torch.training
 
-nlpstack.torch.picklable module
--------------------------------
+Submodules
+----------
 
-.. automodule:: nlpstack.torch.picklable
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. toctree::
+   :maxdepth: 6
 
-nlpstack.torch.util module
---------------------------
+   nlpstack.torch.model
+   nlpstack.torch.picklable
+   nlpstack.torch.predictor
+   nlpstack.torch.util
 
-.. automodule:: nlpstack.torch.util
+Module contents
+---------------
+
+.. automodule:: nlpstack.torch
    :members:
    :undoc-members:
    :show-inheritance:

@@ -4,6 +4,16 @@ import torch
 
 
 class FeedForward(torch.nn.Module):
+    """
+    A simple feed forward neural network.
+
+    Args:
+        input_dim: The dimension of the input.
+        hidden_dims: A sequence of integers specifying the dimensions of each layer.
+        dropout: The dropout probability. Defaults to `0.0`.
+        activation: The activation function. Defaults to `torch.nn.ReLU()`
+    """
+
     def __init__(
         self,
         input_dim: int,
@@ -29,14 +39,18 @@ class FeedForward(torch.nn.Module):
             ]
         )
 
-    def forward(self, x: torch.FloatTensor) -> torch.FloatTensor:
+    def forward(self, inputs: torch.FloatTensor) -> torch.FloatTensor:
         """
-        :param x: (batch_size, input_dim)
-        :return: (batch_size, hidden_dim)
+        Args:
+            inputs: A tensor of shape `(batch_size, ..., input_dim)`.
+
+        Returns:
+            A tensor of shape `(batch_size, ..., hidden_dims[-1])`.
         """
+        output = inputs
         for layer in self._layers:
-            x = layer(x)
-        return x
+            output = layer(output)
+        return output
 
     def get_input_dim(self) -> int:
         return self._input_dim

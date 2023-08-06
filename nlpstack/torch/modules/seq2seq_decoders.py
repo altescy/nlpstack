@@ -1,3 +1,27 @@
+"""
+PyTorch modules for sequence-to-sequence decoders.
+All decoders have the same interface and can be used in the same way.
+
+Example:
+    Decoding by putting batched inputs all together:
+
+    >>> import torch
+    >>> from nlpstack.torch.modules.seq2seq_decoders import LstmSeq2SeqDecoder
+    >>> decoder = LstmSeq2SeqDecoder(input_dim=16, hidden_dim=16, num_layers=1)
+    >>> inputs = torch.randn(2, 3, 16)
+    >>> memory = torch.randn(2, 5, 16)
+    >>> outputs, state = decoder(inputs, memory)
+
+    Step-by-step decoding:
+
+    >>> state = decoder.get_initial_state(inputs, memory)
+    >>> output = inputs  # Shape: (batch_size, given_sequence_length, input_dim)
+    >>> for _ in range(num_steps):
+    ...     outputs, state = decoder(output, memory, last_state=state)
+    ...     output = outputs[:, -1:]  # Shape: (batch_size, 1, input_dim)
+"""
+
+
 import dataclasses
 from contextlib import suppress
 from os import PathLike
@@ -14,6 +38,13 @@ Seq2SeqDecoderState = TypeVar("Seq2SeqDecoderState")
 
 
 class Seq2SeqDecoder(torch.nn.Module, Generic[Seq2SeqDecoderState]):
+    """
+    A base module for sequence-to-sequence decoders.
+
+    Attributes:
+        State: The type of the decoder state for step-by-step decoding.
+    """
+
     State: Seq2SeqDecoderState
 
     def forward(
@@ -24,6 +55,18 @@ class Seq2SeqDecoder(torch.nn.Module, Generic[Seq2SeqDecoderState]):
         memory_mask: Optional[torch.BoolTensor] = None,
         last_state: Optional[Seq2SeqDecoderState] = None,
     ) -> Tuple[torch.Tensor, Seq2SeqDecoderState]:
+        """
+        Args:
+            inputs: A tensor of shape `(batch_size, input_length, input_dim)`.
+            memory: A tensor of shape `(batch_size, memory_length, memory_dim)` representing the
+                memory vecotors such as the encoder outputs.
+            inputs_mask: A tensor of shape `(batch_size, input_length)` representing the mask for
+                the inputs.
+            memory_mask: A tensor of shape `(batch_size, memory_length)` representing the mask for
+                the memory.
+            last_state: The last decoder state, which is used for step-by-step decoding. Defaults
+                to `None`.
+        """
         raise NotImplementedError
 
     def get_initial_state(
@@ -43,8 +86,35 @@ class Seq2SeqDecoder(torch.nn.Module, Generic[Seq2SeqDecoderState]):
 
 
 class TransformerSeq2SeqDecoder(Seq2SeqDecoder["TransformerSeq2SeqDecoder.State"]):
+    """
+    A sequence-to-sequence decoder based on the Transformer architecture.
+
+    Args:
+        input_dim: The dimension of the input vectors.
+        num_layers: The number of layers.
+        feedforward_hidden_dim: The hidden dimension of the feedforward layers. Defaults to `2048`.
+        num_attention_heads: The number of attention heads. Defaults to `8`.
+        positional_encoding: The type of positional encoding. Defaults to `"sinusoidal"`.
+        positional_embedding_size: The size of the positional embeddings. Defaults to `512`.
+        dropout: The dropout rate. Defaults to `0.1`.
+        layer_norm_eps: The epsilon value for layer normalization. Defaults to `1e-5`.
+        activation: The activation function. Defaults to `"relu"`.
+        norm_first: Whether to apply layer normalization before the attention layer. Defaults to
+            `False`.
+        use_cross_attention: Whether to use cross attention. Please set `True` for encoder-decoder
+            architectures. Defaults to `False`.
+    """
+
     @dataclasses.dataclass
     class State:
+        """
+        The decoder state for step-by-step decoding.
+
+        Parameters:
+            cache: The cache for the decoder layers. A tensor of shape `(num_layers, batch_size,
+                memory_length, memory_dim)`.
+        """
+
         cache: Optional[torch.Tensor] = None
 
     def __init__(
@@ -135,8 +205,32 @@ class TransformerSeq2SeqDecoder(Seq2SeqDecoder["TransformerSeq2SeqDecoder.State"
 
 
 class LstmSeq2SeqDecoder(Seq2SeqDecoder["LstmSeq2SeqDecoder.State"]):
+    """
+    A stacked LSTM decoder.
+
+    Args:
+        input_dim: The dimension of the inputs to the decoder.
+        hidden_dim: The dimension of the outputs of the decoder.
+        num_layers: The number of layers in the decoder.
+        bias: Whether or not to include bias parameters in the LSTM. Defaults to `True`.
+        dropout: The dropout probability. Defaults to `0.1`.
+        use_cross_attention: Whether to use cross attention. Please set `True` for encoder-decoder
+            architectures. Defaults to `False`.
+        initial_state_encoder: An optional `Seq2VecEncoder` to use to initialize the hidden state
+            of the decoder from memory vectors. If `None`, the initial hidden state is initialized
+            to zero. Defaults to `None`.
+    """
+
     @dataclasses.dataclass
     class State:
+        """
+        The decoder state for step-by-step decoding.
+
+        Parameters:
+            hidden: The hidden state of the decoder. A tensor of shape `(num_layers, batch_size, hidden_dim)`.
+            cell: The cell state of the decoder. A tensor of shape `(num_layers, batch_size, hidden_dim)`.
+        """
+
         hidden: torch.Tensor
         cell: torch.Tensor
 
@@ -214,6 +308,11 @@ class LstmSeq2SeqDecoder(Seq2SeqDecoder["LstmSeq2SeqDecoder.State"]):
 
 
 class PretrainedTransformerSeq2SeqDecoder(Seq2SeqDecoder["PretrainedTransformerSeq2SeqDecoder.State"]):
+    """
+    A sequence decoder for pretrained transformer models.
+    Note that this module requires transformers library to be installed.
+    """
+
     @dataclasses.dataclass
     class State:
         past_key_values: Optional[Tuple[Tuple[torch.Tensor, ...], ...]] = None

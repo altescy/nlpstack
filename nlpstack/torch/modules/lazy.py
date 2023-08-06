@@ -4,6 +4,14 @@ import torch
 
 
 class LazyLinearOutput(torch.nn.modules.lazy.LazyModuleMixin, torch.nn.Linear):
+    """
+    A linear layer whose output dimension is not known at initialization.
+
+    Args:
+        in_features: The dimension of the input.
+        bias: Whether to use bias. Defaults to `True`.
+    """
+
     cls_to_become = torch.nn.Linear  # type: ignore[assignment]
     weight: torch.nn.UninitializedParameter
     bias: torch.nn.UninitializedParameter  # type: ignore[assignment]
@@ -27,6 +35,12 @@ class LazyLinearOutput(torch.nn.modules.lazy.LazyModuleMixin, torch.nn.Linear):
         *args: Any,
         **kwargs: Any,
     ) -> None:
+        """
+        Initialize the parameters of the layer.
+
+        Args:
+            out_features (int): The dimension of the output.
+        """
         if self.has_uninitialized_params():
             num_embeddings = kwargs.get("out_features", 0)
             with torch.no_grad():
@@ -38,6 +52,19 @@ class LazyLinearOutput(torch.nn.modules.lazy.LazyModuleMixin, torch.nn.Linear):
 
 
 class LazyEmbedding(torch.nn.modules.lazy.LazyModuleMixin, torch.nn.Embedding):
+    """
+    An embedding layer whose number of embeddings and padding index is not known at initialization.
+
+    Args:
+        embedding_dim: The size of each embedding vector
+        max_norm: If given, each embedding vector with norm larger than `max_norm`` is renormalized to have norm `max_norm`.
+        norm_type: The p of the p-norm to compute for the `max_norm` option. Default `2.0`.
+        scale_grad_by_freq:  If given, this will scale gradients by the inverse of frequency of the words in the mini-batch.
+            Defaults to`False`.
+        sparse: If `True`, gradient w.r.t. `weight` matrix will be a sparse tensor.
+        freeze: Whether to freeze the embedding. Defaults to `False`.
+    """
+
     cls_to_become = torch.nn.Embedding  # type: ignore[assignment]
     weight: torch.nn.UninitializedParameter
 

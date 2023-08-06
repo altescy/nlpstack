@@ -1,58 +1,30 @@
-nlpstack.torch.modules package
-==============================
+modules
+=======
 
-nlpstack.torch.modules.feedforward module
------------------------------------------
+Submodules
+----------
 
-.. automodule:: nlpstack.torch.modules.feedforward
-   :members:
-   :undoc-members:
-   :show-inheritance:
+.. toctree::
+   :maxdepth: 6
 
-nlpstack.torch.modules.lazy module
-----------------------------------
+   nlpstack.torch.modules.count_embedder
+   nlpstack.torch.modules.crf
+   nlpstack.torch.modules.feedforward
+   nlpstack.torch.modules.heads
+   nlpstack.torch.modules.lazy
+   nlpstack.torch.modules.scalarmix
+   nlpstack.torch.modules.seq2seq_decoders
+   nlpstack.torch.modules.seq2seq_encoders
+   nlpstack.torch.modules.seq2vec_encoders
+   nlpstack.torch.modules.text_embedders
+   nlpstack.torch.modules.time_distributed
+   nlpstack.torch.modules.token_embedders
+   nlpstack.torch.modules.transformer
 
-.. automodule:: nlpstack.torch.modules.lazy
-   :members:
-   :undoc-members:
-   :show-inheritance:
+Module contents
+---------------
 
-nlpstack.torch.modules.scalarmix module
----------------------------------------
-
-.. automodule:: nlpstack.torch.modules.scalarmix
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-nlpstack.torch.modules.seq2seq\_encoders module
------------------------------------------------
-
-.. automodule:: nlpstack.torch.modules.seq2seq_encoders
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-nlpstack.torch.modules.seq2vec\_encoders module
------------------------------------------------
-
-.. automodule:: nlpstack.torch.modules.seq2vec_encoders
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-nlpstack.torch.modules.text\_embedders module
----------------------------------------------
-
-.. automodule:: nlpstack.torch.modules.text_embedders
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-nlpstack.torch.modules.token\_embedders module
-----------------------------------------------
-
-.. automodule:: nlpstack.torch.modules.token_embedders
+.. automodule:: nlpstack.torch.modules
    :members:
    :undoc-members:
    :show-inheritance:

@@ -12,7 +12,18 @@ from nlpstack.torch.modules.lazy import LazyLinearOutput
 
 
 class Head(torch.nn.Module):
+    """
+    A base module for prediction heads.
+    """
+
     def forward(self, inputs: torch.FloatTensor) -> torch.FloatTensor:
+        """
+        Args:
+            inputs: A tensor of shape `(batch_size, ..., input_dim)`.
+
+        Returns:
+            A tensor of shape `(batch_size, ..., output_dim)`.
+        """
         raise NotImplementedError
 
     def get_input_dim(self) -> int:
@@ -23,6 +34,15 @@ class Head(torch.nn.Module):
 
 
 class ClassificationHead(Head):
+    """
+    A classification head.
+
+    Args:
+        input_dim: The dimension of the input.
+        bias: Whether to use bias. Defaults to `True`.
+        namespace: The vocabulary namespace of the labels. Defaults to `"labels"`.
+    """
+
     def __init__(
         self,
         input_dim: int,
@@ -47,10 +67,31 @@ class ClassificationHead(Head):
         return self._output_dim
 
     def forward(self, inputs: torch.FloatTensor) -> torch.FloatTensor:
+        """
+        Args:
+            inputs: A tensor of shape `(batch_size, ..., input_dim)`.
+
+        Returns:
+            A tensor of shape `(batch_size, ..., num_labels)`.
+        """
         return cast(torch.FloatTensor, self._projection(inputs))
 
 
 class LanguageModelingHead(Head):
+    """
+    A language modeling head.
+
+    Args:
+        input_dim: The dimension of the input.
+        bias: Whether to use bias. Defaults to `True`.
+        namespace: The vocabulary namespace of the output tokens. Defaults to `"tokens"`.
+        pretrained_embedding: A pretrained word embedding. If specified, the weights of the
+            projection layer will be initialized with the given word embeddings. Defaults to `None`.
+        extend_vocab: Whether to extend the vocabulary with the pretrained word embeddings.
+            Please set `True` for adding new tokens which are not contained in the training dataset.
+            Defaults to `False`.
+    """
+
     def __init__(
         self,
         input_dim: int,
@@ -96,10 +137,27 @@ class LanguageModelingHead(Head):
         return self._projection.out_features
 
     def forward(self, inputs: torch.FloatTensor) -> torch.FloatTensor:
+        """
+        Args:
+            inputs: A tensor of shape `(batch_size, ..., input_dim)`.
+
+        Returns:
+            A tensor of shape `(batch_size, ..., vocab_size)`.
+        """
         return cast(torch.FloatTensor, self._projection(inputs))
 
 
 class PretrainedTransformerHead(Head):
+    """
+    A head for pretrained transformer models.
+    This module loads a pretrained transformer head from `transformers` library.
+    Note that this module requires `transformers` library to be installed.
+
+    Args:
+        pretrained_model_name: The name of the pretrained model.
+        train_parameters: Whether to train the parameters of the head. Defaults to `True`.
+    """
+
     def __init__(
         self,
         pretrained_model_name: Union[str, PathLike],
@@ -128,4 +186,11 @@ class PretrainedTransformerHead(Head):
         return self._output_dim
 
     def forward(self, inputs: torch.FloatTensor) -> torch.FloatTensor:
+        """
+        Args:
+            inputs: A tensor of shape `(batch_size, ..., input_dim)`.
+
+        Returns:
+            A tensor of shape `(batch_size, ..., vocab_size)`.
+        """
         return cast(torch.FloatTensor, self._head(inputs))

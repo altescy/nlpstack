@@ -1,6 +1,3 @@
-# This script is based on the AllenNLP implementation of ScalarMix:
-# https://github.com/allenai/allennlp/blob/v2.10.0/allennlp/modules/scalar_mix.py
-
 from typing import List, Optional, Sequence
 
 import torch
@@ -13,6 +10,10 @@ class ScalarMix(torch.nn.Module):
     where `s = softmax(w)`, with `w` and `gamma` scalar parameters.
     In addition, if `do_layer_norm=True` then apply layer normalization to each tensor
     before weighting.
+
+    Note:
+        This script is based on the AllenNLP implementation of ScalarMix:
+        https://github.com/allenai/allennlp/blob/v2.10.0/allennlp/modules/scalar_mix.py
     """
 
     def __init__(

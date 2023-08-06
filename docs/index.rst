@@ -12,10 +12,9 @@ Welcome to NLPSTACK's documentation!
 ====================================
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 4
 
-   api_reference/index
-
+   api_reference/nlpstack
 
 
 Indices and tables
