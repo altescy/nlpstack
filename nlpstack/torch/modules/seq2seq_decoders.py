@@ -53,7 +53,7 @@ class TransformerSeq2SeqDecoder(Seq2SeqDecoder["TransformerSeq2SeqDecoder.State"
         num_layers: int,
         feedforward_hidden_dim: int = 2048,
         num_attention_heads: int = 8,
-        positional_encoding: Optional[Literal["sinusoidal", "embedding"]] = None,
+        positional_encoding: Optional[Literal["sinusoidal", "embedding"]] = "sinusoidal",
         positional_embedding_size: int = 512,
         dropout: float = 0.1,
         layer_norm_eps: float = 1e-5,
@@ -156,13 +156,11 @@ class LstmSeq2SeqDecoder(Seq2SeqDecoder["LstmSeq2SeqDecoder.State"]):
         self._num_layers = num_layers
         self._use_cross_attention = use_cross_attention
         self._decoder = torch.nn.LSTM(input_dim, hidden_dim, num_layers, bias=bias, dropout=dropout, batch_first=True)  # type: ignore[no-untyped-call]
-        self._initial_state_encoder = (
-            torch.nn.Sequential(
-                initial_state_encoder,
-                torch.nn.Linear(initial_state_encoder.get_output_dim(), hidden_dim * num_layers),
-            )
-            if initial_state_encoder is not None
-            else None
+        self._initial_state_encoder = initial_state_encoder
+        self._ininial_satte_projection = (
+            None
+            if initial_state_encoder is None
+            else torch.nn.Linear(initial_state_encoder.get_output_dim(), hidden_dim * num_layers)
         )
 
     def forward(
@@ -200,8 +198,11 @@ class LstmSeq2SeqDecoder(Seq2SeqDecoder["LstmSeq2SeqDecoder.State"]):
             )
         if memory is not None and not self._use_cross_attention:
             raise ValueError("memory is given but use_cross_attention is False")
+        assert self._initial_state_encoder is not None and self._ininial_satte_projection is not None
         return LstmSeq2SeqDecoder.State(
-            hidden=self._initial_state_encoder(memory, memory_mask),
+            hidden=self._ininial_satte_projection(self._initial_state_encoder(memory, memory_mask)).view(
+                self._num_layers, batch_size, self._hidden_dim
+            ),
             cell=torch.zeros((self._num_layers, batch_size, self._hidden_dim), device=inputs.device),
         )
 
