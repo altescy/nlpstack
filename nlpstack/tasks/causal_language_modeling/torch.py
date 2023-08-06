@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Any, Mapping, Optional, Sequence, Tuple, cast
+from typing import Any, Dict, Mapping, Optional, Sequence, Tuple, cast
 
 import numpy
 import torch
@@ -102,9 +102,9 @@ class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference]):
         return_only_generated: bool = False,
         **kwargs: Any,
     ) -> TorchCausalLanguageModelOutput:
-        max_new_tokens = max_new_tokens or self._max_new_tokens
-        temperature = temperature or self._temperature
-        top_k = top_k or self._top_k
+        max_new_tokens = max_new_tokens if max_new_tokens is not None else self._max_new_tokens
+        temperature = temperature if temperature is not None else self._temperature
+        top_k = top_k if top_k is not None else self._top_k
 
         token_ids = get_token_ids_from_text(text)
         mask = get_mask_from_text(text)
