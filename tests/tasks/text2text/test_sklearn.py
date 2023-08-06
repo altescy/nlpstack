@@ -4,7 +4,6 @@ from typing import List, Tuple
 
 from nlpstack.data.tokenizers import CharacterTokenizer
 from nlpstack.tasks.text2text.sklearn import SklearnText2Text
-from nlpstack.tasks.text2text.types import Text2TextExample
 
 
 def snake_to_camel(text: str) -> str:
