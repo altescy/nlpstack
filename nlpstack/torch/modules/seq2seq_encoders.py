@@ -161,7 +161,7 @@ class TransformerSeq2SeqEncoder(Seq2SeqEncoder):
         num_layers: int,
         feedforward_hidden_dim: int = 2048,
         num_attention_heads: int = 8,
-        positional_encoding: Optional[Literal["sinusoidal", "embedding"]] = None,
+        positional_encoding: Optional[Literal["sinusoidal", "embedding"]] = "sinusoidal",
         positional_embedding_size: int = 512,
         dropout: float = 0.1,
         layer_norm_eps: float = 1e-5,
