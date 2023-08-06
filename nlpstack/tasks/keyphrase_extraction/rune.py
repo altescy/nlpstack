@@ -37,6 +37,16 @@ class CValue(Rune[KeyphraseExtracionExample, KeyphraseExtractionPrediction]):
             raise RuntimeError("CValue has not been trained yet.")
         return self._extracted_phrases
 
+    def get_keyphrases(self, top_k: Optional[int] = None) -> Sequence[Tuple[Token, ...]]:
+        if self._extracted_phrases is None:
+            raise RuntimeError("CValue has not been trained yet.")
+        top_k = top_k or self._top_k
+        return sorted(
+            self._extracted_phrases,
+            key=self._extracted_phrases.get,  # type: ignore[arg-type]
+            reverse=True,
+        )[:top_k]
+
     def train(
         self,
         train_dataset: Sequence[KeyphraseExtracionExample],
@@ -56,7 +66,7 @@ class CValue(Rune[KeyphraseExtracionExample, KeyphraseExtractionPrediction]):
             if self._candidate_postag_pattern is None:
                 return True
             postag_pattern = "".join(token.postag or "NULL" for token in phrase)
-            return bool(self._candidate_postag_pattern.match(postag_pattern))
+            return self._candidate_postag_pattern.match(postag_pattern) is not None
 
         logger.info("[1/3] Counting n-grams...")
         phrase_frequencies: Dict[Tuple[Token, ...], int] = {}
@@ -71,7 +81,7 @@ class CValue(Rune[KeyphraseExtracionExample, KeyphraseExtractionPrediction]):
         longer_phrase_average_frequencies: Dict[Tuple[Token, ...], float] = {}
         longer_phrase_count: Dict[Tuple[Token, ...], int] = {}
         for phrase in ProgressBar(phrase_frequencies, desc="[2/3] Collecting phrases"):
-            for start in range(0, len(phrase) - self._ngram_range[0]):
+            for start in range(len(phrase) - self._ngram_range[0]):
                 for end in range(start + self._ngram_range[0], len(phrase) + 1):
                     if start == 0 and end == len(phrase):
                         continue
