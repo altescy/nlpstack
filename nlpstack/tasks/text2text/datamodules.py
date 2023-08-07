@@ -142,7 +142,7 @@ class Text2TextDataModule(
                 ]
                 for token_ids in top_token_ids
             ]
-            top_texts = [self._target_tokenizer.decode(tokens) for tokens in top_tokens]
+            top_texts = [self._target_tokenizer.detokenize(tokens) for tokens in top_tokens]
             yield Text2TextPrediction(top_texts, top_tokens)
 
     def read_dataset(

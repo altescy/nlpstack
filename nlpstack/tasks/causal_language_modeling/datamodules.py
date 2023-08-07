@@ -121,7 +121,7 @@ class CausalLanguageModelingDataModule(
                 ]
                 for token_ids in top_token_ids
             ]
-            top_texts = [self._tokenizer.decode(tokens) for tokens in top_tokens]
+            top_texts = [self._tokenizer.detokenize(tokens) for tokens in top_tokens]
             yield CausalLanguageModelingPrediction(top_texts, top_tokens)
 
     def read_dataset(
