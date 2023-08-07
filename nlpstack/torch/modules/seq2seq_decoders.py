@@ -59,7 +59,7 @@ class Seq2SeqDecoder(torch.nn.Module, Generic[Seq2SeqDecoderState]):
         Args:
             inputs: A tensor of shape `(batch_size, input_length, input_dim)`.
             memory: A tensor of shape `(batch_size, memory_length, memory_dim)` representing the
-                memory vecotors such as the encoder outputs.
+                memory vectors such as the encoder outputs.
             inputs_mask: A tensor of shape `(batch_size, input_length)` representing the mask for
                 the inputs.
             memory_mask: A tensor of shape `(batch_size, memory_length)` representing the mask for
