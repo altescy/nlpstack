@@ -24,8 +24,13 @@ class CausalLanguageModelingInference:
 
 @dataclasses.dataclass
 class CausalLanguageModelingPrediction:
+    top_texts: Sequence[str]
     top_tokens: Sequence[Sequence[str]]
     metadata: Optional[Mapping[str, Any]] = None
+
+    @property
+    def text(self) -> str:
+        return self.top_texts[0]
 
     @property
     def tokens(self) -> Sequence[str]:

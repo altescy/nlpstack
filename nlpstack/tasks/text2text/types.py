@@ -25,7 +25,12 @@ class Text2TextInference:
 
 @dataclasses.dataclass
 class Text2TextPrediction:
+    top_texts: Sequence[str]
     top_tokens: Sequence[Sequence[str]]
+
+    @property
+    def text(self) -> str:
+        return self.top_texts[0]
 
     @property
     def tokens(self) -> Sequence[str]:
