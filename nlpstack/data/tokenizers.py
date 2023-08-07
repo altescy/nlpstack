@@ -3,7 +3,7 @@ Tokenizers for NLPSTACK, which are used to split a text into tokens and also to 
 
 Example:
     >>> from nlpstack.data import SpacyTokenizer
-    >>> tokenizer = SpacyTokenizer("en_core_web_sm", with_whitespaces=True)
+    >>> tokenizer = SpacyTokenizer("en_core_web_sm", with_whitespace=True)
     >>> tokens = tokenizer.tokenize("It is a good day.")
     >>> detokenized_text = tokenizer.detokenize(tokens)
 """
