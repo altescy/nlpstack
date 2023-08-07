@@ -29,5 +29,4 @@ y_pred = model.predict(X_pred, temperature=0.0)
 
 for given, pred, gold in zip(X_pred, y_pred, X):
     gold = gold[len(given) :]
-    pred = "".join(pred)
     print(f"{pred} ({gold})")

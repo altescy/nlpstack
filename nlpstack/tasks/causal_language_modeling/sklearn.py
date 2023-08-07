@@ -19,7 +19,7 @@ logger = getLogger(__name__)
 
 InputsX = Sequence[str]
 InputsY = Sequence[str]
-Outputs = Sequence[Sequence[str]]
+Outputs = Sequence[str]
 
 
 class SklearnCausalLanguageModel(
@@ -40,7 +40,7 @@ class SklearnCausalLanguageModel(
 
     @staticmethod
     def output_builder(predictions: Iterator[CausalLanguageModelingPrediction]) -> Outputs:
-        return [prediction.tokens for prediction in predictions]
+        return [prediction.text for prediction in predictions]
 
     def __init__(
         self,
