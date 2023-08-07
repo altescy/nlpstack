@@ -131,7 +131,7 @@ class SpacyTokenizer(Tokenizer):
 class PretrainedTransformerTokenizer(Tokenizer):
     """
     A tokenizer uses a model from Huggingface's transformers library.
-    We take a model name as an augment, which will pass to `AutoTokenizer.from_pretrained`
+    We take a model name as an argument, which will pass to `AutoTokenizer.from_pretrained`
 
     Args:
         pretrained_model_name: The name, path or URL of the pretrained model.
