@@ -3,7 +3,7 @@ Tokenizers for NLPSTACK, which are used to split a text into tokens and also to 
 
 Example:
     >>> from nlpstack.data import SpacyTokenizer
-    >>> tokenizer = SpacyTokenizer("en_core_web_sm")
+    >>> tokenizer = SpacyTokenizer("en_core_web_sm", with_whitespaces=True)
     >>> tokens = tokenizer.tokenize("It is a good day.")
     >>> detokenized_text = tokenizer.detokenize(tokens)
 """
@@ -39,7 +39,7 @@ class Token(NamedTuple):
     """
     A token in a text.
 
-    Attributes:
+    Parameters:
         surface: The surface form of the token.
         postag: The part-of-speech tag of the token. Defaults to `None`.
         lemma: The lemma of the token. Defaults to `None`.
