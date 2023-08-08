@@ -15,6 +15,7 @@ class KeyphraseExtracionExample:
 
 @dataclasses.dataclass
 class KeyphraseExtractionInference:
+    tokens: Sequence[str]
     pred_spans: numpy.ndarray
     gold_spans: Optional[numpy.ndarray] = None
     metadata: Optional[Sequence[Mapping[str, Any]]] = None

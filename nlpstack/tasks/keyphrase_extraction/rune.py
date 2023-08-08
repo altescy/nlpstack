@@ -1,7 +1,7 @@
 import math
 import re
 from logging import getLogger
-from typing import Any, Dict, Mapping, Optional, Pattern, Sequence, Tuple, Union
+from typing import Any, Dict, Literal, Mapping, Optional, Pattern, Sequence, Tuple, Union, overload
 
 from nlpstack.common import ProgressBar
 from nlpstack.data.tokenizers import Token, Tokenizer, WhitespaceTokenizer
@@ -37,15 +37,48 @@ class CValue(Rune[KeyphraseExtracionExample, KeyphraseExtractionPrediction]):
             raise RuntimeError("CValue has not been trained yet.")
         return self._extracted_phrases
 
-    def get_keyphrases(self, top_k: Optional[int] = None) -> Sequence[Tuple[Token, ...]]:
+    @overload
+    def get_keyphrases(
+        self,
+        *,
+        top_k: Optional[int] = ...,
+        threshold: Optional[float] = ...,
+        return_tokens: Literal[True],
+    ) -> Sequence[Tuple[Token, ...]]:
+        ...
+
+    @overload
+    def get_keyphrases(
+        self,
+        *,
+        top_k: Optional[int] = ...,
+        threshold: Optional[float] = ...,
+        return_tokens: Literal[False] = ...,
+    ) -> Sequence[str]:
+        ...
+
+    def get_keyphrases(
+        self,
+        *,
+        top_k: Optional[int] = None,
+        threshold: Optional[float] = None,
+        return_tokens: bool = False,
+    ) -> Union[Sequence[str], Sequence[Tuple[Token, ...]]]:
         if self._extracted_phrases is None:
             raise RuntimeError("CValue has not been trained yet.")
-        top_k = top_k or self._top_k
-        return sorted(
-            self._extracted_phrases,
+        top_k = top_k if top_k is not None else self._top_k
+        threshold = threshold if threshold is not None else self._threshold
+        phrases = {phrase: cvalue for phrase, cvalue in self._extracted_phrases.items() if cvalue >= threshold}
+        top_keyphrases = sorted(
+            phrases,
             key=self._extracted_phrases.get,  # type: ignore[arg-type]
             reverse=True,
         )[:top_k]
+
+        if return_tokens:
+            return top_keyphrases
+
+        return [self._tokenizer.decode(phrase) for phrase in top_keyphrases]
 
     def train(
         self,
