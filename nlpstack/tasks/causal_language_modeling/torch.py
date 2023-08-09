@@ -1,13 +1,14 @@
 import dataclasses
-from typing import Any, Mapping, Optional, Sequence, Tuple, cast
+from typing import Any, Generic, Mapping, Optional, Sequence, Tuple, cast
 
 import numpy
 import torch
 import torch.nn.functional as F
 
+from nlpstack.torch.generation import BeamSearch, DeterministicSampler
 from nlpstack.torch.model import TorchModel
 from nlpstack.torch.modules.heads import LanguageModelingHead
-from nlpstack.torch.modules.seq2seq_decoders import Seq2SeqDecoder
+from nlpstack.torch.modules.seq2seq_decoders import Seq2SeqDecoder, Seq2SeqDecoderState
 from nlpstack.torch.modules.token_embedders import Embedding
 from nlpstack.torch.util import get_mask_from_text, get_token_ids_from_text
 
@@ -21,14 +22,15 @@ class TorchCausalLanguageModelOutput:
     loss: Optional[torch.FloatTensor] = None
 
 
-class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference]):
+class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference], Generic[Seq2SeqDecoderState]):
     def __init__(
         self,
         embedder: Embedding,
-        decoder: Seq2SeqDecoder,
+        decoder: Seq2SeqDecoder[Seq2SeqDecoderState],
         lmhead: Optional[LanguageModelingHead] = None,
         dropout: Optional[float] = None,
-        ignore_padding_loss: bool = True,
+        ignore_padding_loss: bool = False,
+        beam_search: Optional[BeamSearch] = None,
         token_namespace: str = "tokens",
         max_new_tokens: int = 100,
         temperature: float = 1.0,
@@ -40,6 +42,7 @@ class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference]):
         self._lmhead = lmhead
         self._dropout = torch.nn.Dropout(dropout) if dropout is not None else None
         self._ignore_padding_loss = ignore_padding_loss
+        self._beam_search = beam_search or BeamSearch(sampler=DeterministicSampler())
         self._loss = torch.nn.CrossEntropyLoss(reduction="sum")
         self._token_namespace = token_namespace
         self._max_new_tokens = max_new_tokens
@@ -58,6 +61,13 @@ class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference]):
             self._eos_index = datamodule.vocab.get_eos_index(self._token_namespace)
         else:
             self._eos_index = datamodule.vocab.get_pad_index(self._token_namespace)
+        self._beam_search.setup(
+            *args,
+            datamodule=datamodule,
+            vocab=datamodule.vocab,
+            eos_index=self._eos_index,
+            **kwargs,
+        )
 
     def _compute_logits(self, inputs: torch.FloatTensor) -> torch.FloatTensor:
         if self._dropout:
@@ -147,49 +157,20 @@ class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference]):
             inference.perplexity = perplexity
 
         if not self.training:
-            # take decoding steps
-            min_given_tokens = int(mask.sum(dim=1).min().item())
-            max_given_tokens = int(mask.sum(dim=1).max().item())
 
-            original_token_ids = token_ids
-            token_ids = cast(torch.LongTensor, token_ids[:, :min_given_tokens])
-            embeddings = embeddings[:, :min_given_tokens]
+            def step(
+                token_ids: torch.LongTensor, state: Seq2SeqDecoderState
+            ) -> Tuple[torch.Tensor, Seq2SeqDecoderState]:
+                batch_size, beam_size, sequence_length = token_ids.size()
+                embeddings = self._embedder(token_ids.view(batch_size * beam_size, sequence_length))
+                encodings, state = self._decoder(embeddings)
+                logits = self._compute_logits(encodings)
+                log_probs = F.log_softmax(logits[:, -1, :], dim=1).view(batch_size, beam_size, -1)
+                return log_probs, state
 
-            last_state = self._decoder.get_initial_state(embeddings, inputs_mask=mask)
-            is_done = torch.zeros(token_ids.size(0), dtype=torch.bool, device=token_ids.device)
-            for timestep in range(min_given_tokens, min_given_tokens + max_new_tokens):
-                output, last_state = self._decoder(embeddings, last_state=last_state)
-                logits = self._compute_logits(output[:, -1:, :])
-                if top_k:
-                    v, _ = logits.topk(top_k, dim=2)
-                    logits = cast(torch.FloatTensor, logits.masked_fill(logits < v[:, :, -1:], -float("inf")))
-                new_token_id = (
-                    torch.multinomial((logits[:, -1, :] / temperature).softmax(1), num_samples=1)
-                    if temperature > 0
-                    else logits.argmax(dim=2)
-                )
-                if timestep < max_given_tokens:
-                    new_token_id = torch.where(
-                        mask[:, timestep : timestep + 1],
-                        original_token_ids[:, timestep : timestep + 1],
-                        new_token_id,
-                    )
-                if self._eos_index is not None:
-                    is_done |= new_token_id.squeeze(1) == self._eos_index
-                    new_token_id = new_token_id.masked_fill(is_done.unsqueeze(1), self._eos_index)
-                token_ids = cast(torch.LongTensor, torch.cat([token_ids, new_token_id], dim=1))
-                if is_done.all():
-                    break
-                embeddings = self._embedder(new_token_id)
+            state = self._decoder.get_initial_state(embeddings, inputs_mask=mask)
+            pred_token_ids, pred_mask, scores = self._beam_search.search(token_ids, mask, state, step)
 
-            pred_token_ids = cast(
-                torch.LongTensor,
-                token_ids.unsqueeze(1),
-            )
-            pred_mask = cast(
-                torch.BoolTensor,
-                torch.ones_like(pred_token_ids) if self._eos_index else pred_token_ids != self._eos_index,
-            )
             if return_only_generated:
                 pred_token_ids, pred_mask = self._get_generated_sequences(token_ids, pred_token_ids, mask, pred_mask)
 

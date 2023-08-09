@@ -18,8 +18,7 @@ def generate_dataset(num_examples: int) -> List[str]:
 X = generate_dataset(1000)
 model = SklearnCausalLanguageModel(
     tokenizer=CharacterTokenizer(),
-    eos_token="@@END@@",
-    max_epochs=50,
+    max_epochs=3,
     learning_rate=1e-2,
     batch_size=32,
 ).fit(X)
