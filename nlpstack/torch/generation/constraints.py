@@ -212,7 +212,6 @@ class StopTokenConstraint(Constraint[None]):
         log_probs: torch.Tensor,
     ) -> torch.Tensor:
         if self._stop_token_ids:
-            print("apply constraint")
             log_probs[:, :, self._stop_token_ids] = float("-inf")
         return log_probs
 
