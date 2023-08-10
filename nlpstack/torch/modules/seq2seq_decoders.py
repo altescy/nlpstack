@@ -25,7 +25,7 @@ Example:
 import dataclasses
 from contextlib import suppress
 from os import PathLike
-from typing import Callable, Generic, Literal, Optional, Tuple, Type, TypeVar, Union, cast
+from typing import Any, Callable, Generic, Literal, Mapping, Optional, Tuple, Type, TypeVar, Union, cast
 
 import minato
 import torch
@@ -77,6 +77,9 @@ class Seq2SeqDecoder(torch.nn.Module, Generic[Seq2SeqDecoderState]):
         inputs_mask: Optional[torch.BoolTensor] = None,
         memory_mask: Optional[torch.BoolTensor] = None,
     ) -> Seq2SeqDecoderState:
+        raise NotImplementedError
+
+    def can_take_memory(self) -> bool:
         raise NotImplementedError
 
     def get_input_dim(self) -> int:
@@ -215,6 +218,9 @@ class TransformerSeq2SeqDecoder(Seq2SeqDecoder["TransformerSeq2SeqDecoder.State"
     ) -> "TransformerSeq2SeqDecoder.State":
         return TransformerSeq2SeqDecoder.State()
 
+    def can_take_memory(self) -> bool:
+        return self._use_cross_attention
+
     def get_input_dim(self) -> int:
         return self._input_dim
 
@@ -337,6 +343,9 @@ class LstmSeq2SeqDecoder(Seq2SeqDecoder["LstmSeq2SeqDecoder.State"]):
             cell=torch.zeros((self._num_layers, batch_size, self._hidden_dim), device=inputs.device),
         )
 
+    def can_take_memory(self) -> bool:
+        return self._use_cross_attention or self._initial_state_encoder is not None
+
     def get_input_dim(self) -> int:
         return self._input_dim
 
@@ -364,6 +373,7 @@ class PretrainedTransformerSeq2SeqDecoder(Seq2SeqDecoder["PretrainedTransformerS
         train_parameters: bool = True,
         submodule: Optional[str] = None,
         load_weights: bool = True,
+        additional_config: Optional[Mapping[str, Any]] = None,
     ) -> None:
         from transformers import AutoConfig, AutoModel
 
@@ -372,9 +382,11 @@ class PretrainedTransformerSeq2SeqDecoder(Seq2SeqDecoder["PretrainedTransformerS
 
         super().__init__()
         if load_weights:
-            self._model = AutoModel.from_pretrained(pretrained_model_name)
+            self._model = AutoModel.from_pretrained(pretrained_model_name, **(additional_config or {}))
         else:
-            self._model = AutoModel.from_config(AutoConfig.from_pretrained(pretrained_model_name))
+            self._model = AutoModel.from_config(
+                AutoConfig.from_pretrained(pretrained_model_name, **(additional_config or {}))
+            )
 
         if submodule:
             self._model = getattr(self._model, submodule)
@@ -423,6 +435,11 @@ class PretrainedTransformerSeq2SeqDecoder(Seq2SeqDecoder["PretrainedTransformerS
         memory_mask: Optional[torch.BoolTensor] = None,
     ) -> "PretrainedTransformerSeq2SeqDecoder.State":
         return PretrainedTransformerSeq2SeqDecoder.State()
+
+    def can_take_memory(self) -> bool:
+        memory_available_keywords = {"encdecatt", "encoder_att", "crossatt", "cross_att"}
+        parmaeter_names = {name.lower() for name, _ in self.named_parameters()}
+        return any(keyword in name for keyword in memory_available_keywords for name in parmaeter_names)
 
     def get_input_dim(self) -> int:
         return int(self._model.config.hidden_size)
