@@ -121,9 +121,10 @@ class TransformerSeq2SeqDecoder(Seq2SeqDecoder["TransformerSeq2SeqDecoder.State"
 
         cache: Optional[torch.Tensor] = None
 
-        def update(self, backpointer: torch.LongTensor) -> None:
+        def update(self, backpointer: torch.LongTensor) -> "TransformerSeq2SeqDecoder.State":
             if self.cache is None:
-                return
+                return self
+
             batch_size, beam_size = backpointer.size()
             if self.cache.size(1) == batch_size:
                 # Shape: (num_layers, batch_size * beam_size, sequence_length, embedding_dim)
@@ -136,7 +137,7 @@ class TransformerSeq2SeqDecoder(Seq2SeqDecoder["TransformerSeq2SeqDecoder.State"
                 backpointer + (beam_size * torch.arange(batch_size, device=backpointer.device).unsqueeze(1))
             ).view(-1)
             # Shape: (num_layers, batch_size * beam_size, sequence_length, embedding_dim)
-            self.cache = self.cache[:, flattened_backpointer, :, :]
+            return TransformerSeq2SeqDecoder.State(self.cache[:, flattened_backpointer, :, :])
 
     def __init__(
         self,
@@ -258,7 +259,7 @@ class LstmSeq2SeqDecoder(Seq2SeqDecoder["LstmSeq2SeqDecoder.State"]):
         hidden: torch.Tensor
         cell: torch.Tensor
 
-        def update(self, backpointer: torch.LongTensor) -> None:
+        def update(self, backpointer: torch.LongTensor) -> "LstmSeq2SeqDecoder.State":
             batch_size, beam_size = backpointer.size()
             if self.hidden.size(1) == batch_size:
                 self.hidden = self.hidden.repeat_interleave(beam_size, dim=1)
@@ -273,9 +274,11 @@ class LstmSeq2SeqDecoder(Seq2SeqDecoder["LstmSeq2SeqDecoder.State"]):
                 backpointer + (beam_size * torch.arange(batch_size, device=backpointer.device).unsqueeze(1))
             ).view(-1)
             # Shape: (num_layers, batch_size * beam_size, hidden_dim)
-            self.hidden = self.hidden[:, flattened_backpointer, :]
+            hidden = self.hidden[:, flattened_backpointer, :]
             # Shape: (num_layers, batch_size * beam_size, hidden_dim)
-            self.cell = self.cell[:, flattened_backpointer, :]
+            cell = self.cell[:, flattened_backpointer, :]
+
+            return LstmSeq2SeqDecoder.State(hidden, cell)
 
     def __init__(
         self,
@@ -363,7 +366,7 @@ class PretrainedTransformerSeq2SeqDecoder(Seq2SeqDecoder["PretrainedTransformerS
     class State:
         past_key_values: Optional[Tuple[Tuple[torch.Tensor]]] = None
 
-        def update(self, backpointer: torch.LongTensor) -> None:
+        def update(self, backpointer: torch.LongTensor) -> "PretrainedTransformerSeq2SeqDecoder.State":
             raise NotImplementedError
 
     def __init__(

@@ -6,9 +6,11 @@ import torch
 from .constraints import Constraint, MultiConstraint
 from .samplers import DeterministicSampler, Sampler
 
+StepStateSelf = TypeVar("StepStateSelf", bound="StepStateInterface")
+
 
 class StepStateInterface(Protocol):
-    def update(self, backpointer: torch.LongTensor) -> None:
+    def update(self: StepStateSelf, backpointer: torch.LongTensor) -> StepStateSelf:
         """
         Args:
             backpointer: Tensor of shape `(batch_size, beam_size)`.
@@ -38,7 +40,7 @@ class BeamSearch:
         self,
         max_steps: int = 50,
         beam_size: int = 10,
-        sampling_size_per_beam: Optional[int] = None,
+        sampling_size_per_node: Optional[int] = None,
         sampler: Optional[Sampler] = None,
         constraint: Optional[Union[Constraint, List[Constraint]]] = None,
     ) -> None:
@@ -47,7 +49,7 @@ class BeamSearch:
 
         self._max_steps = max_steps
         self._beam_size = beam_size
-        self._sampling_size_per_beam = sampling_size_per_beam or beam_size
+        self._sampling_size_per_node = sampling_size_per_node or beam_size
         self._sampler = sampler or DeterministicSampler()
         self._constraint = constraint
         self._eos_index: Optional[int] = None
@@ -79,7 +81,7 @@ class BeamSearch:
 
         beam_size = self._beam_size
         batch_size = token_ids.size(0)
-        sampling_size_per_node = beam_size
+        sampling_size_per_node = self._sampling_size_per_node
 
         sampler = self._sampler
         constraint = self._constraint
@@ -102,7 +104,7 @@ class BeamSearch:
         # Shape: (batch_size, beam_size)
         last_token_ids = cast(torch.LongTensor, token_ids[:, :, -1])
 
-        state.update(backpointer)
+        state = state.update(backpointer)
         sampler_state = sampler.init_state(token_ids, mask)
         constraint_state = constraint.init_state(token_ids, mask) if constraint else None
 
@@ -191,7 +193,7 @@ class BeamSearch:
             )
             backpointers.append(backpointer)
 
-            state.update(backpointer)
+            state = state.update(backpointer)
 
             if constraint:
                 constraint_state = constraint.update_state(constraint_state, last_token_ids, backpointer)
