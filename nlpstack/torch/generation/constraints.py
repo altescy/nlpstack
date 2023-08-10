@@ -4,6 +4,8 @@ from typing import Any, Dict, Generic, List, Sequence, Set, Tuple, TypeVar
 
 import torch
 
+from nlpstack.data import Vocabulary
+
 ConstraintState = TypeVar("ConstraintState")
 
 
@@ -185,4 +187,39 @@ class NoRepeatNgramConstraint(Constraint["NoRepeatNgramConstraint.State"]):
                 prefix.append(last_token)
                 if len(prefix) == self._ngram_size:
                     prefix.pop(0)
+        return state
+
+
+class StopTokenConstraint(Constraint[None]):
+    def __init__(
+        self,
+        stop_tokens: Sequence[str],
+        namespace: str = "tokens",
+    ) -> None:
+        self._namespace = namespace
+        self._stop_tokens = set(stop_tokens)
+        self._stop_token_ids: Sequence[int] = ()
+
+    def setup(self, *args: Any, vocab: Vocabulary, **kwargs: Any) -> None:
+        self._stop_token_ids = [vocab.get_index_by_token(self._namespace, token) for token in self._stop_tokens]
+
+    def init_state(self, token_ids: torch.LongTensor, mask: torch.BoolTensor) -> None:
+        return None
+
+    def apply(
+        self,
+        state: None,
+        log_probs: torch.Tensor,
+    ) -> torch.Tensor:
+        if self._stop_token_ids:
+            print("apply constraint")
+            log_probs[:, :, self._stop_token_ids] = float("-inf")
+        return log_probs
+
+    def update_state(
+        self,
+        state: None,
+        last_token_ids: torch.LongTensor,
+        last_backpointer: torch.LongTensor,
+    ) -> None:
         return state

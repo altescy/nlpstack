@@ -54,9 +54,16 @@ class BeamSearch:
         self._constraint = constraint
         self._eos_index: Optional[int] = None
 
-    def setup(self, *args: Any, eos_index: int, **kwargs: Any) -> None:
+    def setup(
+        self,
+        *args: Any,
+        eos_index: Optional[int] = None,
+        **kwargs: Any,
+    ) -> None:
         self._eos_index = eos_index
         self._sampler.setup(*args, eos_inde=eos_index, **kwargs)
+        if self._constraint is not None:
+            self._constraint.setup(*args, eos_index=eos_index, **kwargs)
 
     @torch.no_grad()
     def search(
