@@ -36,10 +36,12 @@ class BeamSearch:
         self,
         max_steps: int = 50,
         beam_size: int = 10,
+        sampling_size_per_beam: Optional[int] = None,
         sampler: Optional[Sampler] = None,
     ) -> None:
         self._max_steps = max_steps
         self._beam_size = beam_size
+        self._sampling_size_per_beam = sampling_size_per_beam or beam_size
         self._sampler = sampler or DeterministicSampler()
         self._eos_index: Optional[int] = None
 
@@ -70,7 +72,7 @@ class BeamSearch:
 
         beam_size = self._beam_size
         batch_size = token_ids.size(0)
-        sampling_size_per_node = 3
+        sampling_size_per_node = beam_size
 
         initial_token_ids = token_ids
         initial_mask = mask
@@ -96,6 +98,7 @@ class BeamSearch:
         for timestep in range(min_initial_length, self._max_steps):
             if self._eos_index is not None and (token_ids == self._eos_index).all():
                 break
+
             # Shape: (batch_size, beam_size, vocab_size)
             log_probs, state = step(token_ids, state)
             (
@@ -112,6 +115,8 @@ class BeamSearch:
                 beam_indices,  # Shape: (batch_size, beam_size)
                 sampler_state,
             ) = self._sampler.sample_beams(expanded_cumulated_log_probs, beam_size, sampler_state)
+
+            cumulated_log_probs = beam_log_probs
 
             # Shape: (batch_size, beam_size)
             new_token_ids = top_next_token_ids.view(batch_size, -1).gather(1, beam_indices)
@@ -173,26 +178,25 @@ class BeamSearch:
 
     @staticmethod
     def _reconstruct_sequences(predictions: List[torch.Tensor], backpointers: List[torch.Tensor]) -> List[torch.Tensor]:
-        # Reconstruct the sequences.
-        # shape: [(batch_size, beam_size, 1)]
+        # Shape: [(batch_size, beam_size, 1)]
         reconstructed_predictions = [predictions[-1].unsqueeze(2)]
 
         if not backpointers:
             return reconstructed_predictions
 
-        # shape: (batch_size, beam_size)
+        # Shape: (batch_size, beam_size)
         cur_backpointers = backpointers[-1]
 
         for timestep in range(len(predictions) - 2, 0, -1):
-            # shape: (batch_size, beam_size, 1)
+            # Shape: (batch_size, beam_size, 1)
             cur_preds = predictions[timestep].gather(1, cur_backpointers).unsqueeze(2)
 
             reconstructed_predictions.append(cur_preds)
 
-            # shape: (batch_size, beam_size)
-            cur_backpointers = backpointers[timestep - 1].gather(1, cur_backpointers)
+            # Shape: (batch_size, beam_size)
+            cur_backpointers = backpointers[timestep].gather(1, cur_backpointers)
 
-        # shape: (batch_size, beam_size, 1)
+        # Shape: (batch_size, beam_size, 1)
         final_preds = predictions[0].gather(1, cur_backpointers).unsqueeze(2)
 
         reconstructed_predictions.append(final_preds)

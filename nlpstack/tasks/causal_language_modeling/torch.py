@@ -163,7 +163,7 @@ class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference], Gene
             ) -> Tuple[torch.Tensor, Seq2SeqDecoderState]:
                 batch_size, beam_size, sequence_length = token_ids.size()
                 embeddings = self._embedder(token_ids.view(batch_size * beam_size, sequence_length))
-                encodings, state = self._decoder(embeddings)
+                encodings, state = self._decoder(embeddings, last_state=state)
                 logits = self._compute_logits(encodings)
                 log_probs = F.log_softmax(logits[:, -1, :], dim=1).view(batch_size, beam_size, -1)
                 return log_probs, state

@@ -1,4 +1,4 @@
-from typing import Any, Generic, Tuple, TypeVar
+from typing import Any, Generic, Tuple, TypeVar, cast
 
 import torch
 
@@ -54,4 +54,43 @@ class DeterministicSampler(Sampler[None]):
     ) -> Tuple[torch.Tensor, torch.LongTensor, None]:
         size = min(size, log_probs.size(-1))
         selected_log_probs, selected_indices = torch.topk(log_probs, size, dim=-1)
+        return selected_log_probs, selected_indices, state
+
+
+class MultinomialSampler(Sampler[None]):
+    def __init__(
+        self,
+        temperature: float = 1.0,
+        with_replacement: bool = False,
+    ) -> None:
+        self._temperature = temperature
+        self._with_replacement = with_replacement
+
+    def init_state(self, log_probs: torch.Tensor) -> None:
+        return None
+
+    def sample_nodes(
+        self,
+        log_probs: torch.Tensor,
+        size: int,
+        state: None,
+    ) -> Tuple[torch.Tensor, torch.LongTensor, None]:
+        *dims, vocab_size = log_probs.size()
+
+        flattened_log_probs = log_probs.view(-1, vocab_size)
+
+        if self._temperature != 1.0:
+            _probabilities = (flattened_log_probs / self._temperature).softmax(1)
+        else:
+            _probabilities = flattened_log_probs.exp()
+
+        selected_indices = cast(
+            torch.LongTensor,
+            torch.multinomial(_probabilities, size, replacement=self._with_replacement),
+        )
+        selected_log_probs = flattened_log_probs.gather(1, selected_indices)
+
+        selected_indices = cast(torch.LongTensor, selected_indices.view(*dims, size))
+        selected_log_probs = selected_log_probs.view(*dims, size)
+
         return selected_log_probs, selected_indices, state

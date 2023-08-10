@@ -133,7 +133,7 @@ class TransformerSeq2SeqDecoder(Seq2SeqDecoder["TransformerSeq2SeqDecoder.State"
 
             # Shape: (batch_size * beam_size)
             flattened_backpointer = (
-                backpointer + (beam_size * torch.arange(batch_size, device=backpointer.device))
+                backpointer + (beam_size * torch.arange(batch_size, device=backpointer.device).unsqueeze(1))
             ).view(-1)
             # Shape: (num_layers, batch_size * beam_size, sequence_length, embedding_dim)
             self.cache = self.cache[:, flattened_backpointer, :, :]
