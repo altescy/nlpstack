@@ -9,7 +9,14 @@ class Sampler(Generic[SamplerState]):
     def setup(self, *args: Any, **kwargs: Any) -> None:
         pass
 
-    def init_state(self, token_ids: torch.LongTensor) -> SamplerState:
+    def init_state(self, token_ids: torch.LongTensor, mask: torch.BoolTensor) -> SamplerState:
+        """
+        Args:
+            token_ids: Tensor of shape `(batch_size, beam_size, given_length)`.
+            mask: Tensor of shape `(batch_size, beam_size, given_length)`.
+        Returns:
+            state: Initial state of the sampler.
+        """
         raise NotImplementedError
 
     def sample_nodes(
@@ -43,7 +50,7 @@ class Sampler(Generic[SamplerState]):
 
 
 class DeterministicSampler(Sampler[None]):
-    def init_state(self, log_probs: torch.Tensor) -> None:
+    def init_state(self, token_ids: torch.LongTensor, mask: torch.BoolTensor) -> None:
         return None
 
     def sample_nodes(
@@ -66,7 +73,7 @@ class MultinomialSampler(Sampler[None]):
         self._temperature = temperature
         self._with_replacement = with_replacement
 
-    def init_state(self, log_probs: torch.Tensor) -> None:
+    def init_state(self, token_ids: torch.LongTensor, mask: torch.BoolTensor) -> None:
         return None
 
     def sample_nodes(

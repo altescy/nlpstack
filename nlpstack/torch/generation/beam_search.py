@@ -1,7 +1,9 @@
-from typing import Any, Callable, List, NamedTuple, Optional, Protocol, Tuple, TypeVar, cast
+from functools import lru_cache
+from typing import Any, Callable, List, NamedTuple, Optional, Protocol, Tuple, TypeVar, Union, cast
 
 import torch
 
+from .constraints import Constraint, MultiConstraint
 from .samplers import DeterministicSampler, Sampler
 
 
@@ -38,11 +40,16 @@ class BeamSearch:
         beam_size: int = 10,
         sampling_size_per_beam: Optional[int] = None,
         sampler: Optional[Sampler] = None,
+        constraint: Optional[Union[Constraint, List[Constraint]]] = None,
     ) -> None:
+        if isinstance(constraint, list):
+            constraint = cast(Constraint, MultiConstraint(constraint))
+
         self._max_steps = max_steps
         self._beam_size = beam_size
         self._sampling_size_per_beam = sampling_size_per_beam or beam_size
         self._sampler = sampler or DeterministicSampler()
+        self._constraint = constraint
         self._eos_index: Optional[int] = None
 
     def setup(self, *args: Any, eos_index: int, **kwargs: Any) -> None:
@@ -74,13 +81,15 @@ class BeamSearch:
         batch_size = token_ids.size(0)
         sampling_size_per_node = beam_size
 
+        sampler = self._sampler
+        constraint = self._constraint
+
         initial_token_ids = token_ids
         initial_mask = mask
         initial_lengths = initial_mask.sum(dim=1)
         min_initial_length = int(initial_lengths.min().item())
         max_initial_length = int(initial_lengths.max().item())
 
-        sampler_state = self._sampler.init_state(token_ids)
         cumulated_log_probs = torch.zeros((batch_size, beam_size), device=token_ids.device)
         backpointer = cast(torch.LongTensor, torch.zeros((batch_size, beam_size), dtype=torch.long))
 
@@ -90,17 +99,43 @@ class BeamSearch:
         )
         # Shape: (batch_size, beam_size, min_initial_length)
         mask = cast(torch.BoolTensor, mask[:, :min_initial_length].unsqueeze(1).repeat_interleave(beam_size, dim=1))
+        # Shape: (batch_size, beam_size)
+        last_token_ids = cast(torch.LongTensor, token_ids[:, :, -1])
+
         state.update(backpointer)
+        sampler_state = sampler.init_state(token_ids, mask)
+        constraint_state = constraint.init_state(token_ids, mask) if constraint else None
 
         predictions: List[torch.Tensor] = list(token_ids.unbind(dim=2))
         backpointers: List[torch.Tensor] = list(torch.zeros_like(token_ids).unbind(dim=2))
 
+        @lru_cache
+        def get_eos_mask(vocab_size: int) -> torch.BoolTensor:
+            """Return one-hot mask for EOS token."""
+            assert self._eos_index is not None
+            return cast(torch.BoolTensor, (torch.arange(vocab_size) == self._eos_index))
+
         for timestep in range(min_initial_length, self._max_steps):
-            if self._eos_index is not None and (token_ids == self._eos_index).all():
+            if self._eos_index is not None and (last_token_ids == self._eos_index).all():
                 break
 
             # Shape: (batch_size, beam_size, vocab_size)
             log_probs, state = step(token_ids, state)
+
+            if self._constraint is not None:
+                # Shape: (batch_size, beam_size, vocab_size)
+                log_probs = self._constraint.apply(constraint_state, log_probs)
+
+            # Enforce to sample eos token if last token is eos.
+            if self._eos_index is not None:
+                # Shape: (batch_size, beam_size, 1)
+                beam_mask = (last_token_ids == self._eos_index).unsqueeze(2)
+                # Shape: (1, vocab_size)
+                eos_mask = get_eos_mask(log_probs.size(2)).unsqueeze(0)
+                # Shape: (batch_size, beam_size, vocab_size)
+                log_probs = log_probs.masked_fill(beam_mask * eos_mask, 0.0)
+                log_probs = log_probs.masked_fill(beam_mask * ~eos_mask, float("-inf"))
+
             (
                 top_log_probs,  # Shape: (batch_size, beam_size, sampling_size_per_node)
                 top_next_token_ids,  # Shape: (batch_size, beam_size, sampling_size_per_node)
@@ -119,13 +154,16 @@ class BeamSearch:
             cumulated_log_probs = beam_log_probs
 
             # Shape: (batch_size, beam_size)
-            new_token_ids = top_next_token_ids.view(batch_size, -1).gather(1, beam_indices)
+            last_token_ids = cast(torch.LongTensor, top_next_token_ids.view(batch_size, -1).gather(1, beam_indices))
 
             if timestep < max_initial_length:
-                new_token_ids = torch.where(
-                    initial_mask[:, timestep : timestep + 1].expand(batch_size, beam_size),
-                    initial_token_ids[:, timestep : timestep + 1].expand(batch_size, beam_size),
-                    new_token_ids,
+                last_token_ids = cast(
+                    torch.LongTensor,
+                    torch.where(
+                        initial_mask[:, timestep : timestep + 1].expand(batch_size, beam_size),
+                        initial_token_ids[:, timestep : timestep + 1].expand(batch_size, beam_size),
+                        last_token_ids,
+                    ),
                 )
                 cumulated_log_probs = torch.where(
                     initial_mask[:, timestep : timestep + 1].expand(batch_size, beam_size),
@@ -141,19 +179,22 @@ class BeamSearch:
                     ),
                 )
 
-            predictions.append(new_token_ids)
+            predictions.append(last_token_ids)
 
             # Shape: (batch_size, beam_size, 1)
-            token_ids = cast(torch.LongTensor, new_token_ids.unsqueeze(2))
+            token_ids = cast(torch.LongTensor, last_token_ids.unsqueeze(2))
 
             # Shape: (batch_size, beam_size)
             backpointer = cast(
                 torch.LongTensor,
                 torch.divide(beam_indices, sampling_size_per_node, rounding_mode="trunc").long(),
             )
+            backpointers.append(backpointer)
 
             state.update(backpointer)
-            backpointers.append(backpointer)
+
+            if constraint:
+                constraint_state = constraint.update_state(constraint_state, last_token_ids, backpointer)
 
         # Shape: (batch_size, beam_size)
         final_scores = cumulated_log_probs
