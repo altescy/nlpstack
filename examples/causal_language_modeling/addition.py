@@ -17,15 +17,15 @@ def generate_dataset(num_examples: int) -> List[str]:
 
 X = generate_dataset(1000)
 model = SklearnCausalLanguageModel(
+    eos_token="@@EOS@@",
     tokenizer=CharacterTokenizer(),
-    eos_token="@@END@@",
-    max_epochs=50,
+    max_epochs=20,
     learning_rate=1e-2,
     batch_size=32,
 ).fit(X)
 
 X_pred = [text.split(" = ")[0] + " = " for text in X[:10]]
-y_pred = model.predict(X_pred, temperature=0.0)
+y_pred = model.predict(X_pred)
 
 for given, pred, gold in zip(X_pred, y_pred, X):
     gold = gold[len(given) :]

@@ -20,7 +20,7 @@ from nlpstack.torch.modules.seq2seq_encoders import (
 
 
 @pytest.mark.parametrize(
-    "seq2seq_encoder",
+    "encoder",
     [
         FeedForwardSeq2SeqEncoder(FeedForward(6, [6])),
         GruSeq2SeqEncoder(6, 3, 1, bidirectional=True),
@@ -42,7 +42,7 @@ from nlpstack.torch.modules.seq2seq_encoders import (
         GatedCnnSeq2SeqEncoder(6, [[GatedCnnSeq2SeqEncoder.Layer(3, 6)]], output_dim=6),
     ],
 )
-def test_seq2seq_encoder(seq2seq_encoder: Seq2SeqEncoder) -> None:
+def test_seq2seq_encoder(encoder: Seq2SeqEncoder) -> None:
     inputs = torch.randn(4, 5, 6)
     mask = torch.BoolTensor(
         [
@@ -53,5 +53,5 @@ def test_seq2seq_encoder(seq2seq_encoder: Seq2SeqEncoder) -> None:
         ]
     )
 
-    output = seq2seq_encoder(inputs, mask)
+    output = encoder(inputs, mask)
     assert output.shape == (4, 5, 6)

@@ -133,7 +133,7 @@ class Text2TextDataModule(
             token_indices_to_ignore.add(self._vocab.get_bos_index(self._target_namespace))
         if self._vocab.has_eos_token(self._target_namespace):
             token_indices_to_ignore.add(self._vocab.get_eos_index(self._target_namespace))
-        for top_token_ids in inference.pred_token_ids.tolist():
+        for top_token_ids, scores in zip(inference.pred_token_ids.tolist(), inference.scores.tolist()):
             top_tokens = [
                 [
                     self.vocab.get_token_by_index(self._target_namespace, token_id)
@@ -143,7 +143,7 @@ class Text2TextDataModule(
                 for token_ids in top_token_ids
             ]
             top_texts = [self._target_tokenizer.detokenize(tokens) for tokens in top_tokens]
-            yield Text2TextPrediction(top_texts, top_tokens)
+            yield Text2TextPrediction(top_texts, top_tokens, scores)
 
     def read_dataset(
         self,

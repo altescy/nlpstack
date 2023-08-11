@@ -112,7 +112,7 @@ class CausalLanguageModelingDataModule(
             token_indices_to_ignore.add(self._vocab.get_bos_index(self._namespace))
         if self._vocab.has_eos_token(self._namespace):
             token_indices_to_ignore.add(self._vocab.get_eos_index(self._namespace))
-        for top_token_ids in inference.pred_token_ids.tolist():
+        for top_token_ids, scores in zip(inference.pred_token_ids.tolist(), inference.scores.tolist()):
             top_tokens = [
                 [
                     self.vocab.get_token_by_index(self._namespace, token_id)
@@ -122,7 +122,7 @@ class CausalLanguageModelingDataModule(
                 for token_ids in top_token_ids
             ]
             top_texts = [self._tokenizer.detokenize(tokens) for tokens in top_tokens]
-            yield CausalLanguageModelingPrediction(top_texts, top_tokens)
+            yield CausalLanguageModelingPrediction(top_texts, top_tokens, scores)
 
     def read_dataset(
         self,

@@ -33,11 +33,11 @@ dataset = generate_dataset(1000)
 model = Text2Text(
     source_tokenizer=CharacterTokenizer(),
     batch_size=32,
-    max_epochs=30,
+    max_epochs=20,
     learning_rate=1e-2,
     metric=[Perplexity(), BLEU()],
 )
 model.train(dataset)
 
-for example, prediction in zip(dataset[:10], model.predict(dataset[:10], top_k=5)):
+for example, prediction in zip(dataset[:10], model.predict(dataset[:10])):
     print(f"{example.source} -> {prediction.text} ({example.target})")
