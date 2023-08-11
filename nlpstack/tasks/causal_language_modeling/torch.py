@@ -125,6 +125,7 @@ class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference], Gene
         inference = CausalLanguageModelingInference(
             pred_token_ids=numpy.zeros((token_ids.size(0), 1), dtype=int),
             pred_mask=numpy.ones((token_ids.size(0), 1), dtype=bool),
+            scores=numpy.zeros((token_ids.size(0), 1), dtype=float),
             metadata=metadata,
         )
         if labels is not None:
@@ -176,5 +177,6 @@ class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference], Gene
 
             inference.pred_token_ids = pred_token_ids.detach().cpu().numpy()
             inference.pred_mask = pred_mask.detach().cpu().numpy()
+            inference.scores = scores.detach().cpu().numpy()
 
         return TorchCausalLanguageModelOutput(inference=inference, loss=loss)

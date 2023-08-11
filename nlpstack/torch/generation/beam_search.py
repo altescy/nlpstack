@@ -5,6 +5,7 @@ import torch
 
 from .constraints import Constraint, MultiConstraint
 from .samplers import DeterministicSampler, Sampler
+from .scorer import BeamScorer, SequenceLogProbabilityScorer
 
 StepStateSelf = TypeVar("StepStateSelf", bound="StepStateInterface")
 
@@ -42,6 +43,7 @@ class BeamSearch:
         beam_size: int = 10,
         sampling_size_per_node: Optional[int] = None,
         sampler: Optional[Sampler] = None,
+        scorer: Optional[BeamScorer] = None,
         constraint: Optional[Union[Constraint, List[Constraint]]] = None,
     ) -> None:
         if isinstance(constraint, list):
@@ -51,6 +53,7 @@ class BeamSearch:
         self._beam_size = beam_size
         self._sampling_size_per_node = sampling_size_per_node or beam_size
         self._sampler = sampler or DeterministicSampler()
+        self._scorer = scorer or SequenceLogProbabilityScorer()
         self._constraint = constraint
         self._eos_index: Optional[int] = None
 
@@ -61,7 +64,8 @@ class BeamSearch:
         **kwargs: Any,
     ) -> None:
         self._eos_index = eos_index
-        self._sampler.setup(*args, eos_inde=eos_index, **kwargs)
+        self._sampler.setup(*args, eos_index=eos_index, **kwargs)
+        self._scorer.setup(*args, eos_index=eos_index, **kwargs)
         if self._constraint is not None:
             self._constraint.setup(*args, eos_index=eos_index, **kwargs)
 
@@ -91,6 +95,7 @@ class BeamSearch:
         sampling_size_per_node = self._sampling_size_per_node
 
         sampler = self._sampler
+        scorer = self._scorer
         constraint = self._constraint
 
         initial_token_ids = token_ids
@@ -99,7 +104,6 @@ class BeamSearch:
         min_initial_length = int(initial_lengths.min().item())
         max_initial_length = int(initial_lengths.max().item())
 
-        cumulated_log_probs = torch.zeros((batch_size, beam_size), device=token_ids.device)
         backpointer = cast(torch.LongTensor, torch.zeros((batch_size, beam_size), dtype=torch.long))
 
         # Shape: (batch_size, beam_size, min_initial_length)
@@ -113,6 +117,7 @@ class BeamSearch:
 
         state = state.update(backpointer)
         sampler_state = sampler.init_state(token_ids, mask)
+        scorer_state = scorer.init_state(token_ids, mask)
         constraint_state = constraint.init_state(token_ids, mask) if constraint else None
 
         predictions: List[torch.Tensor] = list(token_ids.unbind(dim=2))
@@ -152,15 +157,13 @@ class BeamSearch:
             ) = self._sampler.sample_nodes(log_probs, sampling_size_per_node, sampler_state)
 
             # Shape: (batch_size, beam_size * sampling_size_per_node)
-            expanded_cumulated_log_probs = (top_log_probs + cumulated_log_probs.unsqueeze(2)).view(batch_size, -1)
+            top_scores = scorer.score(scorer_state, top_log_probs).view(batch_size, -1)
 
             (
-                beam_log_probs,  # Shape: (batch_size, beam_size)
+                beam_scores,  # Shape: (batch_size, beam_size)
                 beam_indices,  # Shape: (batch_size, beam_size)
                 sampler_state,
-            ) = self._sampler.sample_beams(expanded_cumulated_log_probs, beam_size, sampler_state)
-
-            cumulated_log_probs = beam_log_probs
+            ) = self._sampler.sample_beams(top_scores, beam_size, sampler_state)
 
             # Shape: (batch_size, beam_size)
             last_token_ids = cast(torch.LongTensor, top_next_token_ids.view(batch_size, -1).gather(1, beam_indices))
@@ -173,11 +176,6 @@ class BeamSearch:
                         initial_token_ids[:, timestep : timestep + 1].expand(batch_size, beam_size),
                         last_token_ids,
                     ),
-                )
-                cumulated_log_probs = torch.where(
-                    initial_mask[:, timestep : timestep + 1].expand(batch_size, beam_size),
-                    torch.zeros_like(cumulated_log_probs),
-                    cumulated_log_probs,
                 )
                 beam_indices = cast(
                     torch.LongTensor,
@@ -201,24 +199,30 @@ class BeamSearch:
             backpointers.append(backpointer)
 
             state = state.update(backpointer)
+            scorer_state = scorer.update_state(scorer_state, beam_scores, last_token_ids, backpointer)
 
             if constraint:
                 constraint_state = constraint.update_state(constraint_state, last_token_ids, backpointer)
 
-        # Shape: (batch_size, beam_size)
-        final_scores = cumulated_log_probs
         # Shape: (batch_size, beam_size, max_steps)
-        final_token_ids = torch.cat(list(reversed(self._reconstruct_sequences(predictions, backpointers))), 2)
+        final_token_ids = cast(
+            torch.LongTensor, torch.cat(list(reversed(self._reconstruct_sequences(predictions, backpointers))), 2)
+        )
+        # Shape: (batch_size, beam_size, max_steps)
+        final_mask = cast(
+            torch.BoolTensor,
+            torch.ones_like(final_token_ids, dtype=torch.bool)
+            if self._eos_index is None
+            else (final_token_ids != self._eos_index),
+        )
+        # Shape: (batch_size, beam_size)
+        final_scores = scorer.finalize(scorer_state, final_token_ids, final_mask)
 
         sorted_final_scores, sorted_final_indices = final_scores.sort(dim=1, descending=True)
         sorted_final_token_ids = final_token_ids.gather(
             1, sorted_final_indices.unsqueeze(-1).expand_as(final_token_ids)
         )
-        sorted_final_mask = (
-            torch.ones_like(sorted_final_token_ids, dtype=torch.bool)
-            if self._eos_index is None
-            else (sorted_final_token_ids != self._eos_index)
-        )
+        sorted_final_mask = final_mask.gather(1, sorted_final_indices.unsqueeze(-1).expand_as(final_mask))
 
         return BeamSearchOutput(
             cast(torch.LongTensor, sorted_final_token_ids),

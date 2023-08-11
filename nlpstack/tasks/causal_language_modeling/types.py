@@ -16,6 +16,7 @@ class CausalLanguageModelingExample:
 class CausalLanguageModelingInference:
     pred_token_ids: numpy.ndarray
     pred_mask: numpy.ndarray
+    scores: numpy.ndarray
     gold_token_ids: Optional[numpy.ndarray] = None
     gold_mask: Optional[numpy.ndarray] = None
     perplexity: Optional[float] = None
@@ -26,6 +27,7 @@ class CausalLanguageModelingInference:
 class CausalLanguageModelingPrediction:
     top_texts: Sequence[str]
     top_tokens: Sequence[Sequence[str]]
+    scores: Sequence[float]
     metadata: Optional[Mapping[str, Any]] = None
 
     @property
@@ -35,3 +37,7 @@ class CausalLanguageModelingPrediction:
     @property
     def tokens(self) -> Sequence[str]:
         return self.top_tokens[0]
+
+    @property
+    def score(self) -> float:
+        return self.scores[0]
