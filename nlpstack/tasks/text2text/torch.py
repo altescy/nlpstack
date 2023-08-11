@@ -38,6 +38,9 @@ class TorchText2Text(TorchModel[Text2TextInference]):
         source_namespace: str = "tokens",
         target_namespace: str = "tokens",
     ) -> None:
+        if not decoder.can_take_memory():
+            raise ValueError("Decoder must be able to take memory")
+
         super().__init__()
         self._source_embedder = source_embedder
         self._target_embedder = target_embedder

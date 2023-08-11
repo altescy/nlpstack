@@ -24,6 +24,7 @@ Example:
 
 import dataclasses
 from contextlib import suppress
+from functools import lru_cache
 from os import PathLike
 from typing import Any, Callable, Generic, Literal, Mapping, Optional, Tuple, Type, TypeVar, Union, cast
 
@@ -36,6 +37,11 @@ from nlpstack.torch.modules.transformer import CausalTransformerDecoder, CausalT
 from nlpstack.torch.util import add_positional_features, masked_softmax, weighted_sum
 
 Seq2SeqDecoderState = TypeVar("Seq2SeqDecoderState", bound=StepStateInterface)
+
+
+@lru_cache
+def _get_backpointer_offsets(batch_size: int, beam_size: int, device: torch.device) -> torch.LongTensor:
+    return cast(torch.LongTensor, beam_size * torch.arange(batch_size, device=device).unsqueeze(1))
 
 
 class Seq2SeqDecoder(torch.nn.Module, Generic[Seq2SeqDecoderState]):
@@ -134,10 +140,12 @@ class TransformerSeq2SeqDecoder(Seq2SeqDecoder["TransformerSeq2SeqDecoder.State"
 
             # Shape: (batch_size * beam_size)
             flattened_backpointer = (
-                backpointer + (beam_size * torch.arange(batch_size, device=backpointer.device).unsqueeze(1))
+                backpointer + _get_backpointer_offsets(batch_size, beam_size, backpointer.device)
             ).view(-1)
             # Shape: (num_layers, batch_size * beam_size, sequence_length, embedding_dim)
-            return TransformerSeq2SeqDecoder.State(self.cache[:, flattened_backpointer, :, :])
+            cache = self.cache[:, flattened_backpointer, :, :]
+
+            return TransformerSeq2SeqDecoder.State(cache)
 
     def __init__(
         self,
@@ -271,7 +279,7 @@ class LstmSeq2SeqDecoder(Seq2SeqDecoder["LstmSeq2SeqDecoder.State"]):
 
             # Shape: (batch_size * beam_size,)
             flattened_backpointer = (
-                backpointer + (beam_size * torch.arange(batch_size, device=backpointer.device).unsqueeze(1))
+                backpointer + _get_backpointer_offsets(batch_size, beam_size, self.hidden.device)
             ).view(-1)
             # Shape: (num_layers, batch_size * beam_size, hidden_dim)
             hidden = self.hidden[:, flattened_backpointer, :]
