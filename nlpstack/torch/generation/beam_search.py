@@ -3,7 +3,7 @@ from typing import Any, Callable, List, NamedTuple, Optional, Protocol, Tuple, T
 
 import torch
 
-from .constraints import Constraint, LengthConstraint, MultiConstraint
+from .constraints import Constraint, MultiConstraint
 from .samplers import DeterministicSampler, Sampler
 from .scorer import BeamScorer, SequenceLogProbabilityScorer
 
@@ -76,6 +76,10 @@ class BeamSearch:
         mask: torch.BoolTensor,
         state: StepState,
         step: Callable[[torch.LongTensor, StepState], Tuple[torch.Tensor, StepState]],
+        *,
+        beam_size: Optional[int] = None,
+        max_steps: Optional[int] = None,
+        **kwargs: Any,
     ) -> BeamSearchOutput:
         """
         Args:
@@ -90,9 +94,10 @@ class BeamSearch:
             Output of beam search with attributes `token_ids` and `scores`.
         """
 
-        beam_size = self._beam_size
+        beam_size = self._beam_size if beam_size is None else beam_size
         batch_size = token_ids.size(0)
         sampling_size_per_node = self._sampling_size_per_node
+        max_steps = self._max_steps if max_steps is None else max_steps
 
         sampler = self._sampler
         scorer = self._scorer
@@ -129,7 +134,7 @@ class BeamSearch:
             assert self._eos_index is not None
             return cast(torch.BoolTensor, (torch.arange(vocab_size) == self._eos_index))
 
-        for timestep in range(min_initial_length, self._max_steps):
+        for timestep in range(min_initial_length, max_steps):
             if self._eos_index is not None and (last_token_ids == self._eos_index).all():
                 break
 
@@ -154,7 +159,7 @@ class BeamSearch:
                 top_log_probs,  # Shape: (batch_size, beam_size, sampling_size_per_node)
                 top_next_token_ids,  # Shape: (batch_size, beam_size, sampling_size_per_node)
                 sampler_state,
-            ) = self._sampler.sample_nodes(log_probs, sampling_size_per_node, sampler_state)
+            ) = self._sampler.sample_nodes(log_probs, sampling_size_per_node, sampler_state, **kwargs)
 
             # Shape: (batch_size, beam_size * sampling_size_per_node)
             top_scores = scorer.score(scorer_state, top_log_probs).view(batch_size, -1)
@@ -163,7 +168,7 @@ class BeamSearch:
                 beam_scores,  # Shape: (batch_size, beam_size)
                 beam_indices,  # Shape: (batch_size, beam_size)
                 sampler_state,
-            ) = self._sampler.sample_beams(top_scores, beam_size, sampler_state)
+            ) = self._sampler.sample_beams(top_scores, beam_size, sampler_state, **kwargs)
 
             # Shape: (batch_size, beam_size)
             last_token_ids = cast(torch.LongTensor, top_next_token_ids.view(batch_size, -1).gather(1, beam_indices))

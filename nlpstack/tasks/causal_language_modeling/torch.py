@@ -5,7 +5,7 @@ import numpy
 import torch
 import torch.nn.functional as F
 
-from nlpstack.torch.generation import BeamSearch, DeterministicSampler
+from nlpstack.torch.generation import BeamSearch
 from nlpstack.torch.model import TorchModel
 from nlpstack.torch.modules.heads import LanguageModelingHead
 from nlpstack.torch.modules.seq2seq_decoders import Seq2SeqDecoder, Seq2SeqDecoderState
@@ -32,9 +32,6 @@ class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference], Gene
         ignore_padding_loss: bool = False,
         beam_search: Optional[BeamSearch] = None,
         token_namespace: str = "tokens",
-        max_new_tokens: int = 100,
-        temperature: float = 1.0,
-        top_k: Optional[int] = None,
     ) -> None:
         super().__init__()
         self._embedder = embedder
@@ -42,12 +39,9 @@ class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference], Gene
         self._lmhead = lmhead
         self._dropout = torch.nn.Dropout(dropout) if dropout is not None else None
         self._ignore_padding_loss = ignore_padding_loss
-        self._beam_search = beam_search or BeamSearch(sampler=DeterministicSampler())
+        self._beam_search = beam_search or BeamSearch()
         self._loss = torch.nn.CrossEntropyLoss(reduction="sum")
         self._token_namespace = token_namespace
-        self._max_new_tokens = max_new_tokens
-        self._temperature = temperature
-        self._top_k = top_k
         self._eos_index: Optional[int] = None
 
     def setup(
@@ -106,16 +100,9 @@ class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference], Gene
         labels: Optional[Mapping[str, Mapping[str, torch.Tensor]]] = None,
         metadata: Optional[Sequence[Any]] = None,
         *,
-        max_new_tokens: Optional[int] = None,
-        temperature: Optional[float] = None,
-        top_k: Optional[int] = None,
         return_only_generated: bool = False,
         **kwargs: Any,
     ) -> TorchCausalLanguageModelOutput:
-        max_new_tokens = max_new_tokens if max_new_tokens is not None else self._max_new_tokens
-        temperature = temperature if temperature is not None else self._temperature
-        top_k = top_k if top_k is not None else self._top_k
-
         token_ids = get_token_ids_from_text(text)
         mask = get_mask_from_text(text)
 
@@ -170,7 +157,7 @@ class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference], Gene
                 return log_probs, state
 
             state = self._decoder.get_initial_state(embeddings, inputs_mask=mask)
-            pred_token_ids, pred_mask, scores = self._beam_search.search(token_ids, mask, state, step)
+            pred_token_ids, pred_mask, scores = self._beam_search.search(token_ids, mask, state, step, **kwargs)
 
             if return_only_generated:
                 pred_token_ids, pred_mask = self._get_generated_sequences(token_ids, pred_token_ids, mask, pred_mask)

@@ -17,6 +17,7 @@ class Text2TextExample:
 class Text2TextInference:
     pred_token_ids: numpy.ndarray
     pred_mask: numpy.ndarray
+    scores: numpy.ndarray
     gold_token_ids: Optional[numpy.ndarray] = None
     gold_mask: Optional[numpy.ndarray] = None
     perplexity: Optional[float] = None
@@ -27,6 +28,7 @@ class Text2TextInference:
 class Text2TextPrediction:
     top_texts: Sequence[str]
     top_tokens: Sequence[Sequence[str]]
+    scores: Sequence[float]
 
     @property
     def text(self) -> str:
@@ -35,3 +37,7 @@ class Text2TextPrediction:
     @property
     def tokens(self) -> Sequence[str]:
         return self.top_tokens[0]
+
+    @property
+    def score(self) -> float:
+        return self.scores[0]

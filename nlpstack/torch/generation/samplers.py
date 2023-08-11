@@ -1,4 +1,4 @@
-from typing import Any, Generic, Tuple, TypeVar, cast
+from typing import Any, Generic, Optional, Tuple, TypeVar, cast
 
 import torch
 
@@ -24,6 +24,7 @@ class Sampler(Generic[SamplerState]):
         log_probs: torch.Tensor,
         size: int,
         state: SamplerState,
+        **kwargs: Any,
     ) -> Tuple[torch.Tensor, torch.LongTensor, SamplerState]:
         """
         Args:
@@ -43,6 +44,7 @@ class Sampler(Generic[SamplerState]):
         log_probs: torch.Tensor,
         size: int,
         state: SamplerState,
+        **kwargs: Any,
     ) -> Tuple[torch.Tensor, torch.LongTensor, SamplerState]:
         size = min(size, log_probs.size(-1))
         selected_log_probs, selected_indices = torch.topk(log_probs, size, dim=-1)
@@ -58,6 +60,7 @@ class DeterministicSampler(Sampler[None]):
         log_probs: torch.Tensor,
         size: int,
         state: None,
+        **kwargs: Any,
     ) -> Tuple[torch.Tensor, torch.LongTensor, None]:
         size = min(size, log_probs.size(-1))
         selected_log_probs, selected_indices = torch.topk(log_probs, size, dim=-1)
@@ -81,19 +84,26 @@ class MultinomialSampler(Sampler[None]):
         log_probs: torch.Tensor,
         size: int,
         state: None,
+        *,
+        temperature: Optional[float] = None,
+        with_replacement: Optional[bool] = None,
+        **kwargs: Any,
     ) -> Tuple[torch.Tensor, torch.LongTensor, None]:
+        temperature = self._temperature if temperature is None else temperature
+        with_replacement = self._with_replacement if with_replacement is None else with_replacement
+
         *dims, vocab_size = log_probs.size()
 
         flattened_log_probs = log_probs.view(-1, vocab_size)
 
         if self._temperature != 1.0:
-            _probabilities = (flattened_log_probs / self._temperature).softmax(1)
+            _probabilities = (flattened_log_probs / temperature).softmax(1)
         else:
             _probabilities = flattened_log_probs.exp()
 
         selected_indices = cast(
             torch.LongTensor,
-            torch.multinomial(_probabilities, size, replacement=self._with_replacement),
+            torch.multinomial(_probabilities, size, replacement=with_replacement),
         )
         selected_log_probs = flattened_log_probs.gather(1, selected_indices)
 

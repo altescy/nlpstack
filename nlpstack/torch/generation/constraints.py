@@ -34,6 +34,7 @@ class Constraint(Generic[ConstraintState]):
         self,
         state: ConstraintState,
         log_probs: torch.Tensor,
+        **kwargs: Any,
     ) -> torch.Tensor:
         """
         Apply the constraint to the log probabilities.
@@ -89,6 +90,7 @@ class MultiConstraint(Constraint[Sequence[Any]]):
         self,
         state: Sequence[Any],
         log_probs: torch.Tensor,
+        **kwargs: Any,
     ) -> torch.Tensor:
         for constraint, constraint_state in zip(self.constraints, state):
             log_probs = constraint.apply(constraint_state, log_probs)
@@ -152,6 +154,7 @@ class NoRepeatNgramConstraint(Constraint["NoRepeatNgramConstraint.State"]):
         self,
         state: State,
         log_probs: torch.Tensor,
+        **kwargs: Any,
     ) -> torch.Tensor:
         batch_size, beam_size, vocab_size = log_probs.size()
         for batch_index in range(batch_size):
@@ -210,6 +213,7 @@ class StopTokenConstraint(Constraint[None]):
         self,
         state: None,
         log_probs: torch.Tensor,
+        **kwargs: Any,
     ) -> torch.Tensor:
         if self._stop_token_ids:
             log_probs[:, :, self._stop_token_ids] = float("-inf")
@@ -241,22 +245,27 @@ class LengthConstraint(Constraint["LengthConstraint.State"]):
                 sequences in the beam.
         """
 
+        given_lengths: torch.LongTensor
         current_lengths: torch.LongTensor
 
     def __init__(
         self,
         min_length: Optional[int] = None,
         max_length: Optional[int] = None,
+        max_new_tokens: Optional[int] = None,
     ) -> None:
         if min_length is not None and min_length < 0:
             raise ValueError(f"min_length ({min_length}) must be >= 0.")
         if max_length is not None and max_length < 0:
             raise ValueError(f"max_length ({max_length}) must be >= 0.")
+        if max_new_tokens is not None and max_new_tokens < 0:
+            raise ValueError(f"max_new_tokens ({max_new_tokens}) must be >= 0.")
         if min_length is not None and max_length is not None and min_length > max_length:
             raise ValueError(f"min_length ({min_length}) must be <= max_length ({max_length}).")
 
         self._min_length = min_length
         self._max_length = max_length
+        self._max_new_tokens = max_new_tokens
         self._eos_index: Optional[int] = None
 
     def setup(
@@ -274,6 +283,7 @@ class LengthConstraint(Constraint["LengthConstraint.State"]):
 
         batch_size, beam_size, _ = token_ids.size()
         state = LengthConstraint.State(
+            given_lengths=cast(torch.LongTensor, mask.sum(dim=2, dtype=torch.long)),
             current_lengths=cast(torch.LongTensor, mask.sum(dim=2, dtype=torch.long)),
         )
         return state
@@ -282,19 +292,34 @@ class LengthConstraint(Constraint["LengthConstraint.State"]):
         self,
         state: "LengthConstraint.State",
         log_probs: torch.Tensor,
+        *,
+        min_length: Optional[int] = None,
+        max_length: Optional[int] = None,
+        max_new_tokens: Optional[int] = None,
+        **kwargs: Any,
     ) -> torch.Tensor:
         assert self._eos_index is not None, "LengthConstraint requires an EOS index to be set."
 
+        min_length = self._min_length if min_length is None else min_length
+        max_length = self._max_length if max_length is None else max_length
+        max_new_tokens = self._max_new_tokens if max_new_tokens is None else max_new_tokens
+
+        # Shape: (batch_size, beam_size, 1)
+        given_lengths = state.given_lengths.unsqueeze(2).expand_as(log_probs)
         # Shape: (batch_size, beam_size, 1)
         current_lengths = state.current_lengths.unsqueeze(2).expand_as(log_probs)
         # Shape: (1, vocab_size)
         eos_mask = (torch.arange(log_probs.size(-1), device=log_probs.device) == self._eos_index).unsqueeze(0)
 
-        if self._min_length is not None:
-            min_length_mask = current_lengths < self._min_length
+        if max_new_tokens is not None:
+            max_new_tokens_mask = current_lengths >= given_lengths + max_new_tokens
+            log_probs = log_probs.masked_fill(max_new_tokens_mask * eos_mask, 0.0)
+            log_probs = log_probs.masked_fill(max_new_tokens_mask * ~eos_mask, float("-inf"))
+        if min_length is not None:
+            min_length_mask = current_lengths < min_length
             log_probs = log_probs.masked_fill(min_length_mask * eos_mask, float("-inf"))
         if self._max_length is not None:
-            max_length_mask = current_lengths >= self._max_length
+            max_length_mask = current_lengths >= max_length
             log_probs = log_probs.masked_fill(max_length_mask * eos_mask, 0.0)
             log_probs = log_probs.masked_fill(max_length_mask * ~eos_mask, float("-inf"))
 
