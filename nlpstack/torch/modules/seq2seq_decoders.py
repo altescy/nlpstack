@@ -372,10 +372,28 @@ class PretrainedTransformerSeq2SeqDecoder(Seq2SeqDecoder["PretrainedTransformerS
 
     @dataclasses.dataclass
     class State:
-        past_key_values: Optional[Tuple[Tuple[torch.Tensor]]] = None
+        past_key_values: Optional[Tuple[Tuple[torch.Tensor, ...], ...]] = None
 
         def update(self, backpointer: torch.LongTensor) -> "PretrainedTransformerSeq2SeqDecoder.State":
-            raise NotImplementedError
+            if self.past_key_values is None:
+                return self
+
+            batch_size, beam_size = backpointer.size()
+
+            # Shape: (batch_size * beam_size,)
+            flattened_backpointer = (
+                backpointer + _get_backpointer_offsets(batch_size, beam_size, backpointer.device)
+            ).view(-1)
+
+            def expand_tensor(tensor: torch.Tensor) -> torch.Tensor:
+                if tensor.size(0) == batch_size:
+                    tensor = tensor.repeat_interleave(beam_size, dim=0)
+                assert tensor.size(0) == batch_size * beam_size
+                return tensor[flattened_backpointer]
+
+            past_key_values = tuple(tuple(expand_tensor(cache) for cache in layer) for layer in self.past_key_values)
+
+            return PretrainedTransformerSeq2SeqDecoder.State(past_key_values)
 
     def __init__(
         self,
