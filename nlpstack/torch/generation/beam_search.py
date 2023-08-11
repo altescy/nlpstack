@@ -3,7 +3,7 @@ from typing import Any, Callable, List, NamedTuple, Optional, Protocol, Tuple, T
 
 import torch
 
-from .constraints import Constraint, MultiConstraint
+from .constraints import Constraint, LengthConstraint, MultiConstraint
 from .samplers import DeterministicSampler, Sampler
 from .scorer import BeamScorer, SequenceLogProbabilityScorer
 

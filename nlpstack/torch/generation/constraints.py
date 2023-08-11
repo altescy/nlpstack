@@ -1,6 +1,6 @@
 import dataclasses
 from collections import defaultdict
-from typing import Any, Dict, Generic, List, Sequence, Set, Tuple, TypeVar
+from typing import Any, Dict, Generic, List, Optional, Sequence, Set, Tuple, TypeVar, cast
 
 import torch
 
@@ -221,4 +221,91 @@ class StopTokenConstraint(Constraint[None]):
         last_token_ids: torch.LongTensor,
         last_backpointer: torch.LongTensor,
     ) -> None:
+        return state
+
+
+class LengthConstraint(Constraint["LengthConstraint.State"]):
+    """
+    A constraint that enforces a minimum and maximum length on the sequences produced by beam search.
+
+    Args:
+        min_length: The minimum length of the sequences produced by beam search.
+        max_length: The maximum length of the sequences produced by beam search.
+    """
+
+    @dataclasses.dataclass
+    class State:
+        """
+        Parameters:
+            current_lengths: Tensor of shape `(batch_size, beam_size)` representing the current lengths of the
+                sequences in the beam.
+        """
+
+        current_lengths: torch.LongTensor
+
+    def __init__(
+        self,
+        min_length: Optional[int] = None,
+        max_length: Optional[int] = None,
+    ) -> None:
+        if min_length is not None and min_length < 0:
+            raise ValueError(f"min_length ({min_length}) must be >= 0.")
+        if max_length is not None and max_length < 0:
+            raise ValueError(f"max_length ({max_length}) must be >= 0.")
+        if min_length is not None and max_length is not None and min_length > max_length:
+            raise ValueError(f"min_length ({min_length}) must be <= max_length ({max_length}).")
+
+        self._min_length = min_length
+        self._max_length = max_length
+        self._eos_index: Optional[int] = None
+
+    def setup(
+        self,
+        *args: Any,
+        eos_index: Optional[int] = None,
+        **kwargs: Any,
+    ) -> None:
+        if eos_index is None:
+            raise ValueError("LengthConstraint requires an EOS index to be set.")
+        self._eos_index = eos_index
+
+    def init_state(self, token_ids: torch.LongTensor, mask: torch.BoolTensor) -> State:
+        assert self._eos_index is not None, "LengthConstraint requires an EOS index to be set."
+
+        batch_size, beam_size, _ = token_ids.size()
+        state = LengthConstraint.State(
+            current_lengths=cast(torch.LongTensor, mask.sum(dim=2, dtype=torch.long)),
+        )
+        return state
+
+    def apply(
+        self,
+        state: "LengthConstraint.State",
+        log_probs: torch.Tensor,
+    ) -> torch.Tensor:
+        assert self._eos_index is not None, "LengthConstraint requires an EOS index to be set."
+
+        # Shape: (batch_size, beam_size, 1)
+        current_lengths = state.current_lengths.unsqueeze(2).expand_as(log_probs)
+        # Shape: (1, vocab_size)
+        eos_mask = (torch.arange(log_probs.size(-1), device=log_probs.device) == self._eos_index).unsqueeze(0)
+
+        if self._min_length is not None:
+            min_length_mask = current_lengths < self._min_length
+            log_probs = log_probs.masked_fill(min_length_mask * eos_mask, float("-inf"))
+        if self._max_length is not None:
+            max_length_mask = current_lengths >= self._max_length
+            log_probs = log_probs.masked_fill(max_length_mask * eos_mask, 0.0)
+            log_probs = log_probs.masked_fill(max_length_mask * ~eos_mask, float("-inf"))
+
+        return log_probs
+
+    def update_state(
+        self,
+        state: "LengthConstraint.State",
+        last_token_ids: torch.LongTensor,
+        last_backpointer: torch.LongTensor,
+    ) -> "LengthConstraint.State":
+        current_lengths = state.current_lengths.gather(dim=1, index=last_backpointer)
+        state.current_lengths = cast(torch.LongTensor, current_lengths + 1)
         return state
