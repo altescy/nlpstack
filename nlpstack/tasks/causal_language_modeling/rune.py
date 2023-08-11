@@ -6,6 +6,7 @@ from nlpstack.data import DataLoader, Vocabulary
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 from nlpstack.rune import RuneForTorch, SetupMode
+from nlpstack.torch.generation import BeamSearch
 from nlpstack.torch.modules.seq2seq_decoders import LstmSeq2SeqDecoder
 from nlpstack.torch.modules.token_embedders import Embedding
 from nlpstack.torch.training import TorchTrainer
@@ -43,6 +44,7 @@ class CausalLanguageModel(
         datamodule: Optional[CausalLanguageModelingDataModule] = None,
         # model configuration
         dropout: Optional[float] = None,
+        beam_search: Optional[BeamSearch] = None,
         model: Optional[TorchCausalLanguageModel] = None,
         # training configuration
         max_epochs: int = 4,
@@ -114,10 +116,11 @@ class CausalLanguageModel(
                 embedder=Embedding(128),
                 decoder=LstmSeq2SeqDecoder(128, 128, 2),
                 dropout=dropout,
+                beam_search=beam_search,
             )
         else:
-            if dropout is not None:
-                warnings.warn("Ignoring dropout because model is given.", UserWarning)
+            if (dropout, beam_search) != (None, None):
+                warnings.warn("Ignoring dropout and beam_search because model is given.", UserWarning)
 
         if trainer is None:
             trainer = TorchTrainer(
