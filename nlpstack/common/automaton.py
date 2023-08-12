@@ -199,8 +199,9 @@ class NFA(Generic[Symbol]):
         Create an NFA that accepts the closure of the language of an NFA.
         """
         start = NFAState[Symbol]()
-        start.epsilon_transitions.add(self.start)
         end = NFAState[Symbol](is_final=True)
+        start.epsilon_transitions.add(end)
+        start.epsilon_transitions.add(self.start)
         self.end.epsilon_transitions.add(self.start)
         self.end.epsilon_transitions.add(end)
         self.end.is_final = False
