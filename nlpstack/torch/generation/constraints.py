@@ -396,9 +396,9 @@ class JsonConstraint(Constraint["JsonConstraint.State"]):
     - Supported types are: "object", "array", "string", "number", "boolean", "null"
     - We assume that `true`, `false`, and `null` tokens are contained in the vocabulary.
     - Numbers are treated as a single token. So the model cannot generate numbers that are not
-        already in the vocabulary.
+      already in the vocabulary.
     - The schema must be deterministic. This means that the schema must not contain any "anyOf",
-        "oneOf", or "not" keywords.
+      "oneOf", or "not" keywords.
     - The schema must not contain any default values or constraints, like "default", "pattern", etc.
 
     Args:
