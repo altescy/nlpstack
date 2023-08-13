@@ -4,7 +4,7 @@ from typing import Any, Dict, Generic, List, Literal, Mapping, NamedTuple, Optio
 
 import torch
 
-from nlpstack.common import NFA, DFAState
+from nlpstack.common import DFA, NFA, DFAState
 from nlpstack.data import Tokenizer, Vocabulary
 
 ConstraintState = TypeVar("ConstraintState")
@@ -379,6 +379,156 @@ class LengthConstraint(Constraint["LengthConstraint.State"]):
         current_lengths = state.current_lengths.gather(dim=1, index=last_backpointer)
         state.current_lengths = cast(torch.LongTensor, current_lengths + 1)
         return state
+
+
+class CandidatePhrasesConstraint(Constraint["CandidatePhrasesConstraint.State"]):
+    """
+    A constraint that enforces that the generated sequences match exactly a set of candidate
+    phrases. This is useful for tasks like classification where the model is required to generate
+    a sequence that matches a set of labels.
+
+    Args:
+        phrases: A list of phrases to match.
+        namespace: The namespace of the generated tokens.
+        tokenizer: A tokenizer to use for the generated JSON string. The tokenizer must be
+            given at `__init__` or `setup` time.
+    """
+
+    @dataclasses.dataclass
+    class State:
+        dfastate: List[List[DFAState[int]]]
+        timestep: int
+        timestep_to_start: torch.LongTensor
+
+    def __init__(
+        self,
+        phrases: Sequence[str],
+        namespace: str = "tokens",
+        tokenizer: Optional[Tokenizer] = None,
+    ) -> None:
+        self._phrases = phrases
+        self._namespace = namespace
+        self._tokenizer = tokenizer
+        self._dfa: Optional[DFA[int]] = None
+
+    def setup(
+        self,
+        *args: Any,
+        vocab: Vocabulary,
+        tokenizer: Optional[Tokenizer] = None,
+        target_tokenizer: Optional[Tokenizer] = None,
+        eos_index: Optional[int] = None,
+        **kwargs: Any,
+    ) -> None:
+        tokenizer = target_tokenizer or tokenizer or self._tokenizer
+
+        if tokenizer is None:
+            raise ValueError("Tokenizer must be provided to JsonConstraint")
+
+        self._tokenizer = tokenizer
+        self._eos_index = eos_index
+        self._dfa = self._nfa_from_phrases(self._phrases, tokenizer, vocab).compile()
+
+    def init_state(
+        self,
+        token_ids: torch.LongTensor,
+        mask: torch.BoolTensor,
+        rest_token_ids: torch.LongTensor,
+        rest_mask: torch.BoolTensor,
+    ) -> "CandidatePhrasesConstraint.State":
+        assert self._dfa is not None, "CandidatePhrasesConstraint.setup() must be called before init_state()"
+
+        batch_size, beam_size, sequence_length = token_ids.size()
+        timestep_to_start = cast(torch.LongTensor, mask.long().sum(-1) + rest_mask.long().sum(-1))
+        return CandidatePhrasesConstraint.State(
+            dfastate=[[self._dfa.state for _ in range(beam_size)] for _ in range(batch_size)],
+            timestep=sequence_length,
+            timestep_to_start=timestep_to_start,
+        )
+
+    def apply(
+        self,
+        state: "CandidatePhrasesConstraint.State",
+        log_probs: torch.Tensor,
+        **kwargs: Any,
+    ) -> torch.Tensor:
+        batch_size, beam_size, vocab_size = log_probs.size()
+
+        all_token_ids = set(range(vocab_size))
+        # Shape: (vocab_size,)
+        eos_mask = (
+            (torch.arange(vocab_size, device=log_probs.device) == self._eos_index)
+            if self._eos_index is not None
+            else None
+        )
+        for batch_index in range(batch_size):
+            for beam_index in range(beam_size):
+                dfastate = state.dfastate[batch_index][beam_index]
+                timestep_to_start = int(state.timestep_to_start[batch_index, beam_index])
+                if state.timestep < timestep_to_start:
+                    continue
+                if dfastate.is_final:
+                    if eos_mask is not None:
+                        log_probs[batch_index, beam_index, eos_mask] = 0.0
+                        log_probs[batch_index, beam_index, ~eos_mask] = -float("inf")
+                else:
+                    candidates = dfastate.acceptable_symbols()
+                    log_probs[batch_index, beam_index, list(all_token_ids - candidates)] = -float("inf")
+
+        return log_probs
+
+    def update_state(
+        self,
+        state: "CandidatePhrasesConstraint.State",
+        last_token_ids: torch.LongTensor,
+        last_backpointer: torch.LongTensor,
+    ) -> "CandidatePhrasesConstraint.State":
+        assert self._dfa is not None, "CandidatePhrasesConstraint.setup() must be called before update_state()"
+
+        batch_size, beam_size = last_backpointer.size()
+
+        dfastates = state.dfastate
+
+        # align constraint state
+        for batch_index in range(batch_size):
+            indices = last_backpointer[batch_index].tolist()
+            dfastates[batch_index] = [state.dfastate[batch_index][index] for index in indices]
+
+        for batch_index in range(batch_size):
+            for beam_index in range(beam_size):
+                dfastate = state.dfastate[batch_index][beam_index]
+                if dfastate.is_final:
+                    continue
+                timestep_to_start = int(state.timestep_to_start[batch_index, beam_index].item())
+                if state.timestep < timestep_to_start:
+                    continue
+                token_id = int(last_token_ids[batch_index, beam_index].item())
+                dfastate_or_none = self._dfa.step(dfastate, token_id)
+                if dfastate_or_none is None:
+                    raise ValueError(f"Invalid token {token_id} at timestep {state.timestep}")
+                dfastates[batch_index][beam_index] = dfastate_or_none
+
+        return CandidatePhrasesConstraint.State(
+            dfastate=dfastates,
+            timestep=state.timestep + 1,
+            timestep_to_start=state.timestep_to_start,
+        )
+
+    def _nfa_from_phrases(
+        self,
+        phrases: Sequence[str],
+        tokenizer: Tokenizer,
+        vocab: Vocabulary,
+    ) -> NFA[int]:
+        output = NFA[int].from_epsilon()
+        for phrase in phrases:
+            tokens = tokenizer.tokenize(phrase)
+            token_ids = [vocab.get_index_by_token(self._namespace, token.surface) for token in tokens]
+            nfa = NFA[int].from_epsilon()
+            for token_id in token_ids:
+                nfa += NFA.from_symbol(token_id)
+            output |= nfa
+        return output
 
 
 class JsonConstraint(Constraint["JsonConstraint.State"]):
