@@ -37,6 +37,10 @@ class CausalLanguageModelingDataModule(
     def vocab(self) -> Vocabulary:
         return self._vocab
 
+    @property
+    def tokenizer(self) -> Tokenizer:
+        return self._tokenizer
+
     def setup(
         self,
         *args: Any,

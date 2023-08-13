@@ -72,6 +72,8 @@ class TorchText2Text(TorchModel[Text2TextInference]):
             *args,
             datamodule=datamodule,
             vocab=datamodule.vocab,
+            source_tokenizer=datamodule.source_tokenizer,
+            target_tokenizer=datamodule.target_tokenizer,
             eos_index=self._target_eos_index,
             **kwargs,
         )

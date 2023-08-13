@@ -1,6 +1,7 @@
 from .beam_search import BeamSearch  # noqa: F401
 from .constraints import (  # noqa: F401
     Constraint,
+    JsonConstraint,
     LengthConstraint,
     MultiConstraint,
     NoRepeatNgramConstraint,

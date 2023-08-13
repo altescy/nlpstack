@@ -1,10 +1,11 @@
 import dataclasses
 from collections import defaultdict
-from typing import Any, Dict, Generic, List, Optional, Sequence, Set, Tuple, TypeVar, cast
+from typing import Any, Dict, Generic, List, Literal, Mapping, NamedTuple, Optional, Sequence, Set, Tuple, TypeVar, cast
 
 import torch
 
-from nlpstack.data import Vocabulary
+from nlpstack.common import NFA, DFAState
+from nlpstack.data import Tokenizer, Vocabulary
 
 ConstraintState = TypeVar("ConstraintState")
 
@@ -18,13 +19,25 @@ class Constraint(Generic[ConstraintState]):
     def setup(self, *args: Any, **kwargs: Any) -> None:
         pass
 
-    def init_state(self, token_ids: torch.LongTensor, mask: torch.BoolTensor) -> ConstraintState:
+    def init_state(
+        self,
+        token_ids: torch.LongTensor,
+        mask: torch.BoolTensor,
+        rest_token_ids: torch.LongTensor,
+        rest_mask: torch.BoolTensor,
+    ) -> ConstraintState:
         """
         Return the initial state of the constraint.
 
         Args:
-            token_ids: Tensor of shape `(batch_size, beam_size, given_length)`.
-            mask: Tensor of shape `(batch_size, beam_size, given_length)`.
+            token_ids: Tensor of shape `(batch_size, beam_size, given_length)` representing
+                the token IDs of the given sequence truncated to the minimum length in the batch.
+            mask: Tensor of shape `(batch_size, beam_size, given_length)` representing
+                the mask of the given sequence truncated to the minimum length in the batch.
+            rest_token_ids: Tensor of shape `(batch_size, beam_size, rest_length)` representing
+                the token IDs of the rest of the given sequence.
+            rest_mask: Tensor of shape `(batch_size, beam_size, rest_length)` representing
+                the mask of the rest of the given sequence.
         Returns:
             state: Initial state of the constraint.
         """
@@ -83,8 +96,22 @@ class MultiConstraint(Constraint[Sequence[Any]]):
         for constraint in self.constraints:
             constraint.setup(*args, **kwargs)
 
-    def init_state(self, token_ids: torch.LongTensor, mask: torch.BoolTensor) -> Sequence[Any]:
-        return tuple(constraint.init_state(token_ids, mask) for constraint in self.constraints)
+    def init_state(
+        self,
+        token_ids: torch.LongTensor,
+        mask: torch.BoolTensor,
+        rest_token_ids: torch.LongTensor,
+        rest_mask: torch.BoolTensor,
+    ) -> Sequence[Any]:
+        return tuple(
+            constraint.init_state(
+                token_ids,
+                mask,
+                rest_token_ids,
+                rest_mask,
+            )
+            for constraint in self.constraints
+        )
 
     def apply(
         self,
@@ -134,7 +161,13 @@ class NoRepeatNgramConstraint(Constraint["NoRepeatNgramConstraint.State"]):
             raise ValueError(f"ngram_size must be >= 1, got {ngram_size}")
         self._ngram_size = ngram_size
 
-    def init_state(self, token_ids: torch.LongTensor, mask: torch.BoolTensor) -> State:
+    def init_state(
+        self,
+        token_ids: torch.LongTensor,
+        mask: torch.BoolTensor,
+        rest_token_ids: torch.LongTensor,
+        rest_mask: torch.BoolTensor,
+    ) -> State:
         batch_size, beam_size, _ = token_ids.size()
         state = NoRepeatNgramConstraint.State(
             seen_ngrams=[[defaultdict(set) for _ in range(beam_size)] for _ in range(batch_size)],
@@ -206,7 +239,13 @@ class StopTokenConstraint(Constraint[None]):
     def setup(self, *args: Any, vocab: Vocabulary, **kwargs: Any) -> None:
         self._stop_token_ids = [vocab.get_index_by_token(self._namespace, token) for token in self._stop_tokens]
 
-    def init_state(self, token_ids: torch.LongTensor, mask: torch.BoolTensor) -> None:
+    def init_state(
+        self,
+        token_ids: torch.LongTensor,
+        mask: torch.BoolTensor,
+        rest_token_ids: torch.LongTensor,
+        rest_mask: torch.BoolTensor,
+    ) -> None:
         return None
 
     def apply(
@@ -278,7 +317,13 @@ class LengthConstraint(Constraint["LengthConstraint.State"]):
             raise ValueError("LengthConstraint requires an EOS index to be set.")
         self._eos_index = eos_index
 
-    def init_state(self, token_ids: torch.LongTensor, mask: torch.BoolTensor) -> State:
+    def init_state(
+        self,
+        token_ids: torch.LongTensor,
+        mask: torch.BoolTensor,
+        rest_token_ids: torch.LongTensor,
+        rest_mask: torch.BoolTensor,
+    ) -> State:
         assert self._eos_index is not None, "LengthConstraint requires an EOS index to be set."
 
         batch_size, beam_size, _ = token_ids.size()
@@ -334,3 +379,417 @@ class LengthConstraint(Constraint["LengthConstraint.State"]):
         current_lengths = state.current_lengths.gather(dim=1, index=last_backpointer)
         state.current_lengths = cast(torch.LongTensor, current_lengths + 1)
         return state
+
+
+class JsonConstraint(Constraint["JsonConstraint.State"]):
+    """
+    A constraint that ensures that the generated output is a valid JSON string that matches a given
+    JSON schema. This constraint is implemented as a finite state machine that reads the output
+    string one character at a time. The state machine is constructed from the given JSON schema.
+
+    For causal language modeling, this constraint does not apply to the given tokens, but only to
+    the tokens that are generated by the model. So you can feed any prompt to the model, and the
+    constraint will only be applied after the prompt.
+
+    Currently, there are some limitations to the schema and the generated JSON string:
+
+    - Supported types are: "object", "array", "string", "number", "boolean", "null"
+    - We assume that `true`, `false`, and `null` tokens are contained in the vocabulary.
+    - Numbers are treated as a single token. So the model cannot generate numbers that are not
+        already in the vocabulary.
+    - The schema must be deterministic. This means that the schema must not contain any "anyOf",
+        "oneOf", or "not" keywords.
+    - The schema must not contain any default values or constraints, like "default", "pattern", etc.
+
+    Args:
+        jsonschema: A JSON schema that the output must match.
+        namespace: A namespace of the vocabulary to use for the generated JSON string.
+        tokenizer: A tokenizer to use for the generated JSON string. The tokenizer must be
+            given at `__init__` or `setup` time.
+    """
+
+    class JsonSymbol(NamedTuple):
+        name: Literal[
+            "OPEN_BRACE",
+            "CLOSE_BRACE",
+            "OPEN_BRACKET",
+            "CLOSE_BRACKET",
+            "COLON",
+            "COMMA",
+            "QUOTE",
+            "KEY",
+            "STRING",
+            "NUMBER",
+            "BOOLEAN",
+            "NULL",
+            "WHITESPACE",
+        ]
+        value: Optional[str] = None
+        last_json_symbol: Optional["JsonConstraint.JsonSymbol"] = None
+
+    @dataclasses.dataclass
+    class _BeamState:
+        dfastate: DFAState["JsonConstraint.JsonSymbol"]
+        last_json_symbol: Optional["JsonConstraint.JsonSymbol"] = None
+        buffer: List[int] = dataclasses.field(default_factory=list)
+
+    @dataclasses.dataclass
+    class State:
+        states: List[List["JsonConstraint._BeamState"]]
+        timestep_to_start: torch.LongTensor
+        timestep: int = 0
+
+    def __init__(
+        self,
+        jsonschema: Mapping[str, Any],
+        namespace: str = "tokens",
+        tokenizer: Optional[Tokenizer] = None,
+    ) -> None:
+        self._jsonschema = jsonschema
+        self._namespace = namespace
+        self._tokenizer = tokenizer
+        self._eos_index: Optional[int] = None
+        self._dfa = self._nfa_from_jsonschema(self._jsonschema).compile()
+        self._string_token_ids: Set[int] = set()
+        self._number_token_ids: Set[int] = set()
+        self._boolean_token_ids: Set[int] = set()
+        self._null_token_ids: Set[int] = set()
+        self._whitespace_token_ids: Set[int] = set()
+        self._open_brace_token_ids: Set[int] = set()
+        self._close_brace_token_ids: Set[int] = set()
+        self._open_bracket_token_ids: Set[int] = set()
+        self._close_bracket_token_ids: Set[int] = set()
+        self._colon_token_ids: Set[int] = set()
+        self._comma_token_ids: Set[int] = set()
+        self._quote_token_ids: Set[int] = set()
+        self._key_token_ids: Dict[str, Sequence[int]] = {}
+
+    def setup(
+        self,
+        *args: Any,
+        vocab: Vocabulary,
+        tokenizer: Optional[Tokenizer] = None,
+        target_tokenizer: Optional[Tokenizer] = None,
+        eos_index: Optional[int] = None,
+        **kwargs: Any,
+    ) -> None:
+        keys = self._extract_keys_from_schema(self._jsonschema)
+        index_to_token = vocab.get_index_to_token(self._namespace)
+        tokenizer = target_tokenizer or tokenizer or self._tokenizer
+
+        if tokenizer is None:
+            raise ValueError("Tokenizer must be provided to JsonConstraint")
+
+        self._tokenizer = tokenizer
+        self._eos_index = eos_index
+        self._index_to_token = index_to_token
+        self._string_token_ids = {index for index, token in index_to_token.items() if self._is_string_token(token)}
+        self._number_token_ids = {index for index, token in index_to_token.items() if self._is_number_token(token)}
+        self._boolean_token_ids = {index for index, token in index_to_token.items() if self._is_boolean_token(token)}
+        self._null_token_ids = {index for index, token in index_to_token.items() if self._is_null_token(token)}
+        self._whitespace_token_ids = {
+            index for index, token in index_to_token.items() if self._is_whitespace_token(token)
+        }
+        self._open_brace_token_ids = {
+            index for index, token in index_to_token.items() if self._is_open_brace_token(token)
+        }
+        self._close_brace_token_ids = {
+            index for index, token in index_to_token.items() if self._is_close_brace_token(token)
+        }
+        self._open_bracket_token_ids = {
+            index for index, token in index_to_token.items() if self._is_open_bracket_token(token)
+        }
+        self._close_bracket_token_ids = {
+            index for index, token in index_to_token.items() if self._is_close_bracket_token(token)
+        }
+        self._colon_token_ids = {index for index, token in index_to_token.items() if self._is_colon_token(token)}
+        self._comma_token_ids = {index for index, token in index_to_token.items() if self._is_comma_token(token)}
+        self._quote_token_ids = {index for index, token in index_to_token.items() if self._is_quote_token(token)}
+        self._key_token_ids = {
+            key: [vocab.get_index_by_token(self._namespace, token.surface) for token in self._tokenizer.tokenize(key)]
+            for *_, key in keys
+        }
+
+    def init_state(
+        self,
+        token_ids: torch.LongTensor,
+        mask: torch.BoolTensor,
+        rest_token_ids: torch.LongTensor,
+        rest_mask: torch.BoolTensor,
+    ) -> "JsonConstraint.State":
+        batch_size, beam_size, sequence_length = token_ids.size()
+        timestep_to_start = cast(torch.LongTensor, mask.long().sum(-1) + rest_mask.long().sum(-1))
+        return JsonConstraint.State(
+            states=[
+                [JsonConstraint._BeamState(dfastate=self._dfa.state) for _ in range(beam_size)]
+                for _ in range(batch_size)
+            ],
+            timestep=sequence_length,
+            timestep_to_start=timestep_to_start,
+        )
+
+    def apply(
+        self,
+        state: "JsonConstraint.State",
+        log_probs: torch.Tensor,
+        **kwargs: Any,
+    ) -> torch.Tensor:
+        batch_size, beam_size, vocab_size = log_probs.size()
+
+        all_token_ids = set(range(vocab_size))
+        # Shape: (vocab_size,)
+        eos_mask = (
+            (torch.arange(vocab_size, device=log_probs.device) == self._eos_index)
+            if self._eos_index is not None
+            else None
+        )
+        for batch_index in range(batch_size):
+            for beam_index in range(beam_size):
+                beam_state = state.states[batch_index][beam_index]
+                timestep_to_start = int(state.timestep_to_start[batch_index, beam_index])
+                if state.timestep < timestep_to_start:
+                    continue
+                if beam_state.dfastate.is_final:
+                    if eos_mask is not None:
+                        log_probs[batch_index, beam_index, eos_mask] = 0.0
+                        log_probs[batch_index, beam_index, ~eos_mask] = -float("inf")
+                else:
+                    json_symbols = beam_state.dfastate.acceptable_symbols()
+                    candidates = set()
+                    for json_symbol in json_symbols:
+                        candidates |= self._get_available_token_ids(beam_state, json_symbol)
+                    token_ids_to_mask = all_token_ids - candidates
+                    log_probs[batch_index, beam_index, list(token_ids_to_mask)] = -float("inf")
+
+        return log_probs
+
+    def update_state(
+        self,
+        state: "JsonConstraint.State",
+        last_token_ids: torch.LongTensor,
+        last_backpointer: torch.LongTensor,
+    ) -> "JsonConstraint.State":
+        batch_size, beam_size = last_backpointer.size()
+
+        # align constraint state
+        for batch_index in range(batch_size):
+            indices = last_backpointer[batch_index].tolist()
+            state.states[batch_index] = [state.states[batch_index][index] for index in indices]
+
+        beam_states = state.states
+        timestep = state.timestep
+        timestep_to_start = state.timestep_to_start
+        for batch_index in range(batch_size):
+            for beam_index in range(beam_size):
+                if timestep < timestep_to_start[batch_index, beam_index].item():
+                    continue
+
+                beam_state = beam_states[batch_index][beam_index]
+                last_token_id = int(last_token_ids[batch_index, beam_index].item())
+
+                if beam_state.dfastate.is_final:
+                    continue
+
+                last_json_symbol = self._inspect_json_symbol(beam_state, last_token_id)
+                dfastate = beam_state.dfastate
+                buffer = (
+                    beam_state.buffer + [last_token_id]
+                    if last_json_symbol == beam_state.last_json_symbol
+                    else [last_token_id]
+                )
+
+                do_update = True
+                if last_json_symbol.name == "KEY":
+                    assert last_json_symbol.value is not None
+                    key_token_ids = self._key_token_ids[last_json_symbol.value]
+                    # If key generation is not finished, we should not update the state.
+                    do_update = len(buffer) == len(key_token_ids)
+
+                if do_update:
+                    dfastate_or_none = self._dfa.step(dfastate, last_json_symbol)
+                    if dfastate_or_none is None:
+                        raise ValueError(f"Invalid token id: {last_token_id}")
+                    dfastate = dfastate_or_none
+
+                beam_states[batch_index][beam_index] = JsonConstraint._BeamState(
+                    dfastate=dfastate,
+                    buffer=buffer,
+                    last_json_symbol=last_json_symbol,
+                )
+
+        return JsonConstraint.State(
+            states=beam_states,
+            timestep=timestep + 1,
+            timestep_to_start=timestep_to_start,
+        )
+
+    def _get_available_token_ids(
+        self,
+        state: "JsonConstraint._BeamState",
+        json_symbol: "JsonConstraint.JsonSymbol",
+    ) -> Set[int]:
+        if json_symbol.name == "STRING":
+            return self._string_token_ids
+        elif json_symbol.name == "NUMBER":
+            return self._number_token_ids
+        elif json_symbol.name == "BOOLEAN":
+            return self._boolean_token_ids
+        elif json_symbol.name == "NULL":
+            return self._null_token_ids
+        elif json_symbol.name == "WHITESPACE":
+            return self._whitespace_token_ids
+        elif json_symbol.name == "OPEN_BRACE":
+            return self._open_brace_token_ids
+        elif json_symbol.name == "CLOSE_BRACE":
+            return self._close_brace_token_ids
+        elif json_symbol.name == "OPEN_BRACKET":
+            return self._open_bracket_token_ids
+        elif json_symbol.name == "CLOSE_BRACKET":
+            return self._close_bracket_token_ids
+        elif json_symbol.name == "COLON":
+            return self._colon_token_ids
+        elif json_symbol.name == "COMMA":
+            return self._comma_token_ids
+        elif json_symbol.name == "QUOTE":
+            return self._quote_token_ids
+        elif json_symbol.name == "KEY":
+            assert json_symbol.value is not None
+            key_token_ids = self._key_token_ids[json_symbol.value]
+            if state.last_json_symbol is None or state.last_json_symbol.name != "KEY":
+                next_token_id = key_token_ids[0]
+            else:
+                next_token_id = key_token_ids[len(state.buffer)]
+            return {next_token_id}
+        raise RuntimeError(f"Unknown symbol: {json_symbol}")
+
+    def _inspect_json_symbol(self, state: "JsonConstraint._BeamState", token_id: int) -> "JsonConstraint.JsonSymbol":
+        candidate_json_symbols = state.dfastate.acceptable_symbols()
+        for json_symbol in candidate_json_symbols:
+            if token_id in self._get_available_token_ids(state, json_symbol):
+                return json_symbol
+        raise RuntimeError(f"Invalid token_id: {token_id}")
+
+    @staticmethod
+    def _nfa_from_jsonschema(jsonschema: Mapping[str, Any]) -> NFA[JsonSymbol]:
+        schema_type = jsonschema["type"]
+        if schema_type == "object":
+            nfa = NFA.from_symbol(JsonConstraint.JsonSymbol("OPEN_BRACE"))
+            properties = jsonschema.get("properties", {})
+            for index, (key, subschema) in enumerate(properties.items()):
+                nfa += NFA.from_symbol(JsonConstraint.JsonSymbol("QUOTE"))
+                nfa += NFA.from_symbol(JsonConstraint.JsonSymbol("KEY", key))
+                nfa += NFA.from_symbol(JsonConstraint.JsonSymbol("QUOTE"))
+                nfa += NFA.from_symbol(JsonConstraint.JsonSymbol("COLON"))
+                nfa += NFA.from_symbol(JsonConstraint.JsonSymbol("WHITESPACE"))
+                nfa += JsonConstraint._nfa_from_jsonschema(subschema)
+                if index != len(properties) - 1:
+                    nfa += NFA.from_symbol(JsonConstraint.JsonSymbol("COMMA"))
+                    nfa += NFA.from_symbol(JsonConstraint.JsonSymbol("WHITESPACE"))
+            nfa += NFA.from_symbol(JsonConstraint.JsonSymbol("CLOSE_BRACE"))
+            return nfa
+        if schema_type == "array":
+            head = NFA.from_symbol(JsonConstraint.JsonSymbol("OPEN_BRACKET"))
+            items = JsonConstraint._nfa_from_jsonschema(jsonschema["items"])
+            delimiter = NFA.from_symbol(JsonConstraint.JsonSymbol("COMMA")) + NFA.from_symbol(
+                JsonConstraint.JsonSymbol("WHITESPACE")
+            )
+            delimiter.end.is_final = False
+            items.end.epsilon_transitions.add(delimiter.start)
+            delimiter.end.epsilon_transitions.add(items.start)
+            tail = NFA.from_symbol(JsonConstraint.JsonSymbol("CLOSE_BRACKET"))
+            head.end.epsilon_transitions.add(tail.start)
+            return head + items + tail
+        if schema_type == "string":
+            nfa = NFA.from_symbol(JsonConstraint.JsonSymbol("QUOTE"))
+            nfa += NFA.from_symbol(JsonConstraint.JsonSymbol("STRING")).closure()
+            nfa += NFA.from_symbol(JsonConstraint.JsonSymbol("QUOTE"))
+            return nfa
+        if schema_type == "number":
+            return NFA.from_symbol(JsonConstraint.JsonSymbol("NUMBER"))
+        if schema_type == "boolean":
+            return NFA.from_symbol(JsonConstraint.JsonSymbol("BOOLEAN"))
+        if schema_type == "null":
+            return NFA.from_symbol(JsonConstraint.JsonSymbol("NULL"))
+        raise ValueError(f"Unknown schema type: {schema_type}")
+
+    @staticmethod
+    def _extract_keys_from_schema(
+        jsonschema: Mapping[str, Any],
+        prefix: Tuple[str, ...] = (),
+    ) -> Sequence[Tuple[str, ...]]:
+        """
+        Extracts all keys from a JSON schema.
+        Nested keys are represented as tuples.
+        """
+        keys: List[Tuple[str, ...]] = []
+        schema_type = jsonschema["type"]
+        if schema_type == "object":
+            for key, subschema in jsonschema.get("properties", {}).items():
+                keys.append(prefix + (key,))
+                keys += JsonConstraint._extract_keys_from_schema(subschema, prefix + (key,))
+        if schema_type == "array":
+            keys += JsonConstraint._extract_keys_from_schema(jsonschema["items"], prefix + ("__array__",))
+        return keys
+
+    @staticmethod
+    def _is_string_token(token: str) -> bool:
+        return '"' not in token
+
+    @staticmethod
+    def _is_number_token(token: str) -> bool:
+        token = token.strip(" \n\t")
+        if not all(char.isdigit() or char in ".-" for char in token):
+            return False
+        if "." in token:
+            if token.count(".") > 1:
+                return False
+            if token.startswith(".") or token.endswith("."):
+                return False
+        if "-" in token:
+            if token.count("-") > 1:
+                return False
+            if not token.startswith("-"):
+                return False
+        if "-." in token:
+            return False
+        return True
+
+    @staticmethod
+    def _is_boolean_token(token: str) -> bool:
+        return token.strip(" \n\t") in {"true", "false"}
+
+    @staticmethod
+    def _is_null_token(token: str) -> bool:
+        return token.strip(" \n\t") == "null"
+
+    @staticmethod
+    def _is_whitespace_token(token: str) -> bool:
+        return token.strip(" \n\t") == ""
+
+    @staticmethod
+    def _is_open_brace_token(token: str) -> bool:
+        return token.strip(" \n\t") == "{"
+
+    @staticmethod
+    def _is_close_brace_token(token: str) -> bool:
+        return token.strip(" \n\t") == "}"
+
+    @staticmethod
+    def _is_open_bracket_token(token: str) -> bool:
+        return token.strip(" \n\t") == "["
+
+    @staticmethod
+    def _is_close_bracket_token(token: str) -> bool:
+        return token.strip(" \n\t") == "]"
+
+    @staticmethod
+    def _is_colon_token(token: str) -> bool:
+        return token.strip(" \n\t") == ":"
+
+    @staticmethod
+    def _is_comma_token(token: str) -> bool:
+        return token.strip(" \n\t") == ","
+
+    @staticmethod
+    def _is_quote_token(token: str) -> bool:
+        return token.strip(" \n\t") == '"'
