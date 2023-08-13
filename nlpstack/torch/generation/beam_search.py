@@ -5,7 +5,7 @@ import torch
 
 from .constraints import Constraint, MultiConstraint
 from .samplers import DeterministicSampler, Sampler
-from .scorer import BeamScorer, SequenceLogProbabilityScorer
+from .scorers import BeamScorer, SequenceLogProbabilityScorer
 
 StepStateSelf = TypeVar("StepStateSelf", bound="StepStateInterface")
 

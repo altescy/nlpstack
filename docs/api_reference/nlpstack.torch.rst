@@ -7,6 +7,7 @@ Subpackages
 .. toctree::
    :maxdepth: 6
 
+   nlpstack.torch.generation
    nlpstack.torch.modules
    nlpstack.torch.training
 

@@ -7,6 +7,7 @@ Submodules
 .. toctree::
    :maxdepth: 6
 
+   nlpstack.common.automaton
    nlpstack.common.bleu
    nlpstack.common.cacheutil
    nlpstack.common.filebackend
