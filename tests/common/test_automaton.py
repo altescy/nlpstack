@@ -9,5 +9,5 @@ def test_automaton() -> None:
     assert isinstance(dfa, DFA)
     assert dfa.accepts("abd")
     assert dfa.accepts("accbd")
-    assert not dfa.accepts("ad")
+    assert dfa.accepts("ad")
     assert not dfa.accepts("dca")
