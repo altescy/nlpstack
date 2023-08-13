@@ -114,7 +114,7 @@ class MultinomialSampler(Sampler[None]):
             _mask = torch.zeros_like(flattened_log_probs).scatter(-1, _indices, 1.0)
             flattened_log_probs = flattened_log_probs.masked_fill(_mask == 0.0, -float("inf"))
 
-        if self._temperature != 1.0:
+        if temperature != 1.0:
             probabilities = (flattened_log_probs / temperature).softmax(1)
         else:
             probabilities = flattened_log_probs.exp()
