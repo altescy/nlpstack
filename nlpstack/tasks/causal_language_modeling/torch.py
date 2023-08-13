@@ -59,6 +59,7 @@ class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference], Gene
             *args,
             datamodule=datamodule,
             vocab=datamodule.vocab,
+            tokenizer=datamodule.tokenizer,
             eos_index=self._eos_index,
             **kwargs,
         )

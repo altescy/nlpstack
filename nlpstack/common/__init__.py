@@ -1,3 +1,4 @@
+from nlpstack.common.automaton import DFA, NFA, DFAState, NFAState  # noqa: F401
 from nlpstack.common.bleu import BLEU  # noqa: F401
 from nlpstack.common.cacheutil import cached_property  # noqa: F401
 from nlpstack.common.filebackend import FileBackendMapping, FileBackendSequence  # noqa: F401

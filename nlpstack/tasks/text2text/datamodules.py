@@ -42,6 +42,14 @@ class Text2TextDataModule(
     def vocab(self) -> Vocabulary:
         return self._vocab
 
+    @property
+    def source_tokenizer(self) -> Tokenizer:
+        return self._source_tokenizer
+
+    @property
+    def target_tokenizer(self) -> Tokenizer:
+        return self._target_tokenizer
+
     def setup(
         self,
         *args: Any,

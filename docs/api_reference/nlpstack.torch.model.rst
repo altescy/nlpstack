@@ -1,5 +1,5 @@
-nlpstack.torch.model module
-===========================
+model
+=====
 
 .. automodule:: nlpstack.torch.model
    :members:

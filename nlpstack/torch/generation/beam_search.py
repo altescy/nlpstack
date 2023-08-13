@@ -5,7 +5,7 @@ import torch
 
 from .constraints import Constraint, MultiConstraint
 from .samplers import DeterministicSampler, Sampler
-from .scorer import BeamScorer, SequenceLogProbabilityScorer
+from .scorers import BeamScorer, SequenceLogProbabilityScorer
 
 StepStateSelf = TypeVar("StepStateSelf", bound="StepStateInterface")
 
@@ -119,11 +119,19 @@ class BeamSearch:
         mask = cast(torch.BoolTensor, mask[:, :min_initial_length].unsqueeze(1).repeat_interleave(beam_size, dim=1))
         # Shape: (batch_size, beam_size)
         last_token_ids = cast(torch.LongTensor, token_ids[:, :, -1])
+        # Shape: (batch_size, beam_size, max_initial_length - min_initial_length)
+        rest_token_ids = cast(
+            torch.LongTensor, initial_token_ids[:, min_initial_length:].unsqueeze(1).repeat_interleave(beam_size, dim=1)
+        )
+        # Shape: (batch_size, beam_size, max_initial_length - min_initial_length)
+        rest_mask = cast(
+            torch.BoolTensor, initial_mask[:, min_initial_length:].unsqueeze(1).repeat_interleave(beam_size, dim=1)
+        )
 
         state = state.update(backpointer)
         sampler_state = sampler.init_state(token_ids, mask)
         scorer_state = scorer.init_state(token_ids, mask)
-        constraint_state = constraint.init_state(token_ids, mask) if constraint else None
+        constraint_state = constraint.init_state(token_ids, mask, rest_token_ids, rest_mask) if constraint else None
 
         predictions: List[torch.Tensor] = list(token_ids.unbind(dim=2))
         backpointers: List[torch.Tensor] = list(torch.zeros_like(token_ids).unbind(dim=2))
