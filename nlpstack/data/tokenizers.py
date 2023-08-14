@@ -10,7 +10,7 @@ Example:
 
 from contextlib import suppress
 from os import PathLike
-from typing import Callable, List, NamedTuple, Optional, Sequence, Union
+from typing import Callable, Iterator, List, NamedTuple, Optional, Sequence, Union
 
 import minato
 import numpy
@@ -176,6 +176,9 @@ class FugashiTokenizer(Tokenizer):
         user_dictionary_path: Optional[Union[str, PathLike]] = None,
         with_whitespace: bool = False,
     ) -> None:
+        if fugashi is None:
+            raise ModuleNotFoundError("fugashi is not installed.")
+
         self._system_dictionary_path = system_dictionary_path or "unidic-lite"
         self._user_dictionary_path = user_dictionary_path
         self._with_whitespace = with_whitespace
@@ -207,25 +210,31 @@ class FugashiTokenizer(Tokenizer):
         return fugashi.GenericTagger(" ".join(options))
 
     @cached_property
-    def parse_feature(self) -> Callable[["fugashi.fugashi.Node"], Token]:
-        def parse_feature_for_ipadic(node: fugashi.fugashi.Node) -> Token:
+    def parse_feature(self) -> Callable[["fugashi.fugashi.Node"], Iterator[Token]]:
+        def parse_feature_for_ipadic(node: fugashi.fugashi.Node) -> Iterator[Token]:
             """
             Details about the ipadic parsed result:
             https://taku910.github.io/mecab/
             """
-            return Token(
-                surface=node.white_space + node.surface if self._with_whitespace else node.surface,
+            if self._with_whitespace:
+                for whitespace in node.white_space:
+                    yield Token(whitespace, "空白", " ", vector=None)
+            yield Token(
+                surface=node.surface,
                 postag=node.feature[0],
                 lemma=None if node.feature[0] != "記号" and node.feature[6] == "*" else node.feature[6],
             )
 
-        def parse_feature_for_unidic(node: fugashi.fugashi.Node) -> Token:
+        def parse_feature_for_unidic(node: fugashi.fugashi.Node) -> Iterator[Token]:
             """
             Details about the unidic parsed result:
             https://clrd.ninjal.ac.jp/unidic/faq.html
             """
-            return Token(
-                surface=node.white_space + node.surface if self._with_whitespace else node.surface,
+            if self._with_whitespace:
+                for whitespace in node.white_space:
+                    yield Token(whitespace, "空白", " ", vector=None)
+            yield Token(
+                surface=node.surface,
                 postag=node.feature[0],
                 lemma=node.feature[7] if len(node.feature) >= 8 else None,
             )
@@ -239,7 +248,7 @@ class FugashiTokenizer(Tokenizer):
         raise ValueError("system_dictionary_path must contain 'ipadic' or 'unidic'")
 
     def tokenize(self, text: str) -> List[Token]:
-        return [self.parse_feature(node) for node in self.tagger(text)]
+        return [token for node in self.tagger(text) for token in self.parse_feature(node)]
 
     def detokenize(self, tokens: Union[Sequence[str], Sequence[Token]]) -> str:
         tokens = [token.surface if isinstance(token, Token) else token for token in tokens]
