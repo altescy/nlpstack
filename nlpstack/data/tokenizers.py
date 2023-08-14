@@ -165,9 +165,9 @@ class FugashiTokenizer(Tokenizer):
     Args:
         system_dictionary_path: The path or URL to the system dictionary.
         user_dictionary_path: The path or URL to the user dictionary.
-        with_whitespace: If `True`, each token can contain preceding whitespaces.
-            Please set `True` if you want reconstruct the original text from tokens
-            by using `detokenize()` method. Defaults to `False`.
+        with_whitespace: If `True`, whitespaces between tokens are returned as `空白`
+            tokens. Please set `True` if you want reconstruct the original text from
+            tokens by using `detokenize()` method. Defaults to `False`.
     """
 
     def __init__(
