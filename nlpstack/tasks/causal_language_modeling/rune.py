@@ -28,6 +28,44 @@ class CausalLanguageModel(
         CausalLanguageModelingPrediction,
     ]
 ):
+    """
+    A causal language model.
+
+    Args:
+        min_df: The minimum document frequency of the tokens. If `float`, the minimum
+            document frequency is the fraction of the total number of documents. Defaults to `1`.
+        max_df: The maximum document frequency of the tokens. If `float`, the maximum
+            document frequency is the fraction of the total number of documents. Defaults to `1.0`.
+        pad_token: The padding token. You can specify a different padding token for each
+            namespace by passing a mapping from namespace to padding token. Defaults to `"@@PADDING@@"`.
+        oov_token: The out-of-vocabulary (OOV) token. You can specify a different OOV token
+            for each namespace by passing a mapping from namespace to OOV token. Defaults to `"@@UNKNOWN@@"`.
+        bos_token: The beginning-of-sentence (BOS) token. You can specify a different BOS token
+            for each namespace by passing a mapping from namespace to BOS token. If BOS token
+            is given, the BOS token will be prepended to the beginning of each sequence. Defaults to `{}`.
+        eos_token: The end-of-sentence (EOS) token. You can specify a different EOS token
+            for each namespace by passing a mapping from namespace to EOS token. If EOS token
+            is given, the EOS token will be appended to the end of each sequence. Defaults to `{}`.
+        vocab: The vocabulary. If given, the vocabulary-related arguments will be ignored, otherwise
+            the vocabulary will be constructed from the data. Defaults to `None`.
+        tokenizer: The tokenizer.
+        token_indexers: The token indexers to index the tokens.
+        datamodule: The data module. If given, the data module related arguments will be ignored,
+            otherwise the data module will be constructed from the data. Defaults to `None`.
+        dropout: The dropout rate.
+        beam_search: The beam search module.
+        model: The causal language model for PyTorch. If given, the model related arguments will be ignored,
+            otherwise the model will be constructed from the data. Defaults to `None`.
+        max_epochs: The maximum number of epochs to train the model. Defaults to `4`.
+        batch_size: The batch size. Defaults to `32`.
+        learning_rate: The learning rate. Defaults to `1e-3`.
+        training_callbacks: The training callbacks for `TorchTrainer`. Defaults to `None`.
+        trainer: The trainer for training the model. If given, the trainer related arguments will be ignored,
+            otherwise the trainer will be constructed from the related arguments. Defaults to `None`.
+        metric: The metric for evaluation. Defaults to `None`.
+        random_seed: The random seed. Defaults to `None`.
+    """
+
     def __init__(
         self,
         *,
