@@ -252,5 +252,8 @@ class PretrainedTransformerWordEmbedding(WordEmbedding):
     def __contains__(self, word: str) -> bool:
         return word in self.tokenizer.vocab
 
+    def get_output_dim(self) -> int:
+        return int(self.model.config.hidden_size)
+
     def extend_vocab(self, vocab: Vocabulary, namespace: str) -> None:
         vocab.extend_vocab(namespace, self.tokenizer.vocab.keys())
