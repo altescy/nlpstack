@@ -27,9 +27,11 @@ transformers = {version = ">=4.12.3", optional = true}
 fasttext-wheel = {version = "^0.9.2", optional = true}
 optuna = {version = "^3.2.0", optional = true}
 fugashi = {version = "^1.2.1", optional = true, extras = ["unidic-lite"]}
+sentence-transformers = {version = "^2.2.2", optional = true}
+openai = {version = "^0.27.9", optional = true}
 
 [tool.poetry.extras]
-all = ["mlflow", "spacy", "transformers", "fasttext-wheel", "fugashi", "optuna"]
+all = ["mlflow", "spacy", "transformers", "sentence-transformers", "fasttext-wheel", "fugashi", "optuna", "openai"]
 
 [tool.poetry.group.dev.dependencies]
 python-language-server = "^0.36.2"
@@ -40,6 +42,7 @@ isort = "^5.12.0"
 flake8 = "^5.0.4"
 mypy = "^1.2.0"
 types-setuptools = "^68.0.0.0"
+types-requests = "^2.31.0.2"
 
 [tool.poetry.group.docs]
 optional = true
