@@ -97,7 +97,7 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
                     self._loss_weight[label_index] = total_label_count / label_counts[label]
             else:
                 torch.nn.init.constant(self._loss_weight, 1.0)
-                for label, weight in self._class_weights.items():
+                for label, weight in self._class_weights.items():  # type: ignore[union-attr]
                     label_index = vocab.get_index_by_token(self._label_namespace, label)
                     self._loss_weight[label_index] = weight
 

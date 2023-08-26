@@ -94,7 +94,7 @@ class TorchMultilabelClassifier(TorchModel[MultilabelClassificationInference]):
                     self._pos_weight[label_index] = num_negatives / num_positives
             else:
                 torch.nn.init.constant_(self._pos_weight, 1.0)
-                for label, weight in self._class_weights.items():
+                for label, weight in self._class_weights.items():  # type: ignore[union-attr]
                     label_index = vocab.get_index_by_token(self._label_namespace, label)
                     self._pos_weight[label_index] = weight
 
