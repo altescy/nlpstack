@@ -8,17 +8,54 @@ from collatable.typing import DataArray
 
 
 class BatchSampler:
+    """
+    A batch sampler is responsible for generating batches of indices from a dataset.
+    """
+
     def get_batch_indices(self, dataset: Sequence[Instance]) -> Iterator[List[int]]:
+        """
+        Returns an iterator over batches of indices from the dataset.
+
+        Args:
+            dataset: The dataset to sample from.
+
+        Returns:
+            An iterator over batches of indices from the dataset.
+        """
         raise NotImplementedError
 
     def get_num_batches(self, dataset: Sequence[Instance]) -> int:
+        """
+        Returns the number of batches in the dataset.
+
+        Args:
+            dataset: The dataset to sample from.
+
+        Returns:
+            The number of batches in the dataset.
+        """
         raise NotImplementedError
 
     def get_batch_size(self) -> int:
+        """
+        Returns the batch size.
+
+        Returns:
+            The batch size.
+        """
         raise NotImplementedError
 
 
 class BasicBatchSampler(BatchSampler):
+    """
+    A basic batch sampler that generates batches of indices from a dataset.
+
+    Args:
+        batch_size: The batch size.
+        shuffle: Whether to shuffle the dataset before sampling.
+        drop_last: Whether to drop the last batch if it is smaller than the batch size.
+    """
+
     def __init__(
         self,
         batch_size: int,
@@ -77,6 +114,13 @@ class BatchIterator:
 
 
 class DataLoader:
+    """
+    A data loader is responsible for iterating over batches of instances from a dataset.
+
+    Args:
+        sampler: The batch sampler to use.
+    """
+
     def __init__(
         self,
         sampler: BatchSampler,
@@ -84,7 +128,22 @@ class DataLoader:
         self._sampler = sampler
 
     def __call__(self, dataset: Sequence[Instance]) -> BatchIterator:
+        """
+        Returns an iterator over batches of instances from the dataset.
+
+        Args:
+            dataset: The dataset to iterate over.
+
+        Returns:
+            An iterator over batches of instances from the dataset.
+        """
         return BatchIterator(dataset, self._sampler)
 
     def get_batch_size(self) -> int:
+        """
+        Returns the batch size.
+
+        Returns:
+            The batch size.
+        """
         return self._sampler.get_batch_size()
