@@ -373,8 +373,7 @@ class BagOfEmbeddingsTextEmbedding:
         assert self._window_size is not None
         vectors = vectors[mask]
         if len(vectors) < self._window_size:
-            padding_size = numpy.ceil((self._window_size - len(vectors)) / 2)
-            vectors = numpy.pad(vectors, ((padding_size, padding_size), (0, 0)), "constant")
+            return cast(numpy.ndarray, vectors.mean(0))
         output = -numpy.inf * numpy.ones(self.get_output_dim())
         for offset in range(len(vectors) - self._window_size + 1):
             window = vectors[offset : offset + self._window_size]
