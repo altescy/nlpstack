@@ -2,7 +2,7 @@ import warnings
 from logging import getLogger
 from typing import Any, Dict, Mapping, Optional, Sequence, Set, Union
 
-from nlpstack.data import DataLoader, Vocabulary
+from nlpstack.data import BasicBatchSampler, DataLoader, Vocabulary
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 from nlpstack.rune import RuneForTorch, SetupMode
@@ -62,7 +62,7 @@ class CausalLanguageModel(
         training_callbacks: The training callbacks for `TorchTrainer`. Defaults to `None`.
         trainer: The trainer for training the model. If given, the trainer related arguments will be ignored,
             otherwise the trainer will be constructed from the related arguments. Defaults to `None`.
-        metric: The metric for evaluation. Defaults to `None`.
+        metric: The metric for evaluation. Defaults to `Perplexity()`.
         random_seed: The random seed. Defaults to `None`.
     """
 
@@ -162,8 +162,8 @@ class CausalLanguageModel(
 
         if trainer is None:
             trainer = TorchTrainer(
-                train_dataloader=DataLoader(batch_size=batch_size, shuffle=True),
-                valid_dataloader=DataLoader(batch_size=batch_size, shuffle=False),
+                train_dataloader=DataLoader(BasicBatchSampler(batch_size=batch_size, shuffle=True)),
+                valid_dataloader=DataLoader(BasicBatchSampler(batch_size=batch_size, shuffle=False)),
                 max_epochs=max_epochs,
                 optimizer_factory=AdamFactory(lr=learning_rate),
                 callbacks=training_callbacks,

@@ -8,7 +8,7 @@ import minato
 import numpy
 
 from nlpstack.common import FileBackendMapping, cached_property, murmurhash3
-from nlpstack.data import Vocabulary
+from nlpstack.data.vocabulary import Vocabulary
 from nlpstack.transformers import cache as transformers_cache
 
 try:

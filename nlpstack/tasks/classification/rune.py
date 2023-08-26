@@ -6,7 +6,7 @@ from typing import Any, Dict, Iterable, Iterator, Literal, Mapping, Optional, Se
 
 import numpy
 
-from nlpstack.data import DataLoader, Vocabulary
+from nlpstack.data import BasicBatchSampler, DataLoader, Vocabulary
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 from nlpstack.data.util import batched
@@ -34,6 +34,38 @@ class BasicClassifier(
         ClassificationPrediction,
     ]
 ):
+    """
+    A basic neural text classification model.
+
+    Args:
+        min_df: The minimum document frequency of the tokens. If `float`, the minimum
+            document frequency is the fraction of the total number of documents. Defaults to `1`.
+        max_df: The maximum document frequency of the tokens. If `float`, the maximum
+            document frequency is the fraction of the total number of documents. Defaults to `1.0`.
+        pad_token: The padding token. You can specify a different padding token for each
+            namespace by passing a mapping from namespace to padding token. Defaults to `"@@PADDING@@"`.
+        oov_token: The out-of-vocabulary (OOV) token. You can specify a different OOV token
+            for each namespace by passing a mapping from namespace to OOV token. Defaults to `"@@UNKNOWN@@"`.
+        vocab: The vocabulary. If given, the vocabulary-related arguments will be ignored, otherwise
+            the vocabulary will be constructed from the data. Defaults to `None`.
+        tokenizer: The tokenizer.
+        token_indexers: The token indexers to index the tokens.
+        datamodule: The data module. If given, the data module related arguments will be ignored,
+        dropout: The dropout rate. Defaults to `None`.
+        class_weights: The class weights. If `"balanced"`, the class weights will be set to
+            the inverse of the class frequencies. You can specify a different class weight for
+            each class by passing a mapping from class to class weight. Defaults to `None`.
+        classifier: The classifier. If given, the model related arguments will be ignored.
+        max_epochs: The maximum number of epochs. Defaults to `4`.
+        batch_size: The batch size. Defaults to `32`.
+        learning_rate: The learning rate. Defaults to `1e-3`.
+        training_callbacks: The training callbacks for `TorchTrainer`. Defaults to `None`.
+        trainer: The trainer for training the model. If given, the trainer related arguments will be ignored,
+            otherwise the trainer will be constructed from the related arguments. Defaults to `None`.
+        metric: The metric for evaluation. Defaults to `Accuracy()`.
+        random_seed: The random seed. Defaults to `None`.
+    """
+
     def __init__(
         self,
         *,
@@ -116,8 +148,8 @@ class BasicClassifier(
 
         if trainer is None:
             trainer = TorchTrainer(
-                train_dataloader=DataLoader(batch_size=batch_size, shuffle=True),
-                valid_dataloader=DataLoader(batch_size=batch_size, shuffle=False),
+                train_dataloader=DataLoader(BasicBatchSampler(batch_size=batch_size, shuffle=True)),
+                valid_dataloader=DataLoader(BasicBatchSampler(batch_size=batch_size, shuffle=False)),
                 max_epochs=max_epochs,
                 optimizer_factory=AdamFactory(lr=learning_rate),
                 callbacks=training_callbacks,
@@ -149,6 +181,36 @@ class FastTextClassifier(
         ClassificationPrediction,
     ]
 ):
+    """
+    A fastText classifier.
+
+    Each parameter corresponds to the original fastText implementation. For more details, please refer to here:
+        https://github.com/facebookresearch/fastText/tree/main/python#train_supervised-parameters
+
+    Args:
+        tokenizer: The tokenizer for tokenizing the text. Defaults to `WhitespaceTokenizer()`.
+        learning_rate: The learning rate. Defaults to `0.1`.
+        dim: The dimension of word vectors. Defaults to `100`.
+        ws: The size of the context window. Defaults to `5`.
+        epoch: The number of epochs. Defaults to `5`.
+        min_count: The minimum number of word occurrences. Defaults to `1`.
+        min_count_label: The minimum number of label occurrences. Defaults to `1`.
+        minn: The min length of char ngram. Defaults to `0`.
+        maxn: The max length of char ngram. Defaults to `0`.
+        neg: The number of negatives sampled. Defaults to `5`.
+        word_ngrams: The max length of word ngram. Defaults to `1`.
+        loss: The loss function. Defaults to `"softmax"`.
+        bucket: The number of buckets. Defaults to `2000000`.
+        thread: The number of threads. Defaults to number of CPUs.
+        lr_update_rate: The rate of updates for the learning rate. Defaults to `100`.
+        t: The sampling threshold. Defaults to `0.0001`.
+        pretrained_vectors: The path to pretrained vectors. Defaults to `None`.
+        seed: The random seed. Defaults to `None`.
+        autotune_duration: The duration of autotune in seconds. If given, the model will be
+            trained with autotune. Defaults to `None`.
+        metric: The metric for evaluation. Defaults to `Accuracy()`.
+    """
+
     def __init__(
         self,
         *,

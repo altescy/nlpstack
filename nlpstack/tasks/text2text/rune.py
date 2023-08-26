@@ -2,7 +2,7 @@ import warnings
 from logging import getLogger
 from typing import Any, Dict, Mapping, Optional, Sequence, Set, Union
 
-from nlpstack.data import DataLoader, Vocabulary
+from nlpstack.data import BasicBatchSampler, DataLoader, Vocabulary
 from nlpstack.data.indexers import TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer
 from nlpstack.rune import RuneForTorch
@@ -150,8 +150,8 @@ class Text2Text(
 
         if trainer is None:
             trainer = TorchTrainer(
-                train_dataloader=DataLoader(batch_size=batch_size, shuffle=True),
-                valid_dataloader=DataLoader(batch_size=batch_size, shuffle=False),
+                train_dataloader=DataLoader(BasicBatchSampler(batch_size=batch_size, shuffle=True)),
+                valid_dataloader=DataLoader(BasicBatchSampler(batch_size=batch_size, shuffle=False)),
                 max_epochs=max_epochs,
                 optimizer_factory=AdamFactory(lr=learning_rate),
                 callbacks=training_callbacks,
