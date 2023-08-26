@@ -4760,4 +4760,4 @@ all = ["fasttext-wheel", "fugashi", "mlflow", "openai", "optuna", "sentence-tran
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8,<4.0"
-content-hash = "a9ee9cc3414c3bd44603024eed85499f57ccb4a187f92bbef70f1a918e659ed4"
+content-hash = "8b8bd646f8c129d49aaea1ad8481e7bd721dc833b7bffd52b17132e60e81e957"
