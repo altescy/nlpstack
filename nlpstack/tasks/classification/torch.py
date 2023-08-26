@@ -24,6 +24,27 @@ class BasicClassifierOutput:
 
 
 class TorchBasicClassifier(TorchModel[ClassificationInference]):
+    """
+    A basic classifier for PyTorch.
+
+    Args:
+        embedder: The text embedder.
+        encoder: The sequence-to-vector encoder for building the text representation.
+        contextualizer: The sequence-to-sequence encoder for contextualizing the text representation.
+            This is applied before the encoder. If `None`, no contextualizer is applied. Defaults to
+            `None`.
+        feedforward: The feedforward layer applied to the text representation. This is applied after
+            the encoder. If `None`, no feedforward layer is applied. Defaults to `None`.
+        dropout: The dropout rate. Defaults to `None`.
+        class_weights: The class weights. If `None`, no class weights are used. If `"balanced"`, the
+            class weights are set to be inversely proportional to the class frequencies. Otherwise,
+            the class weights are set to the given mapping. Defaults to `None`.
+        threshold: The threshold for the prediction. If `None`, all the classes are returned as the
+            prediction. Otherwise, only the classes with the probabilities greater than the threshold
+            are returned. Defaults to `None`.
+        label_namespace: The namespace of the labels. Defaults to `"labels"`.
+    """
+
     def __init__(
         self,
         embedder: TextEmbedder,

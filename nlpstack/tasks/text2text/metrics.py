@@ -13,6 +13,10 @@ Text2TextMetric = Metric[Text2TextInference]
 
 
 class Perplexity(Metric[Text2TextInference]):
+    """
+    Perplexity metric for text-to-text task.
+    """
+
     def __init__(self) -> None:
         self._total_nnl = 0.0
         self._total_count = 0
@@ -36,6 +40,15 @@ class Perplexity(Metric[Text2TextInference]):
 
 
 class BLEU(Metric[Text2TextInference]):
+    """
+    BLEU metric for text-to-text task.
+
+    Args:
+        ngram_weights: The weights for N-grams.
+        exclude_tokens: The tokens to exclude for metric computation.
+        namespace: The vocabulary namespace of target tokens.
+    """
+
     def __init__(
         self,
         ngram_weights: Sequence[float] = (0.25, 0.25, 0.25, 0.25),

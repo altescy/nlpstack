@@ -11,6 +11,10 @@ from .types import TopicModelingInference
 
 
 class Perplexity(Metric[TopicModelingInference]):
+    """
+    Perplexity metric for topic modeling.
+    """
+
     def __init__(self) -> None:
         self._total_nll = 0.0
         self._total_count = 0
@@ -30,9 +34,14 @@ class Perplexity(Metric[TopicModelingInference]):
 
 
 class NPMI(Metric[TopicModelingInference]):
-    """Normalized Pointwise Mutual Information (NPMI) metric.
+    """
+    Normalized Pointwise Mutual Information (NPMI) metric.
 
     https://aclanthology.org/E14-1056/
+
+    Args:
+        top_n: The number of words for each topic used for NPMI computation.
+            Defaults to `10`.
     """
 
     def __init__(self, top_n: int = 10) -> None:

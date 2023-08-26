@@ -25,6 +25,25 @@ class TorchText2TextOutput:
 
 
 class TorchText2Text(TorchModel[Text2TextInference]):
+    """
+    A text-to-text model for PyTorch.
+
+    Args:
+        source_embedder: The text embedder for source text.
+        encoder: The sequence encoder for source text.
+        decoder: The sequence decoder for target text.
+        target_embedder: The text embedder for target text. If not given, `source_embedder`
+            is used. Defaults to `None`.
+        lmhead: The head for target token prediction. If not given, the prediction head is
+            tied to `source_embedder`. Defaults to `None`.
+        dropout: The dropout rate. Defaults to `None`.
+        ignore_padding_loss: If `True`, the padding token loss is ignored. Defaults to `False`.
+        beam_search: The beam search module. If given, the prediction is generated via beam search.
+            Defaults to `None`.
+        source_namespace: The vocabulary namespace of source tokens. Defaults to `"tokens"`.
+        target_namespace: The vocabulary namespace of target tokens. Defaults to `"tokens"`.
+    """
+
     def __init__(
         self,
         source_embedder: Embedding,

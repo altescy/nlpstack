@@ -27,6 +27,35 @@ class UnsupervisedSimCSE(
         RepresentationLearningPrediction,
     ]
 ):
+    """
+    An unsupervised SimCSE model.
+
+    Args:
+        min_df: The minimum document frequency of the tokens. If `float`, the minimum
+            document frequency is the fraction of the total number of documents. Defaults to `1`.
+        max_df: The maximum document frequency of the tokens. If `float`, the maximum
+            document frequency is the fraction of the total number of documents. Defaults to `1.0`.
+        pad_token: The padding token. You can specify a different padding token for each
+            namespace by passing a mapping from namespace to padding token. Defaults to `"@@PADDING@@"`.
+        oov_token: The out-of-vocabulary (OOV) token. You can specify a different OOV token
+            for each namespace by passing a mapping from namespace to OOV token. Defaults to `"@@UNKNOWN@@"`.
+        vocab: The vocabulary. If given, the vocabulary-related arguments will be ignored, otherwise
+            the vocabulary will be constructed from the data. Defaults to `None`.
+        tokenizer: The tokenizer.
+        token_indexers: The token indexers to index the tokens.
+        datamodule: The data module. If given, the data module related arguments will be ignored,
+        dropout: The dropout rate. Defaults to `None`.
+        temperature: The temperature parameter for SimCSE training. Defaults to `0.05`.
+        model: The unsupervised SimCSE model. If given, the model related arguments will be ignored.
+        max_epochs: The maximum number of epochs. Defaults to `4`.
+        batch_size: The batch size. Defaults to `32`.
+        learning_rate: The learning rate. Defaults to `1e-3`.
+        training_callbacks: The training callbacks for `TorchTrainer`. Defaults to `None`.
+        trainer: The trainer for training the model. If given, the trainer related arguments will be ignored,
+            otherwise the trainer will be constructed from the related arguments. Defaults to `None`.
+        random_seed: The random seed. Defaults to `None`.
+    """
+
     def __init__(
         self,
         *,

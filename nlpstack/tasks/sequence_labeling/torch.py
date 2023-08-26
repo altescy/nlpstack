@@ -22,6 +22,18 @@ class SequenceLabelerOutput:
 
 
 class TorchSequenceLabeler(TorchModel[SequenceLabelingInference]):
+    """
+    A neural sequence labeling model for PyTorch.
+
+    Args:
+        embedder: The text embedder.
+        encoder: The sequence-to-sequence encoder for contextualizing the text representation.
+        decoder: The CRF decoder. Defaults to `None`.
+        dropout: The dropout rate. Defaults to `None`.
+        top_k: The top-k parameter for the CRF decoder. If given, top-k predictions are returned. Defaults to `None`,
+        label_namespace: The namespace of the labels. Defaults to `"labels"`.
+    """
+
     def __init__(
         self,
         embedder: TextEmbedder,

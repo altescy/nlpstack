@@ -25,6 +25,17 @@ class MultilabelClassificationDataModule(
         MultilabelClassificationPrediction,
     ]
 ):
+    """
+    A data module for multilabel classification.
+
+    Args:
+        vocab: The vocabulary.
+        tokenizer: The tokenizer.
+        token_indexers: The token indexers to index the tokens. Defaults to
+            `{"tokens": SingleIdTokenIndexer()}`
+        label_namespace: The vocabulary namespace for the labels. Defaults to `"labels"`.
+    """
+
     def __init__(
         self,
         vocab: Vocabulary,
@@ -51,12 +62,31 @@ class MultilabelClassificationDataModule(
         dataset: Optional[Sequence[MultilabelClassificationExample]] = None,
         **kwargs: Any,
     ) -> None:
+        """
+        Setup the data module.
+
+        This method tokenizes the dataset and builds the vocabulary.
+
+        Args:
+            dataset: The dataset to tokenize and build the vocabulary from.
+        """
+
         if dataset:
             logger.info("Tokenizing dataset and building vocabulary...")
             dataset = self.tokenize(ProgressBar(dataset, desc="Tokenizing dataset"))
             self._build_vocab(dataset)
 
     def tokenize(self, dataset: Iterable[MultilabelClassificationExample]) -> Sequence[MultilabelClassificationExample]:
+        """
+        Tokenize the dataset and return the tokenized dataset.
+
+        Args:
+            dataset: The dataset to tokenize.
+
+        Returns:
+            The tokenized dataset.
+        """
+
         if not dataset:
             return []
 
@@ -91,6 +121,14 @@ class MultilabelClassificationDataModule(
         self.vocab.build_vocab_from_documents(self._label_namespace, label_iterator())
 
     def build_instance(self, example: MultilabelClassificationExample) -> Instance:
+        """
+        Build an instance from an example.
+        If the given `example.text` is a string, it will be tokenized using the tokenizer.
+
+        Args:
+            example: The example to build the instance from.
+        """
+
         text = example.text
         labels = example.labels
         metadata = example.metadata
@@ -112,6 +150,16 @@ class MultilabelClassificationDataModule(
     def build_predictions(
         self, inference: MultilabelClassificationInference
     ) -> Iterator[MultilabelClassificationPrediction]:
+        """
+        Build predictions from an batched inference result.
+
+        Args:
+            inference: The batched inference result.
+
+        Returns:
+            The predictions.
+        """
+
         sorted_indices = inference.probs.argsort(axis=1)[:, ::-1]
         sorted_probs = numpy.take_along_axis(inference.probs, sorted_indices, axis=1)
         for i, (top_indices, top_probs) in enumerate(zip(sorted_indices.tolist(), sorted_probs.tolist())):
@@ -129,6 +177,16 @@ class MultilabelClassificationDataModule(
             )
 
     def read_dataset(self, dataset: Iterable[MultilabelClassificationExample], **kwargs: Any) -> Iterator[Instance]:
+        """
+        Read the dataset and return a generator of instances.
+
+        Args:
+            dataset: The dataset to read.
+
+        Returns:
+            A generator of instances.
+        """
+
         logger.info("Building instances...")
         for example in ProgressBar(dataset, desc="Building instances"):
             yield self.build_instance(example)

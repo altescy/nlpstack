@@ -22,6 +22,18 @@ class TorchProdLDAOutput:
 
 
 class TorchProdLDA(TorchModel[TopicModelingInference]):
+    """
+    ProdLDA model for PyTorch.
+
+    Args:
+        num_topics: The number of topics.
+        hidden_dim: The dimension of the latent space.
+        alpha: The parameter for Dirichlet prior. Defaults to `0.02`.
+        dropout: The dropout rate. Defaults to `0.0`.
+        prior: The prior distribution. Defaults to `"dirichlet"`.
+        token_namespaces: The vocabulary namespace of tokens. Defaults to `"tokens"`.
+    """
+
     class HiddenToLogNormal(torch.nn.Module):
         def __init__(self, hidden_dim: int, num_topics: int) -> None:
             super().__init__()

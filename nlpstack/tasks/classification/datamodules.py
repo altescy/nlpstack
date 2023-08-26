@@ -26,9 +26,9 @@ class BasicClassificationDataModule(
 
     Args:
         vocab: The vocabulary.
-        tokenizer: The tokenizer.
+        tokenizer: The tokenizer. Defaults to `WhitespaceTokenizer()`.
         token_indexers: The token indexers to index the tokens. Defaults to
-            `{"tokens": SingleIdTokenIndexer()}`
+            `{"tokens": SingleIdTokenIndexer()}`.
         label_namespace: The vocabulary namespace for the labels. Defaults to `"labels"`.
     """
 
