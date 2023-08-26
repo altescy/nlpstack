@@ -28,9 +28,9 @@ class Text2TextDataModule(
         source_tokenizer: The tokenizer for source text. Defaults to `WhitespaceTokenizer()`.
         target_tokenizer: The tokenizer for target text. If not given, `source_tokenizer` is used. Defaults to `None`.
         source_token_indexers: The token indexers to index the source tokens. Defaults to
-        `{"tokens": SingleIdTokenIndexer()}`.
+            `{"tokens": SingleIdTokenIndexer()}`.
         target_token_indexers: The token indexers to index the target tokens. If not given,
-        `source_token_indexers` is used. Defaults to `None`.
+            `source_token_indexers` is used. Defaults to `None`.
         source_namespace: The vocabulary namespace for source text. Defaults to `"tokens"`.
         target_namespace: The vocabulary namespace for target text. Defaults to `"tokens"`.
     """
