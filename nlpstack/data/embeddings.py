@@ -293,10 +293,19 @@ class BagOfEmbeddingsTextEmbedding:
     """
     A text embedding model using bag-of-embeddings.
 
+    The following pooling methods are supported:
+
+    - `"mean"`: Mean pooling.
+    - `"max"`: Max pooling.
+    - `"min"`: Min pooling.
+    - `"sum"`: Sum pooling.
+    - `"hier"`: Hierarchical pooling: https://arxiv.org/abs/1805.09843
+
     Args:
         word_embedding: A word embedding model.
         tokenizer: A tokenizer.
-        pooling: A pooling method. Defaults to `mean`.
+        pooling: A pooling method. Defaults to `"mean"`.
+        normalize: If `True`, normalize word embeddings before pooling. Defaults to `False`.
         window_size: A window size for hierarchical pooling. Defaults to `None`.
     """
 
@@ -305,6 +314,7 @@ class BagOfEmbeddingsTextEmbedding:
         word_embedding: WordEmbedding,
         tokenizer: Optional[Tokenizer] = None,
         pooling: Literal["mean", "max", "min", "sum", "hier"] = "mean",
+        normalize: bool = False,
         window_size: Optional[int] = None,
     ) -> None:
         if pooling not in ("mean", "max", "min", "sum", "hier"):
@@ -315,6 +325,7 @@ class BagOfEmbeddingsTextEmbedding:
         self._word_embedding = word_embedding
         self._tokenizer = tokenizer or WhitespaceTokenizer()
         self._pooling = pooling
+        self._normalize = normalize
         self._window_size = window_size
 
     def get_output_dim(self) -> int:
@@ -333,11 +344,14 @@ class BagOfEmbeddingsTextEmbedding:
         for batch_index, tokens in enumerate(batch_tokens):
             for token_index, token in enumerate(tokens):
                 if token.surface in self._word_embedding:
-                    embeddings[batch_index, token_index] = self._word_embedding[token.surface]
+                    embedding = self._word_embedding[token.surface]
+                    if self._normalize:
+                        embedding /= numpy.linalg.norm(embedding) + 1e-13
+                    embeddings[batch_index, token_index] = embedding
                     mask[batch_index, token_index] = True
 
         if self._pooling == "mean":
-            return cast(numpy.ndarray, embeddings.sum(axis=1) / (mask.sum(axis=1, keepdims=True) + 1e-6))
+            return cast(numpy.ndarray, embeddings.sum(axis=1) / (mask.sum(axis=1, keepdims=True) + 1e-13))
 
         if self._pooling == "max":
             embeddings[~mask] = float("-inf")

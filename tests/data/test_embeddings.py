@@ -10,6 +10,7 @@ from nlpstack.data import BagOfEmbeddingsTextEmbedding, MinhashWordEmbedding, Te
         BagOfEmbeddingsTextEmbedding(MinhashWordEmbedding(64), pooling="mean"),
         BagOfEmbeddingsTextEmbedding(MinhashWordEmbedding(64), pooling="max"),
         BagOfEmbeddingsTextEmbedding(MinhashWordEmbedding(64), pooling="hier", window_size=3),
+        BagOfEmbeddingsTextEmbedding(MinhashWordEmbedding(64), pooling="mean", normalize=True),
     ],
 )
 def test_text_embedding(text_embedding: TextEmbedding) -> None:
