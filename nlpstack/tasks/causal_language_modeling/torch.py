@@ -23,6 +23,19 @@ class TorchCausalLanguageModelOutput:
 
 
 class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference], Generic[Seq2SeqDecoderState]):
+    """
+    A causal language model for PyTorch.
+
+    Args:
+        embedder: The token embedder.
+        decoder: The sequence decoder.
+        lmhead: The language modeling head. If `None`, the prediction head is tied with the token embedder.
+        dropout: The dropout rate.
+        ingore_padding_loss: Whether to ignore the padding tokens when computing the loss.
+        beam_search: The beam search module.
+        token_namespace: The namespace of the tokens.
+    """
+
     def __init__(
         self,
         embedder: Embedding,

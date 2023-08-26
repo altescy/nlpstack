@@ -20,6 +20,16 @@ class CausalLanguageModelingDataModule(
         CausalLanguageModelingPrediction,
     ]
 ):
+    """
+    A data module for causal language modeling.
+
+    Args:
+        vocab: The vocabulary.
+        tokenizer: The tokenizer.
+        token_indexers: The token indexers to index the tokens.
+        namespace: The vocabulary namespace for the tokens.
+    """
+
     def __init__(
         self,
         vocab: Vocabulary,
@@ -48,6 +58,20 @@ class CausalLanguageModelingDataModule(
         generation_mode: Optional[bool] = None,
         **kwargs: Any,
     ) -> None:
+        """
+        Setup the data module.
+
+        This method tokenizes the dataset and builds the vocabulary.
+
+        Args:
+            dataset: The dataset to tokenize and build the vocabulary from.
+            generation_mode: Whether to setup the data module for generation. Please set this to `True` if you are
+                using the data module for generation. This will disable the `labels` field in the instances returned
+                by `build_instance`. This is useful for generation because the labels are not available during
+                generation. If you are using the data module for training, please set this to `False` to enable the
+                `labels` field.
+        """
+
         if dataset:
             with ProgressBar[int](len(dataset) * 2) as progress:
                 progress.set_description("Tokenizing dataset")
@@ -58,6 +82,15 @@ class CausalLanguageModelingDataModule(
             self._generation_mode = generation_mode
 
     def tokenize(self, dataset: Iterable[CausalLanguageModelingExample]) -> Sequence[CausalLanguageModelingExample]:
+        """
+        Tokenize the dataset and return the tokenized dataset.
+
+        Args:
+            dataset: The dataset to tokenize.
+
+        Returns:
+            The tokenized dataset.
+        """
         if not dataset:
             return []
 
@@ -81,6 +114,14 @@ class CausalLanguageModelingDataModule(
             token_indexer.build_vocab(self.vocab, text_iterator())
 
     def build_instance(self, example: CausalLanguageModelingExample) -> Instance:
+        """
+        Build an instance from an example.
+        If the given `example.text` is a string, it will be tokenized using the tokenizer.
+
+        Args:
+            example: The example to build the instance from.
+        """
+
         text = example.text
         metadata = example.metadata
         labels: Optional[Sequence[Token]] = None
@@ -111,6 +152,16 @@ class CausalLanguageModelingDataModule(
     def build_predictions(
         self, inference: CausalLanguageModelingInference
     ) -> Iterator[CausalLanguageModelingPrediction]:
+        """
+        Build predictions from an batched inference result.
+
+        Args:
+            inference: The batched inference result.
+
+        Returns:
+            The predictions.
+        """
+
         token_indices_to_ignore = {self._vocab.get_pad_index(self._namespace)}
         if self._vocab.has_bos_token(self._namespace):
             token_indices_to_ignore.add(self._vocab.get_bos_index(self._namespace))
@@ -131,9 +182,18 @@ class CausalLanguageModelingDataModule(
     def read_dataset(
         self,
         dataset: Iterable[CausalLanguageModelingExample],
-        is_training: bool = False,
         **kwargs: Any,
     ) -> Iterator[Instance]:
+        """
+        Read the dataset and return a generator of instances.
+
+        Args:
+            dataset: The dataset to read.
+
+        Returns:
+            A generator of instances.
+        """
+
         logger.info("Building instances...")
         for example in ProgressBar(dataset, desc="Building instances"):
             yield self.build_instance(example)

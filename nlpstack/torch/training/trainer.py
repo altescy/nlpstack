@@ -6,7 +6,7 @@ from typing import Any, Dict, Generic, List, Mapping, Optional, Sequence, TypeVa
 import torch
 
 from nlpstack.common import ProgressBar
-from nlpstack.data import DataLoader, Instance
+from nlpstack.data import BasicBatchSampler, DataLoader, Instance
 from nlpstack.data.util import batched_iterator
 from nlpstack.evaluation import EmptyMetric, Metric
 from nlpstack.torch.model import TorchModel, TorchModelOutput
@@ -158,13 +158,13 @@ class TorchTrainer:
 
         learning_rate = learning_rate or 1e-3
         available_dataloader = train_dataloader or valid_dataloader
-        batch_size = batch_size or (available_dataloader._batch_size if available_dataloader else 32)
+        batch_size = batch_size or (available_dataloader.get_batch_size() if available_dataloader else 32)
         grad_accum = grad_accum or 1
         devices = [devices] if isinstance(devices, (int, str)) else devices
 
         self._max_grad_norm = max_grad_norm
-        self._train_dataloader = train_dataloader or DataLoader(batch_size=batch_size, shuffle=True)
-        self._valid_dataloader = valid_dataloader or DataLoader(batch_size=batch_size, shuffle=False)
+        self._train_dataloader = train_dataloader or DataLoader(BasicBatchSampler(batch_size=batch_size, shuffle=True))
+        self._valid_dataloader = valid_dataloader or DataLoader(BasicBatchSampler(batch_size=batch_size, shuffle=False))
         self._optimizer_factory = optimizer_factory or AdamFactory(lr=learning_rate)
         self._lrscheduler_factory = lrscheduler_factory
         self._training_engine = training_engine or TrainingEngine()

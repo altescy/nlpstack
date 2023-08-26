@@ -9,6 +9,10 @@ CausalLanguageModelingMetric = Metric[CausalLanguageModelingInference]
 
 
 class Perplexity(Metric[CausalLanguageModelingInference]):
+    """
+    The perplexity metric for causal language modeling.
+    """
+
     def __init__(self) -> None:
         self._total_nnl = 0.0
         self._total_count = 0

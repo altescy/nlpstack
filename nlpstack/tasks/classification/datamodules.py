@@ -21,6 +21,17 @@ class BasicClassificationDataModule(
         ClassificationPrediction,
     ]
 ):
+    """
+    A data module for classification.
+
+    Args:
+        vocab: The vocabulary.
+        tokenizer: The tokenizer. Defaults to `WhitespaceTokenizer()`.
+        token_indexers: The token indexers to index the tokens. Defaults to
+            `{"tokens": SingleIdTokenIndexer()}`.
+        label_namespace: The vocabulary namespace for the labels. Defaults to `"labels"`.
+    """
+
     def __init__(
         self,
         vocab: Vocabulary,
@@ -47,12 +58,30 @@ class BasicClassificationDataModule(
         dataset: Optional[Sequence[ClassificationExample]] = None,
         **kwargs: Any,
     ) -> None:
+        """
+        Setup the data module.
+
+        This method tokenizes the dataset and builds the vocabulary.
+
+        Args:
+            dataset: The dataset to tokenize and build the vocabulary from.
+        """
         if dataset:
             logger.info("Tokenizing dataset and building vocabulary...")
             dataset = self.tokenize(ProgressBar(dataset, desc="Tokenizing dataset"))
             self._build_vocab(dataset)
 
     def tokenize(self, dataset: Iterable[ClassificationExample]) -> Sequence[ClassificationExample]:
+        """
+        Tokenize the dataset and return the tokenized dataset.
+
+        Args:
+            dataset: The dataset to tokenize.
+
+        Returns:
+            The tokenized dataset.
+        """
+
         if not dataset:
             return []
 
@@ -87,6 +116,14 @@ class BasicClassificationDataModule(
         self.vocab.build_vocab_from_documents(self._label_namespace, label_iterator())
 
     def build_instance(self, example: ClassificationExample) -> Instance:
+        """
+        Build an instance from an example.
+        If the given `example.text` is a string, it will be tokenized using the tokenizer.
+
+        Args:
+            example: The example to build the instance from.
+        """
+
         text = example.text
         label = example.label
         metadata = example.metadata
@@ -106,6 +143,16 @@ class BasicClassificationDataModule(
         return Instance(**fields)
 
     def build_predictions(self, inference: ClassificationInference) -> Iterator[ClassificationPrediction]:
+        """
+        Build predictions from an batched inference result.
+
+        Args:
+            inference: The batched inference result.
+
+        Returns:
+            The predictions.
+        """
+
         sorted_indices = inference.probs.argsort(axis=1)[:, ::-1]
         sorted_probs = numpy.take_along_axis(inference.probs, sorted_indices, axis=1)
         for i, (top_indices, top_probs) in enumerate(zip(sorted_indices.tolist(), sorted_probs.tolist())):
@@ -123,6 +170,16 @@ class BasicClassificationDataModule(
             )
 
     def read_dataset(self, dataset: Iterable[ClassificationExample], **kwargs: Any) -> Iterator[Instance]:
+        """
+        Read the dataset and return a generator of instances.
+
+        Args:
+            dataset: The dataset to read.
+
+        Returns:
+            A generator of instances.
+        """
+
         logger.info("Building instances...")
         for example in ProgressBar(dataset, desc="Building instances"):
             yield self.build_instance(example)

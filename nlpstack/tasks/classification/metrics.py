@@ -14,6 +14,13 @@ class ClassificationMetric(Metric[ClassificationInference]):
 
 
 class Accuracy(ClassificationMetric):
+    """
+    Accuracy metric for classification tasks.
+
+    Args:
+        topk: The top-k accuracy. Defaults to `1`.
+    """
+
     def __init__(self, topk: int = 1) -> None:
         self.topk = topk
         self._correct = 0
@@ -37,6 +44,15 @@ FBetaAverage = Literal["micro", "macro"]
 
 
 class FBeta(ClassificationMetric):
+    """
+    F-beta score metric for classification tasks.
+
+    Args:
+        beta: The beta value. Defaults to `1.0`.
+        average: The averaging method. Defaults to `"macro"`.
+        topk: The top-k accuracy. Defaults to `None`.
+    """
+
     def __init__(
         self,
         beta: float = 1.0,
@@ -103,6 +119,14 @@ class FBeta(ClassificationMetric):
 
 
 class PrecisionRecallAuc(ClassificationMetric):  # type: ignore[misc]
+    """
+    Precision-recall AUC metric for classification tasks.
+
+    Args:
+        positive_label: The positive label. Defaults to `"1"`.
+        label_namespace: The label namespace. Defaults to `"labels"`.
+    """
+
     def __init__(
         self,
         positive_label: str,

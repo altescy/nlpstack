@@ -25,6 +25,22 @@ class TorchUnsupervisedSimCSEOutput:
 
 
 class TorchUnsupervisedSimCSE(TorchModel[RepresentationLearningInference]):
+    """
+    An unsupervised SimCSE model for PyTorch.
+
+    Args:
+        embedder: The text embedder.
+        encoder: The sequence-to-vector encoder for building the text representation.
+        contextualizer: The sequence-to-sequence encoder for contextualizing the text representation.
+            This is applied before the encoder. If `None`, no contextualizer is applied. Defaults to
+            `None`.
+        feedforward: The feedforward layer applied to the text representation. This is applied after
+            the encoder. If `None`, no feedforward layer is applied. Defaults to `None`.
+        dropout: The dropout rate. Defaults to `None`.
+        temperature: The tempareture parameter for SimCSE training. Defaults to `0.05`.
+        use_feedforward_for_only_training: If `True`, the feedforward is used only for trainig. Defaults to `False`.
+    """
+
     def __init__(
         self,
         embedder: TextEmbedder,

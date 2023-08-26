@@ -1,3 +1,8 @@
+"""
+Indexers for converting tokens into indices.
+"""
+
+
 from contextlib import suppress
 from os import PathLike
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, Union
@@ -24,20 +29,62 @@ except ModuleNotFoundError:
 
 
 class TokenIndexer:
+    """
+    TokenIndexer is a class that converts tokens into indices.
+    """
+
     def build_vocab(self, vocab: Vocabulary, documents: Iterable[Sequence[Token]]) -> None:
+        """
+        Build vocabulary from documents.
+
+        Args:
+            vocab: Vocabulary to build.
+            documents: Documents to build vocabulary from.
+        """
         pass
 
     def get_vocab_namespace(self) -> Optional[str]:
+        """
+        Get vocabulary namespace.
+
+        Returns:
+            Vocabulary namespace.
+        """
         return None
 
     def get_pad_index(self, vocab: Vocabulary) -> int:
+        """
+        Get padding index.
+
+        Returns:
+            Padding index.
+        """
         raise NotImplementedError
 
     def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> Dict[str, Any]:
+        """
+        Convert tokens into indices.
+
+        Args:
+            tokens: Tokens to convert.
+            vocab: Vocabulary to use.
+
+        Returns:
+            Dictionary of indices.
+        """
         raise NotImplementedError
 
 
 class SingleIdTokenIndexer(TokenIndexer):
+    """
+    SingleIdTokenIndexer is a class that converts tokens into single indices.
+
+    Args:
+        namespace: Vocabulary namespace. Defaults to `"tokens"`.
+        feature_name: The feature name of tokens to use. Defaults to `"surface"`.
+        lowercase: Whether to lowercase tokens. Defaults to `False`.
+    """
+
     def __init__(
         self,
         namespace: str = "tokens",
@@ -70,6 +117,17 @@ class SingleIdTokenIndexer(TokenIndexer):
         return vocab.get_pad_index(self._namespace)
 
     def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> Dict[str, Any]:
+        """
+        Convert tokens into indices.
+
+        Args:
+            tokens: Tokens to convert.
+            vocab: Vocabulary to use.
+
+        Returns:
+            Dictionary of indices containing `"token_ids"` and `"mask"`.
+        """
+
         token_ids = [
             vocab.get_index_by_token(
                 self._namespace,
@@ -82,6 +140,16 @@ class SingleIdTokenIndexer(TokenIndexer):
 
 
 class TokenCharactersIndexer(TokenIndexer):
+    """
+    A TokenIndexer represents tokens as sequences of character indices.
+
+    Args:
+        namespace: Vocabulary namespace. Defaults to `"token_characters"`.
+        feature_name: The feature name of tokens to use. Defaults to `"surface"`.
+        lowercase: Whether to lowercase tokens. Defaults to `False`.
+        min_padding_length: Minimum padding length. Defaults to `0`.
+    """
+
     def __init__(
         self,
         namespace: str = "token_characters",
@@ -117,6 +185,17 @@ class TokenCharactersIndexer(TokenIndexer):
         return vocab.get_pad_index(self._namespace)
 
     def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> Dict[str, Any]:
+        """
+        Convert tokens into indices.
+
+        Args:
+            tokens: Tokens to convert.
+            vocab: Vocabulary to use.
+
+        Returns:
+            Dictionary of indices containing `"token_ids"`, `"mask"`, and `"subword_mask"`.
+        """
+
         token_ids = [
             [vocab.get_index_by_token(self._namespace, character) for character in self._get_token_feature(token)]
             for token in tokens
@@ -137,6 +216,14 @@ class TokenCharactersIndexer(TokenIndexer):
 
 
 class TokenVectorIndexer(TokenIndexer):
+    """
+    A TokenIndexer represents tokens as vectors. This indexer does not support building vectors and vocabulary.
+    You need use tokenizers that support vectorization, such as `SpacyTokenizer`.
+
+    Args:
+        namespace: Vocabulary namespace. Defaults to `None`.
+    """
+
     def __init__(self, namespace: Optional[str] = None) -> None:
         self._namespace = namespace
 
@@ -148,6 +235,17 @@ class TokenVectorIndexer(TokenIndexer):
         return 0
 
     def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> Dict[str, Any]:
+        """
+        Convert tokens into indices.
+
+        Args:
+            tokens: Tokens to convert.
+            vocab: Vocabulary to use.
+
+        Returns:
+            Dictionary of indices containing `"embeddings"` and `"mask"`.
+        """
+
         if not all(token.vector is not None for token in tokens):
             raise ValueError("TokenVectorIndexer requires all tokens to have vector.")
         return {
@@ -157,6 +255,16 @@ class TokenVectorIndexer(TokenIndexer):
 
 
 class PretrainedEmbeddingIndexer(TokenIndexer):
+    """
+    A TokenIndexer represents tokens as pretrained embeddings.
+
+    Args:
+        embedding: Pretrained embedding to use.
+        feature_name: The feature name of tokens to use. Defaults to `"surface"`.
+        lowercase: Whether to lowercase tokens. Defaults to `False`.
+        namespace: Vocabulary namespace. Defaults to `None`.
+    """
+
     def __init__(
         self,
         embedding: WordEmbedding,
@@ -185,6 +293,17 @@ class PretrainedEmbeddingIndexer(TokenIndexer):
         return 0
 
     def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> Dict[str, Any]:
+        """
+        Convert tokens into indices.
+
+        Args:
+            tokens: Tokens to convert.
+            vocab: Vocabulary to use.
+
+        Returns:
+            Dictionary of indices containing `"embeddings"` and `"mask"`.
+        """
+
         return {
             "embeddings": numpy.array([self._embedding[self._get_token_feature(token)] for token in tokens]),
             "mask": numpy.array([True] * len(tokens), dtype=bool),
@@ -192,6 +311,16 @@ class PretrainedEmbeddingIndexer(TokenIndexer):
 
 
 class PretrainedTransformerIndexer(TokenIndexer):
+    """
+    A TokenIndexer represents tokens as indices with pretrained transformer tokenizer.
+
+    Args:
+        pretrained_model_name: Pretrained model name or path.
+        namespace: Vocabulary namespace. Defaults to `None`.
+        tokenize_subwords: Whether to tokenize subwords. Defaults to `False`.
+        add_special_tokens: Whether to add special tokens. Defaults to `False`.
+    """
+
     def __init__(
         self,
         pretrained_model_name: Union[str, PathLike],
@@ -224,6 +353,17 @@ class PretrainedTransformerIndexer(TokenIndexer):
         return int(self.tokenizer.pad_token_id)
 
     def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> Dict[str, Any]:
+        """
+        Convert tokens into indices.
+
+        Args:
+            tokens: Tokens to convert.
+            vocab: Vocabulary to use.
+
+        Returns:
+            Dictionary of indices containing `"token_ids"`, `"type_ids"`, and `"mask"`. `"subword_mask"` and
+            `"offsets"` are also included if `tokenize_subwords` is `True`.
+        """
         if self._tokenize_subwords:
             return self._index_with_subword_tokenization(tokens, vocab)
         return self._index_without_subword_tokenization(tokens, vocab)

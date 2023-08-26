@@ -17,6 +17,10 @@ class SequenceLabelingMetric(Metric[SequenceLabelingInference]):
 
 
 class TokenBasedAccuracy(SequenceLabelingMetric):
+    """
+    Token-based accuracy for sequence labeling task.
+    """
+
     def __init__(self) -> None:
         self._correct = 0
         self._total = 0
@@ -48,6 +52,15 @@ class TokenBasedAccuracy(SequenceLabelingMetric):
 
 
 class SpanBasedF1(SequenceLabelingMetric):
+    """
+    Span-based F1 metric for sequence labeling task.
+
+    Args:
+        label_encoding: The label encoding schema. Defaults to `"BIO"`.
+        label_namespace: The namespace of the label vocabulary. Defaults to `"labels"`.
+        ignore_classes: The sequence of classes to ignore. Defaults to `None`.
+    """
+
     def __init__(
         self,
         label_encoding: LabelEncoding = "BIO",

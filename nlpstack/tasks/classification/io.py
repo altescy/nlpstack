@@ -7,6 +7,14 @@ from .types import ClassificationExample, ClassificationPrediction
 
 
 class JsonlReader:
+    """
+    A classification dataset reader for JSONL files.
+
+    Args:
+        text_field: The field name for the text. Defaults to `"text"`.
+        label_field: The field name for the label. Defaults to `"label"`.
+    """
+
     def __init__(
         self,
         text_field: str = "text",
@@ -27,6 +35,14 @@ class JsonlReader:
 
 
 class JsonlWriter:
+    """
+    A classification dataset writer for JSONL files.
+
+    Args:
+        additional_fields: The additional metadata fields to be written.
+            Defaults to `None`.
+    """
+
     def __init__(
         self,
         additional_fields: Optional[Sequence[str]] = None,

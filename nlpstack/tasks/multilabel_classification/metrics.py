@@ -12,6 +12,14 @@ class MultilabelClassificationMetric(Metric[MultilabelClassificationInference]):
 
 
 class MultilabelAccuracy(MultilabelClassificationMetric):
+    """
+    The accuracy metric for multilabel classification.
+
+    Args:
+        threshold: The threshold for the prediction probabilities. If prediction probabilities are
+            greater than or equal to the threshold, the label is predicted.
+    """
+
     def __init__(self, threshold: Optional[float] = None) -> None:
         self._threshold = threshold
         self._correct = 0
@@ -38,6 +46,14 @@ class MultilabelAccuracy(MultilabelClassificationMetric):
 
 
 class OverallAccuracy(MultilabelClassificationMetric):
+    """
+    The overall accuracy metric for multilabel classification.
+
+    Args:
+        threshold: The threshold for the prediction probabilities. If prediction probabilities are
+            greater than or equal to the threshold, the label is predicted.
+    """
+
     def __init__(self, threshold: Optional[float] = None) -> None:
         self._threshold = threshold
         self._correct = 0
@@ -64,6 +80,14 @@ class OverallAccuracy(MultilabelClassificationMetric):
 
 
 class AverageAccuracy(MultilabelClassificationMetric):
+    """
+    The average accuracy metric for multilabel classification.
+
+    Args:
+        threshold: The threshold for the prediction probabilities. If prediction probabilities are
+            greater than or equal to the threshold, the label is predicted.
+    """
+
     def __init__(self, threshold: Optional[float] = None) -> None:
         self._threshold = threshold
         self._correct: Optional[numpy.ndarray] = None
@@ -95,6 +119,15 @@ class AverageAccuracy(MultilabelClassificationMetric):
 
 
 class MicroMultilabelFBeta(MultilabelClassificationMetric):
+    """
+    The micro F-beta metric for multilabel classification.
+
+    Args:
+        beta: The beta parameter for F-beta.
+        threshold: The threshold for the prediction probabilities. If prediction probabilities are
+            greater than or equal to the threshold, the label is predicted.
+    """
+
     def __init__(
         self,
         beta: float = 1.0,
@@ -140,6 +173,15 @@ class MicroMultilabelFBeta(MultilabelClassificationMetric):
 
 
 class MacroMultilabelFBeta(MultilabelClassificationMetric):
+    """
+    The macro F-beta metric for multilabel classification.
+
+    Args:
+        beta: The beta parameter for F-beta.
+        threshold: The threshold for the prediction probabilities. If prediction probabilities are
+            greater than or equal to the threshold, the label is predicted.
+    """
+
     def __init__(
         self,
         beta: float = 1.0,

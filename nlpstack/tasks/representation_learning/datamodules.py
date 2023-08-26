@@ -20,6 +20,16 @@ class RepresentationLearningDataModule(
         RepresentationLearningPrediction,
     ]
 ):
+    """
+    A data module for representation learning.
+
+    Args:
+        vocab: The vocabulary.
+        tokenizer: The tokenizer. Defaults to `WhitespaceTokenizer()`
+        token_indexers: The token indexers to index the tokens. Defaults to
+            `{"tokens": SingleIdTokenIndexer()}`
+    """
+
     def __init__(
         self,
         vocab: Vocabulary,
@@ -40,6 +50,15 @@ class RepresentationLearningDataModule(
         dataset: Optional[Sequence[RepresentationLearningExample]] = None,
         **kwargs: Any,
     ) -> None:
+        """
+        Setup the data module.
+
+        This method tokenizes the dataset and builds the vocabulary.
+
+        Args:
+            dataset: The dataset to tokenize and build the vocabulary from.
+        """
+
         if dataset:
             with ProgressBar[int](len(dataset) * 2) as progress:
                 progress.set_description("Tokenizing dataset")
@@ -48,6 +67,16 @@ class RepresentationLearningDataModule(
                 self._build_vocab(iter_with_callback(dataset, lambda _: progress.update()))
 
     def tokenize(self, dataset: Iterable[RepresentationLearningExample]) -> Sequence[RepresentationLearningExample]:
+        """
+        Tokenize the dataset and return the tokenized dataset.
+
+        Args:
+            dataset: The dataset to tokenize.
+
+        Returns:
+            The tokenized dataset.
+        """
+
         if not dataset:
             return []
 
@@ -71,6 +100,14 @@ class RepresentationLearningDataModule(
             token_indexer.build_vocab(self.vocab, text_iterator())
 
     def build_instance(self, example: RepresentationLearningExample) -> Instance:
+        """
+        Build an instance from an example.
+        If the given `example.text` is a string, it will be tokenized using the tokenizer.
+
+        Args:
+            example: The example to build the instance from.
+        """
+
         text = example.text
         metadata = example.metadata
 
@@ -88,10 +125,30 @@ class RepresentationLearningDataModule(
     def build_predictions(
         self, inference: RepresentationLearningInference
     ) -> Iterator[RepresentationLearningPrediction]:
+        """
+        Build predictions from an batched inference result.
+
+        Args:
+            inference: The batched inference result.
+
+        Returns:
+            The predictions.
+        """
+
         for embedding in inference.embeddings:
             yield RepresentationLearningPrediction(embedding.tolist())
 
     def read_dataset(self, dataset: Iterable[RepresentationLearningExample], **kwargs: Any) -> Iterator[Instance]:
+        """
+        Read the dataset and return a generator of instances.
+
+        Args:
+            dataset: The dataset to read.
+
+        Returns:
+            A generator of instances.
+        """
+
         logger.info("Building instances...")
         for example in ProgressBar(dataset, desc="Building instances"):
             yield self.build_instance(example)
