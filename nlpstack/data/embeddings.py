@@ -291,7 +291,7 @@ class TextEmbedding:
         raise NotImplementedError
 
 
-class BagOfEmbeddingsTextEmbedding:
+class BagOfEmbeddingsTextEmbedding(TextEmbedding):
     """
     A text embedding model using bag-of-embeddings.
 
