@@ -12,6 +12,8 @@ from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 from nlpstack.data.vocabulary import Vocabulary
 from nlpstack.transformers import cache as transformers_cache
 
+from .util import masked_pool
+
 try:
     import fasttext
 except ModuleNotFoundError:
@@ -350,35 +352,67 @@ class BagOfEmbeddingsTextEmbedding:
                     embeddings[batch_index, token_index] = embedding
                     mask[batch_index, token_index] = True
 
-        if self._pooling == "mean":
-            return cast(numpy.ndarray, embeddings.sum(axis=1) / (mask.sum(axis=1, keepdims=True) + 1e-13))
+        return masked_pool(
+            embeddings,
+            mask,
+            pooling=self._pooling,
+            window_size=self._window_size,
+        )
 
-        if self._pooling == "max":
-            embeddings[~mask] = float("-inf")
-            return cast(numpy.ndarray, embeddings.max(axis=1))
 
-        if self._pooling == "min":
-            embeddings[~mask] = float("inf")
-            return cast(numpy.ndarray, embeddings.min(axis=1))
+class PretrainedTransformerTextEmbedding(TextEmbedding):
+    def __init__(
+        self,
+        pretrained_model_name: Union[str, PathLike],
+        submodule: Optional[str] = None,
+        pooling: Literal["mean", "max", "min", "sum", "hier", "first", "last"] = "mean",
+        window_size: Optional[int] = None,
+    ) -> None:
+        if pooling == "hier" and window_size is None:
+            raise ValueError("window_size must be specified when pooling is 'hier'")
 
-        if self._pooling == "sum":
-            return cast(numpy.ndarray, embeddings.sum(axis=1))
+        from transformers import pipeline
 
-        if self._pooling == "hier":
-            return numpy.array([self._hierarchical_pooling(x, m) for x, m in zip(embeddings, mask)])
+        self._pretrained_model_name = pretrained_model_name
+        self._submodule = submodule
+        self._pooling = pooling
+        self._window_size = window_size
 
-        raise ValueError(f"pooling must be one of 'mean', 'max', 'min', 'sum', or 'hier', but got {self._pooling}")
+        self._pipeline = pipeline("feature-extraction", model=self.model, tokenizer=self.tokenizer)
 
-    def _hierarchical_pooling(self, vectors: numpy.ndarray, mask: numpy.ndarray) -> numpy.ndarray:
-        assert self._window_size is not None
-        vectors = vectors[mask]
-        if len(vectors) < self._window_size:
-            return cast(numpy.ndarray, vectors.mean(0))
-        output = -numpy.inf * numpy.ones(self.get_output_dim())
-        for offset in range(len(vectors) - self._window_size + 1):
-            window = vectors[offset : offset + self._window_size]
-            output = numpy.maximum(output, window.mean(0))
-        return output
+    @cached_property
+    def tokenizer(self) -> "transformers.PreTrainedTokenizer":
+        pretrained_model_name = self._pretrained_model_name
+        with suppress(FileNotFoundError):
+            pretrained_model_name = minato.cached_path(pretrained_model_name)
+        return transformers_cache.get_pretrained_tokenizer(pretrained_model_name)
+
+    @cached_property
+    def model(self) -> "transformers.PreTrainedModel":
+        pretrained_model_name = self._pretrained_model_name
+        with suppress(FileNotFoundError):
+            pretrained_model_name = minato.cached_path(pretrained_model_name)
+        model = transformers_cache.get_pretrained_model(pretrained_model_name)
+        if self._submodule is not None:
+            model = getattr(model, self._submodule)
+        return model
+
+    def get_output_dim(self) -> int:
+        return int(self.model.config.hidden_size)
+
+    def __call__(self, texts: Sequence[str]) -> numpy.ndarray:
+        features = self._pipeline(texts)
+        return numpy.concatenate(
+            [
+                masked_pool(
+                    numpy.array(x),
+                    pooling=self._pooling,
+                    window_size=self._window_size,
+                )
+                for x in features
+            ],
+            axis=0,
+        )
 
 
 class SentenceTransformerTextEmbedding(TextEmbedding):

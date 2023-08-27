@@ -8,6 +8,7 @@ from nlpstack.data.embeddings import (  # noqa: F401
     MinhashWordEmbedding,
     OpenAITextEmbedding,
     PretrainedFasttextWordEmbedding,
+    PretrainedTransformerTextEmbedding,
     PretrainedTransformerWordEmbedding,
     PretrainedWordEmbedding,
     SentenceTransformerTextEmbedding,
