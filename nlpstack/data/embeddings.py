@@ -347,8 +347,6 @@ class BagOfEmbeddingsTextEmbedding:
             for token_index, token in enumerate(tokens):
                 if token.surface in self._word_embedding:
                     embedding = self._word_embedding[token.surface]
-                    if self._normalize:
-                        embedding /= numpy.linalg.norm(embedding) + 1e-13
                     embeddings[batch_index, token_index] = embedding
                     mask[batch_index, token_index] = True
 
@@ -356,16 +354,29 @@ class BagOfEmbeddingsTextEmbedding:
             embeddings,
             mask,
             pooling=self._pooling,
+            normalize=self._normalize,
             window_size=self._window_size,
         )
 
 
 class PretrainedTransformerTextEmbedding(TextEmbedding):
+    """
+    A text embedding model using pretrained transformer models.
+
+    Args:
+        pretrained_model_name: A pretrained model name.
+        submodule: A submodule name. Defaults to `None`.
+        pooling: A pooling method. Defaults to `"mean"`.
+        normalize: If `True`, normalize word embeddings before pooling. Defaults to `False`.
+        window_size: A window size for hierarchical pooling. Defaults to `None`.
+    """
+
     def __init__(
         self,
         pretrained_model_name: Union[str, PathLike],
         submodule: Optional[str] = None,
         pooling: Literal["mean", "max", "min", "sum", "hier", "first", "last"] = "mean",
+        normalize: bool = False,
         window_size: Optional[int] = None,
     ) -> None:
         if pooling == "hier" and window_size is None:
@@ -376,6 +387,7 @@ class PretrainedTransformerTextEmbedding(TextEmbedding):
         self._pretrained_model_name = pretrained_model_name
         self._submodule = submodule
         self._pooling = pooling
+        self._normalize = normalize
         self._window_size = window_size
 
         self._pipeline = pipeline("feature-extraction", model=self.model, tokenizer=self.tokenizer)
@@ -407,6 +419,7 @@ class PretrainedTransformerTextEmbedding(TextEmbedding):
                 masked_pool(
                     numpy.array(x),
                     pooling=self._pooling,
+                    normalize=self._normalize,
                     window_size=self._window_size,
                 )
                 for x in features
@@ -421,7 +434,7 @@ class SentenceTransformerTextEmbedding(TextEmbedding):
 
     Args:
         model_name: A model name. Defaults to `"all-MiniLM-L6-v2"`.
-        normalize_embeddings: Whether to normalize embeddings. Defaults to `False`.
+        normalize_embeddings: Whether to normalize output embeddings. Defaults to `False`.
         device: A device to use. Defaults to `"cpu"`.
     """
 

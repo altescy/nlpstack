@@ -53,6 +53,7 @@ def masked_pool(
     embeddings: numpy.ndarray,
     mask: Optional[numpy.ndarray] = None,
     pooling: Literal["mean", "max", "min", "sum", "hier", "first", "last"] = "mean",
+    normalize: bool = False,
     window_size: Optional[int] = None,
 ) -> numpy.ndarray:
     """
@@ -62,10 +63,14 @@ def masked_pool(
         embeddings: Embeddings to pool of shape (batch_size, sequence_length, embedding_size).
         mask: Mask of shape (batch_size, sequence_length).
         pooling: Pooling method. Defaults to `"mean"`.
+        normalize: Whether to normalize the embeddings before pooling. Defaults to `False`.
         window_size: Window size for hierarchical pooling. Defaults to `None`.
     """
 
     batch_size, sequence_length, embedding_size = embeddings.shape
+
+    if normalize:
+        embeddings = embeddings / (numpy.linalg.norm(embeddings, axis=-1, keepdims=True) + 1e-13)
 
     if mask is None:
         mask = numpy.ones((batch_size, sequence_length), dtype=bool)
