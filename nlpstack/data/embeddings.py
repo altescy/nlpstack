@@ -1,3 +1,4 @@
+import os
 import warnings
 from contextlib import suppress
 from logging import getLogger
@@ -6,6 +7,7 @@ from typing import Any, Iterator, List, Literal, Mapping, Optional, Sequence, Un
 
 import minato
 import numpy
+import requests
 
 from nlpstack.common import FileBackendMapping, cached_property, murmurhash3
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
@@ -476,8 +478,9 @@ class OpenAITextEmbedding(TextEmbedding):
     """
     A text embedding model using OpenAI API.
 
+    You need to set `OPENAI_API_KEY` environment variable.
+
     Args:
-        api_key: An API key. Defaults to `None`.
         model_name: A model name. Defaults to `"text-embedding-ada-002"`.
         organization_id: An organization ID. Defaults to `None`.
         api_base: The base path for the API. Defaults to `None`.
@@ -487,13 +490,14 @@ class OpenAITextEmbedding(TextEmbedding):
 
     def __init__(
         self,
-        api_key: Optional[str] = None,
         model_name: str = "text-embedding-ada-002",
         organization_id: Optional[str] = None,
         api_base: Optional[str] = None,
         api_type: Optional[str] = None,
         api_version: Optional[str] = None,
     ) -> None:
+        api_key = os.environ.get("OPENAI_API_KEY")
+
         if openai is None:
             raise ModuleNotFoundError("openai is not installed")
 
@@ -528,21 +532,27 @@ class HuggingFaceTextEmbedding(TextEmbedding):
     """
     A text embedding model using HuggingFace API.
 
+    You need to set `HUGGINGFACE_API_KEY` environment variable.
+
     Args:
-        api_key: An API key. Defaults to `None`.
         model_name: A model name. Defaults to `"sentence-transformers/all-MiniLM-L6-v2"`.
     """
 
     def __init__(
         self,
-        api_key: str,
         model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
     ) -> None:
-        import requests
-
         self._api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_name}"
-        self._session = requests.Session()
-        self._session.headers.update({"Authorization": f"Bearer {api_key}"})
+        self._session
+
+    @cached_property
+    def _session(self) -> requests.Session:
+        api_key = os.environ.get("HUGGINGFACE_API_KEY")
+        if api_key is None:
+            raise ValueError("Please provide an HuggingFace API key.")
+        session = requests.Session()
+        session.headers.update({"Authorization": f"Bearer {api_key}"})
+        return session
 
     def __call__(self, texts: Sequence[str]) -> numpy.ndarray:
         # Call HuggingFace Embedding API for each document
