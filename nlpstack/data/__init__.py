@@ -15,6 +15,12 @@ from nlpstack.data.embeddings import (  # noqa: F401
     TextEmbedding,
     WordEmbedding,
 )
+from nlpstack.data.generators import (  # noqa: F401
+    HuggingfaceTextGenerator,
+    OpenAIChatTextGenerator,
+    PretrainedTransformerTextGenerator,
+    TextGenerator,
+)
 from nlpstack.data.indexers import (  # noqa: F401
     PretrainedEmbeddingIndexer,
     PretrainedTransformerIndexer,
