@@ -166,6 +166,16 @@ class HuggingfaceTextGenerator(TextGenerator):
 
 
 class PretrainedTransformerTextGenerator(TextGenerator):
+    """
+    A text generator using pretrained transformer models.
+
+    Args:
+        model_name: The name of the model to use. Defaults to `"gpt2"`.
+        task: The task to perform. Defaults to `None`.
+        device: The device to use. Defaults to `"cpu"`.
+        **kwargs: Additional keyword arguments to pass to the model.
+    """
+
     Task = Literal["text-generation", "text2text-generation"]
 
     def __init__(
