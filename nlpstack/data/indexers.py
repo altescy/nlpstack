@@ -324,7 +324,7 @@ class PretrainedTransformerIndexer(TokenIndexer):
     def __init__(
         self,
         pretrained_model_name: Union[str, PathLike],
-        namespace: Optional[str] = None,
+        namespace: str = "tokens",
         tokenize_subwords: bool = False,
         add_special_tokens: bool = False,
     ) -> None:
@@ -346,11 +346,18 @@ class PretrainedTransformerIndexer(TokenIndexer):
         return transformers_cache.get_pretrained_tokenizer(pretrained_model_name)
 
     def build_vocab(self, vocab: Vocabulary, documents: Iterable[Sequence[Token]]) -> None:
-        if self._namespace is not None:
-            raise ValueError("Currently, PretrainedTransformerIndexer does not support building vocabulary.")
+        try:
+            token_to_index = self.tokenizer.get_vocab()
+        except NotImplementedError:
+            token_to_index = {self.tokenizer.convert_ids_to_tokens(i): i for i in range(self.tokenizer.vocab_size)}
+        vocab.build_vocab_from_documents(
+            self._namespace,
+            ([token.surface for token in tokens] for tokens in documents),
+            token_to_index=token_to_index,
+        )
 
     def get_pad_index(self, vocab: Vocabulary) -> int:
-        return int(self.tokenizer.pad_token_id)
+        return vocab.get_pad_index(self._namespace)
 
     def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> Dict[str, Any]:
         """

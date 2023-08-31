@@ -72,7 +72,7 @@ class CausalLanguageModelingDataModule(
                 `labels` field.
         """
 
-        if dataset:
+        if dataset is not None:
             with ProgressBar[int](len(dataset) * 2) as progress:
                 progress.set_description("Tokenizing dataset")
                 dataset = self.tokenize(iter_with_callback(dataset, lambda _: progress.update()))

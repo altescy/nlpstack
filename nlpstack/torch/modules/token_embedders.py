@@ -1,6 +1,6 @@
 from contextlib import suppress
 from os import PathLike
-from typing import Any, Optional, Union, cast
+from typing import Any, Literal, Optional, Union, cast
 
 import minato
 import numpy
@@ -21,6 +21,9 @@ class TokenEmbedder(torch.nn.Module):
 
     def get_output_dim(self) -> int:
         raise NotImplementedError
+
+    def get_weight(self) -> Optional[torch.FloatTensor]:
+        return None
 
 
 class PassThroughTokenEmbedder(TokenEmbedder):
@@ -63,8 +66,7 @@ class Embedding(TokenEmbedder):
         self._pretrained_embedding = pretrained_embedding
         self._extend_vocab = extend_vocab
 
-    @property
-    def weight(self) -> torch.FloatTensor:
+    def get_weight(self) -> torch.FloatTensor:
         return cast(torch.FloatTensor, self._embedding.weight)
 
     def setup(self, *args: Any, vocab: Vocabulary, **kwargs: Any) -> None:
@@ -158,12 +160,24 @@ class AggregativeTokenEmbedder(TokenEmbedder):
 
 
 class PretrainedTransformerEmbedder(TokenEmbedder):
+    class _Embedding(torch.nn.Module):
+        def __init__(self, model: torch.nn.Module) -> None:
+            from transformers import PreTrainedModel
+
+            super().__init__()
+
+            assert isinstance(model, PreTrainedModel)
+            self.embedding = model.get_input_embeddings()
+
+        def forward(self, token_ids: torch.LongTensor) -> torch.FloatTensor:
+            return cast(torch.FloatTensor, self.embedding(token_ids))
+
     def __init__(
         self,
         pretrained_model_name: Union[str, PathLike],
         eval_mode: bool = False,
+        layer_to_use: Literal["embeddings", "last", "all"] = "last",
         train_parameters: bool = True,
-        last_layer_only: bool = True,
         submodule: Optional[str] = None,
         gradient_checkpointing: Optional[bool] = None,
         max_length: Optional[int] = None,
@@ -174,29 +188,35 @@ class PretrainedTransformerEmbedder(TokenEmbedder):
             pretrained_model_name = minato.cached_path(pretrained_model_name)
 
         super().__init__()
-        self._model = AutoModel.from_pretrained(pretrained_model_name)
-        self._scalaer_mix: Optional[ScalarMix] = None
+        model = AutoModel.from_pretrained(pretrained_model_name)
+        scalar_mix: Optional[ScalarMix] = None
+        output_dim: int = model.config.hidden_size
 
         if gradient_checkpointing is not None:
-            self._model.config.update({"gradient_checkpointing": gradient_checkpointing})
+            model.config.update({"gradient_checkpointing": gradient_checkpointing})
 
         if submodule is not None:
-            assert hasattr(self._model, submodule)
-            self._model = getattr(self._model, submodule)
+            assert hasattr(model, submodule), f"Submodule {submodule} is not found in {pretrained_model_name}"
+            model = getattr(model, submodule)
 
         self.eval_mode = eval_mode
         if eval_mode:
-            self._model.eval()
+            model.eval()
 
         if not train_parameters:
-            for param in self._model.parameters():
+            for param in model.parameters():
                 param.requires_grad = False
 
-        if not last_layer_only:
-            self._scalaer_mix = ScalarMix(self._model.config.num_hidden_layers)
-            self._model.config.output_hidden_states = True
+        if layer_to_use == "all":
+            scalar_mix = ScalarMix(model.config.num_hidden_layers)
+            model.config.output_hidden_states = True
+        elif layer_to_use == "embeddings":
+            model = PretrainedTransformerEmbedder._Embedding(model)
 
+        self._model = model
+        self._scalar_mix = scalar_mix
         self._max_length = max_length
+        self._output_dim = output_dim
 
     def train(self, mode: bool = True) -> "PretrainedTransformerEmbedder":
         self.training = mode
@@ -208,7 +228,12 @@ class PretrainedTransformerEmbedder(TokenEmbedder):
         return self
 
     def get_output_dim(self) -> int:
-        return cast(int, self._model.config.hidden_size)
+        return self._output_dim
+
+    def get_weight(self) -> Optional[torch.FloatTensor]:
+        if isinstance(self._model, PretrainedTransformerEmbedder._Embedding):
+            return cast(torch.FloatTensor, self._model.embedding.weight)
+        return None
 
     def forward(
         self,
@@ -233,22 +258,25 @@ class PretrainedTransformerEmbedder(TokenEmbedder):
             if type_ids is not None:
                 type_ids = fold(type_ids, self._max_length)
 
-        transofrmer_inputs = {
-            "input_ids": token_ids,
-            "attention_mask": mask.float() if mask is not None else None,
-        }
-        if type_ids is not None:
-            transofrmer_inputs["token_type_ids"] = type_ids
-
-        transformer_outputs = self._model(**transofrmer_inputs)
-
-        if self._scalaer_mix is not None:
-            # The hidden states will also include the embedding layer, which we don't
-            # include in the scalar mix. Hence the `[1:]` slicing.
-            hidden_states = transformer_outputs.hidden_states[1:]
-            embeddings = self._scalaer_mix(hidden_states)
+        if isinstance(self._model, PretrainedTransformerEmbedder._Embedding):
+            embeddings = self._model(token_ids)
         else:
-            embeddings = transformer_outputs.last_hidden_state
+            transofrmer_inputs = {
+                "input_ids": token_ids,
+                "attention_mask": mask.float() if mask is not None else None,
+            }
+            if type_ids is not None:
+                transofrmer_inputs["token_type_ids"] = type_ids
+
+            transformer_outputs = self._model(**transofrmer_inputs)
+
+            if self._scalar_mix is not None:
+                # The hidden states will also include the embedding layer, which we don't
+                # include in the scalar mix. Hence the `[1:]` slicing.
+                hidden_states = transformer_outputs.hidden_states[1:]
+                embeddings = self._scalar_mix(hidden_states)
+            else:
+                embeddings = transformer_outputs.last_hidden_state
 
         if self._max_length is not None:
             embeddings = unfold(embeddings, sequence_length)

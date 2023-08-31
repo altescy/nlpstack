@@ -1,5 +1,5 @@
 from collections import Counter, defaultdict
-from typing import Dict, Iterable, Mapping, Sequence, Set, Union
+from typing import Dict, Iterable, Mapping, Optional, Sequence, Set, Union
 
 
 class Vocabulary:
@@ -244,16 +244,22 @@ class Vocabulary:
         self,
         namespace: str,
         documents: Iterable[Sequence[str]],
+        token_to_index: Optional[Mapping[str, int]] = None,
     ) -> None:
         if namespace in self._token_to_index:
             raise ValueError(f"Namespace {namespace} already exists.")
+
+        def get_token_index(token: str) -> int:
+            if token_to_index is None:
+                return len(self._index_to_token[namespace])
+            return token_to_index[token]
 
         self._token_to_index[namespace] = {}
         self._index_to_token[namespace] = {}
         self._token_to_count[namespace] = {}
 
         for token in sorted(self._special_tokens.get(namespace, set())):
-            index = len(self._token_to_index[namespace])
+            index = get_token_index(token)
             self._token_to_index[namespace][token] = index
             self._index_to_token[namespace][index] = token
 
@@ -284,7 +290,14 @@ class Vocabulary:
             count = token_count[token]
             df = document_frequency[token]
             if (abs_min_df <= df <= abs_max_df) and (min_count <= count <= max_count):
-                index = len(self._token_to_index[namespace])
+                index = get_token_index(token)
                 self._token_to_index[namespace][token] = index
                 self._index_to_token[namespace][index] = token
                 self._token_to_count[namespace][token] = count
+
+        if token_to_index is not None:
+            extra_tokens = set(token_to_index) - set(self._token_to_index)
+            for token in extra_tokens:
+                index = get_token_index(token)
+                self._token_to_index[namespace][token] = index
+                self._index_to_token[namespace][index] = token

@@ -7,9 +7,9 @@ import torch.nn.functional as F
 
 from nlpstack.torch.generation import BeamSearch
 from nlpstack.torch.model import TorchModel
-from nlpstack.torch.modules.heads import LanguageModelingHead
+from nlpstack.torch.modules.heads import Head
 from nlpstack.torch.modules.seq2seq_decoders import Seq2SeqDecoder, Seq2SeqDecoderState
-from nlpstack.torch.modules.token_embedders import Embedding
+from nlpstack.torch.modules.token_embedders import TokenEmbedder
 from nlpstack.torch.util import get_mask_from_text, get_token_ids_from_text
 
 from .datamodules import CausalLanguageModelingDataModule
@@ -38,14 +38,17 @@ class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference], Gene
 
     def __init__(
         self,
-        embedder: Embedding,
+        embedder: TokenEmbedder,
         decoder: Seq2SeqDecoder[Seq2SeqDecoderState],
-        lmhead: Optional[LanguageModelingHead] = None,
+        lmhead: Optional[Head] = None,
         dropout: Optional[float] = None,
         ignore_padding_loss: bool = False,
         beam_search: Optional[BeamSearch] = None,
         token_namespace: str = "tokens",
     ) -> None:
+        if lmhead is None and embedder.get_weight() is None:
+            raise ValueError("lmhead cannot be None if the embedder has no weight")
+
         super().__init__()
         self._embedder = embedder
         self._decoder = decoder
@@ -82,7 +85,9 @@ class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference], Gene
             inputs = self._dropout(inputs)
         if self._lmhead is not None:
             return cast(torch.FloatTensor, self._lmhead(inputs))
-        return cast(torch.FloatTensor, F.linear(inputs, self._embedder.weight))
+        embedding_weight = self._embedder.get_weight()
+        assert embedding_weight is not None
+        return cast(torch.FloatTensor, F.linear(inputs, embedding_weight))
 
     def _get_generated_sequences(
         self,

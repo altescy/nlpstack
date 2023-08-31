@@ -174,7 +174,7 @@ class PretrainedTransformerHead(Head):
 
         self._input_dim = int(model.config.hidden_size)
         self._output_dim = int(model.config.vocab_size)
-        self._head = model.lm_head
+        self._head = model.get_output_embeddings()
         if not train_parameters:
             for parameter in self._head.parameters():
                 parameter.requires_grad = False

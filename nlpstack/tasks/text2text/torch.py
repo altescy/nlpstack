@@ -8,10 +8,10 @@ import torch.nn.functional as F
 
 from nlpstack.torch.generation import BeamSearch
 from nlpstack.torch.model import TorchModel
-from nlpstack.torch.modules.heads import LanguageModelingHead
+from nlpstack.torch.modules.heads import Head
 from nlpstack.torch.modules.seq2seq_decoders import Seq2SeqDecoder, Seq2SeqDecoderState
 from nlpstack.torch.modules.seq2seq_encoders import Seq2SeqEncoder
-from nlpstack.torch.modules.token_embedders import Embedding
+from nlpstack.torch.modules.token_embedders import TokenEmbedder
 from nlpstack.torch.util import get_mask_from_text, get_token_ids_from_text
 
 from .datamodules import Text2TextDataModule
@@ -46,11 +46,11 @@ class TorchText2Text(TorchModel[Text2TextInference]):
 
     def __init__(
         self,
-        source_embedder: Embedding,
+        source_embedder: TokenEmbedder,
         encoder: Seq2SeqEncoder,
         decoder: Seq2SeqDecoder,
-        target_embedder: Optional[Embedding] = None,
-        lmhead: Optional[LanguageModelingHead] = None,
+        target_embedder: Optional[TokenEmbedder] = None,
+        lmhead: Optional[Head] = None,
         dropout: Optional[float] = None,
         ignore_padding_loss: bool = False,
         beam_search: Optional[BeamSearch] = None,
@@ -59,6 +59,8 @@ class TorchText2Text(TorchModel[Text2TextInference]):
     ) -> None:
         if not decoder.can_take_memory():
             raise ValueError("Decoder must be able to take memory")
+        if lmhead is None and (target_embedder or source_embedder).get_weight() is None:
+            raise ValueError("lmhead is requred if the embedder has no weight")
 
         super().__init__()
         self._source_embedder = source_embedder
@@ -102,10 +104,9 @@ class TorchText2Text(TorchModel[Text2TextInference]):
             inputs = self._dropout(inputs)
         if self._lmhead:
             return cast(torch.FloatTensor, self._lmhead(inputs))
-        return cast(
-            torch.FloatTensor,
-            F.linear(inputs, (self._target_embedder or self._source_embedder).weight),
-        )
+        embedding_weight = (self._target_embedder or self._source_embedder).get_weight()
+        assert embedding_weight is not None
+        return cast(torch.FloatTensor, F.linear(inputs, embedding_weight))
 
     def forward(  # type: ignore[override]
         self,

@@ -145,8 +145,8 @@ class Text2TextDataModule(
 
         if isinstance(source, str):
             source = self._source_tokenizer.tokenize(source)
-        if self._vocab.has_bos_token(self._source_namespace):
-            source = [Token(self._vocab.get_bos_token(self._source_namespace))] + list(source)
+        # if self._vocab.has_bos_token(self._source_namespace):
+        #     source = [Token(self._vocab.get_bos_token(self._source_namespace))] + list(source)
         if self._vocab.has_eos_token(self._source_namespace):
             source = list(source) + [Token(self._vocab.get_eos_token(self._source_namespace))]
 
