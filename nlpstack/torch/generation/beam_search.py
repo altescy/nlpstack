@@ -4,7 +4,7 @@ from typing import Any, Callable, List, NamedTuple, Optional, Protocol, Tuple, T
 import torch
 
 from .constraints import Constraint, MultiConstraint
-from .samplers import DeterministicSampler, Sampler
+from .samplers import MultinomialSampler, Sampler
 from .scorers import BeamScorer, SequenceLogProbabilityScorer
 
 StepStateSelf = TypeVar("StepStateSelf", bound="StepStateInterface")
@@ -52,7 +52,7 @@ class BeamSearch:
         self._max_steps = max_steps
         self._beam_size = beam_size
         self._sampling_size_per_node = sampling_size_per_node or beam_size
-        self._sampler = sampler or DeterministicSampler()
+        self._sampler = sampler or MultinomialSampler()
         self._scorer = scorer or SequenceLogProbabilityScorer()
         self._constraint = constraint
         self._eos_index: Optional[int] = None
