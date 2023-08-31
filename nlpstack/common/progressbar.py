@@ -74,7 +74,7 @@ class ProgressBar(Generic[T]):
 
     def __init__(
         self,
-        total_or_iterable: int | Iterable[T] | None,
+        total_or_iterable: int | Iterable[T] | None = None,
         desc: str | None = None,
         unit: str = "it",
         leave: bool = True,
@@ -88,7 +88,8 @@ class ProgressBar(Generic[T]):
         sizeof_formatter: Callable[[int | float], str] = _default_sizeof_formatter,
         disable: bool = False,
     ) -> None:
-        total_or_iterable = total_or_iterable or cast(Iterator[T], _dummy_iterator())
+        if total_or_iterable is None:
+            total_or_iterable = cast(Iterator[T], _dummy_iterator())
         position = position if position is not None else len(self.get_active_progressbars())
         self._iterable = (
             cast(Iterator[T], range(total_or_iterable)) if isinstance(total_or_iterable, int) else total_or_iterable
@@ -232,7 +233,7 @@ class ProgressBar(Generic[T]):
                 template += "  " + postfix_template
         else:
             total_width = len(self._sizeof_formatter(self._total))
-            percentage = int(100 * self._iterations / self._total)
+            percentage = int(100 * self._iterations / self._total) if self._total > 0 else 100
             remaining_time = (self._total - self._iterations) * interval_ema
             postfix_template = " ".join(postfixes)
 
