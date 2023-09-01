@@ -5,9 +5,8 @@ from typing import Any, Dict, Generic, List, Mapping, Optional, Sequence, TypeVa
 
 import torch
 
-from nlpstack.common import ProgressBar
+from nlpstack.common import ProgressBar, batched_iterator
 from nlpstack.data import BasicBatchSampler, DataLoader, Instance
-from nlpstack.data.util import batched_iterator
 from nlpstack.evaluation import EmptyMetric, Metric
 from nlpstack.torch.model import TorchModel, TorchModelOutput
 from nlpstack.torch.training.callbacks import Callback, StopEarly
