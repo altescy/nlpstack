@@ -247,6 +247,19 @@ class RuneMlflowWorkflow(Workflow):
 
                 mlflow.log_artifacts(tmpdir)
 
+            if valid_examples is not None:
+                logger.info("Start evaluation with valid dataset...")
+                metrics = model.evaluate(valid_examples)
+                mlflow.log_metrics(metrics)
+
+            if rune_config.test_dataset_filename is not None:
+                logger.info("Start evaluation with test dataset...")
+                test_examples = FileBackendSequence.from_iterable(rune_config.reader(rune_config.test_dataset_filename))
+                metrics = model.evaluate(test_examples)
+                mlflow.log_metrics(metrics)
+
+            logger.info("Done")
+
     def tune(
         self,
         config_filename: str,
@@ -430,7 +443,10 @@ class RuneMlflowWorkflow(Workflow):
                     best_result_filename.write_text(json.dumps(best_result, indent=2, ensure_ascii=False))
                     mlflow.log_artifact(best_result_filename)
                 finally:
+                    logger.info("Saving artifacts...")
                     mlflow.log_artifact(optuna_storage_path)
+
+            logger.info("Done")
 
     def evaluate(
         self,
