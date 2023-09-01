@@ -6,10 +6,10 @@ from typing import Any, Dict, Iterable, Iterator, Literal, Mapping, Optional, Se
 
 import numpy
 
+from nlpstack.common import ProgressBar, batched
 from nlpstack.data import BasicBatchSampler, DataLoader, Vocabulary
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
-from nlpstack.data.util import batched
 from nlpstack.evaluation import MultiMetrics
 from nlpstack.rune import RuneForTorch
 from nlpstack.torch.modules.seq2vec_encoders import BagOfEmbeddings
@@ -359,7 +359,7 @@ class FastTextClassifier(
             raise RuntimeError("model is not trained")
         label_to_index = {label: i for i, label in enumerate(self._labels)}
         self.metric.reset()
-        for batch in batched(dataset, batch_size):
+        for batch in ProgressBar(batched(dataset, batch_size), desc="Evaluating"):
             assert all(example.label is not None for example in batch)
             texts = [
                 " ".join(

@@ -1,12 +1,11 @@
 from logging import getLogger
 from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
-from nlpstack.common import FileBackendSequence, ProgressBar
+from nlpstack.common import FileBackendSequence, ProgressBar, iter_with_callback
 from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
-from nlpstack.data.util import iter_with_callback
 
 from .types import CausalLanguageModelingExample, CausalLanguageModelingInference, CausalLanguageModelingPrediction
 

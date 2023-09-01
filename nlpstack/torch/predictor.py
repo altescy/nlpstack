@@ -2,8 +2,8 @@ from typing import Any, Generic, Iterable, Iterator, Optional, Sequence, TypeVar
 
 import torch
 
+from nlpstack.common import batched
 from nlpstack.data import Collator, DataModule
-from nlpstack.data.util import batched
 from nlpstack.torch.model import TorchModel
 from nlpstack.torch.util import move_to_device
 
