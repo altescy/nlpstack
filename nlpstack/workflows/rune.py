@@ -250,12 +250,14 @@ class RuneMlflowWorkflow(Workflow):
             if valid_examples is not None:
                 logger.info("Start evaluation with valid dataset...")
                 metrics = model.evaluate(valid_examples)
+                metrics = {f"valid_{key}": value for key, value in metrics.items()}
                 mlflow.log_metrics(metrics)
 
             if rune_config.test_dataset_filename is not None:
                 logger.info("Start evaluation with test dataset...")
                 test_examples = FileBackendSequence.from_iterable(rune_config.reader(rune_config.test_dataset_filename))
                 metrics = model.evaluate(test_examples)
+                metrics = {f"test_{key}": value for key, value in metrics.items()}
                 mlflow.log_metrics(metrics)
 
             logger.info("Done")
