@@ -4,6 +4,8 @@ local pretrained_model_name = 'bert-base-cased';
 {
   model: {
     type: 'nlpstack.tasks.sequence_labeling.rune.BasicSequenceLabeler',
+    pad_token: '[PAD]',
+    oov_token: '[UNK]',
     token_indexers: {
       tokens: {
         type: 'nlpstack.data.indexers.PretrainedTransformerIndexer',
@@ -21,7 +23,7 @@ local pretrained_model_name = 'bert-base-cased';
               type: 'nlpstack.torch.modules.token_embedders.PretrainedTransformerEmbedder',
               pretrained_model_name: pretrained_model_name,
               train_parameters: false,
-              last_layer_only: false,
+              layer_to_use: 'all',
             },
             dropout: 0.1,
           },
