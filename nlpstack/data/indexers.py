@@ -350,14 +350,26 @@ class PretrainedTransformerIndexer(TokenIndexer):
             token_to_index = self.tokenizer.get_vocab()
         except NotImplementedError:
             token_to_index = {self.tokenizer.convert_ids_to_tokens(i): i for i in range(self.tokenizer.vocab_size)}
+
+        def document_iterator() -> Iterator[Sequence[str]]:
+            for tokens in documents:
+                if self._tokenize_subwords:
+                    surfaces = [subword for token in tokens for subword in self.tokenizer.tokenize(token.surface)]
+                else:
+                    surfaces = [token.surface for token in tokens]
+                yield surfaces
+
         vocab.build_vocab_from_documents(
             self._namespace,
-            ([token.surface for token in tokens] for tokens in documents),
+            document_iterator(),
             token_to_index=token_to_index,
         )
 
     def get_pad_index(self, vocab: Vocabulary) -> int:
         return vocab.get_pad_index(self._namespace)
+
+    def get_vocab_namespace(self) -> str:
+        return self._namespace
 
     def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> Dict[str, Any]:
         """
