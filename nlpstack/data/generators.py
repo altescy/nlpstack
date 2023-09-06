@@ -1,9 +1,11 @@
 import asyncio
 import json
 import os
+from contextlib import suppress
 from os import PathLike
 from typing import Any, List, Literal, Optional, Sequence, Type, TypedDict, Union
 
+import minato
 import requests
 
 from nlpstack.common import cached_property
@@ -190,11 +192,16 @@ class PretrainedTransformerTextGenerator(TextGenerator):
         self._device = device
         self._kwargs = kwargs
 
+        self._pipeline
+
     @cached_property
     def _pipeline(self) -> "transformers.Pipeline":
+        pretrained_model_name = self._pretrained_model_name
+        with suppress(FileNotFoundError):
+            pretrained_model_name = minato.cached_path(pretrained_model_name)
         return transformers.pipeline(
             task=self._task,
-            model=self._pretrained_model_name,
+            model=pretrained_model_name,
             device=self._device,
         )
 
