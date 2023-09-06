@@ -213,7 +213,8 @@ class PretrainedTransformerTextGenerator(TextGenerator):
         pretrained_model_name = self._pretrained_model_name
         with suppress(FileNotFoundError):
             pretrained_model_name = minato.cached_path(pretrained_model_name)
-        model = transformers_cache.get_pretrained_model(pretrained_model_name)
+        auto_cls = transformers.AutoModelForSeq2SeqLM if self._task == "text2text-generation" else None
+        model = transformers_cache.get_pretrained_model(pretrained_model_name, auto_cls=auto_cls)
         return model
 
     def __call__(self, inputs: Sequence[str], **kwargs: Any) -> List[str]:

@@ -1,6 +1,6 @@
 from logging import getLogger
 from os import PathLike
-from typing import Dict, NamedTuple, Union
+from typing import Dict, NamedTuple, Optional, Type, Union
 
 try:
     import transformers
@@ -13,7 +13,7 @@ logger = getLogger(__name__)
 
 class _ModelSpec(NamedTuple):
     model_name: str
-    with_head: bool
+    auto_cls: Type
 
 
 class _TokenizerSpec(NamedTuple):
@@ -26,19 +26,17 @@ _tokenizer_cache: Dict[_TokenizerSpec, "transformers.PreTrainedTokenizer"] = {}
 
 def get_pretrained_model(
     pretrained_model_name_or_path: Union[str, PathLike],
-    with_head: bool = False,
+    auto_cls: Optional[Type] = None,
 ) -> "transformers.PretrainedModel":
     global _model_cache
     if transformers is None:
         raise ModuleNotFoundError("transformers is not installed.")
-    spec = _ModelSpec(str(pretrained_model_name_or_path), with_head)
+    auto_cls = auto_cls or transformers.AutoModel
+    spec = _ModelSpec(str(pretrained_model_name_or_path), auto_cls)
     if spec in _model_cache:
         logger.debug(f"Found cached model: {spec}")
     else:
-        if with_head:
-            _model_cache[spec] = transformers.AutoModelWithLMHead.from_pretrained(pretrained_model_name_or_path)
-        else:
-            _model_cache[spec] = transformers.AutoModel.from_pretrained(pretrained_model_name_or_path)
+        _model_cache[spec] = auto_cls.from_pretrained(pretrained_model_name_or_path)
     return _model_cache[spec]
 
 
