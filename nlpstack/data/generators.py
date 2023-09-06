@@ -9,6 +9,7 @@ import minato
 import requests
 
 from nlpstack.common import cached_property
+from nlpstack.transformers import cache as transformers_cache
 
 try:
     import transformers
@@ -192,18 +193,28 @@ class PretrainedTransformerTextGenerator(TextGenerator):
         self._device = device
         self._kwargs = kwargs
 
-        self._pipeline
+        self._pipeline = transformers.pipeline(
+            task=task,
+            model=self.model,
+            tokenizer=self.tokenizer,
+            device=device,
+            **kwargs,
+        )
 
     @cached_property
-    def _pipeline(self) -> "transformers.Pipeline":
+    def tokenizer(self) -> "transformers.PreTrainedTokenizer":
         pretrained_model_name = self._pretrained_model_name
         with suppress(FileNotFoundError):
             pretrained_model_name = minato.cached_path(pretrained_model_name)
-        return transformers.pipeline(
-            task=self._task,
-            model=pretrained_model_name,
-            device=self._device,
-        )
+        return transformers_cache.get_pretrained_tokenizer(pretrained_model_name)
+
+    @cached_property
+    def model(self) -> "transformers.PreTrainedModel":
+        pretrained_model_name = self._pretrained_model_name
+        with suppress(FileNotFoundError):
+            pretrained_model_name = minato.cached_path(pretrained_model_name)
+        model = transformers_cache.get_pretrained_model(pretrained_model_name)
+        return model
 
     def __call__(self, inputs: Sequence[str], **kwargs: Any) -> List[str]:
         output = self._pipeline(
