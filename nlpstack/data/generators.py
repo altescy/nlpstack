@@ -213,7 +213,7 @@ class PretrainedTransformerTextGenerator(TextGenerator):
         pretrained_model_name = self._pretrained_model_name
         with suppress(FileNotFoundError):
             pretrained_model_name = minato.cached_path(pretrained_model_name)
-        auto_cls = transformers.pipelines.SUPPORTED_TASKS[self._task]["pt"][0]
+        auto_cls = transformers.pipelines.SUPPORTED_TASKS[self._task]["pt"][0] if self._task else None
         model = transformers_cache.get_pretrained_model(pretrained_model_name, auto_cls=auto_cls)
         return model
 
@@ -223,4 +223,10 @@ class PretrainedTransformerTextGenerator(TextGenerator):
             **self._kwargs,
             **kwargs,
         )
-        return [output[0]["generated_text"] for text in output]
+        sequence_delimiter = {**self._kwargs, **kwargs}.get("sequence_delimiter", "\n")
+        return [
+            sequence_delimiter.join(x["generated_text"] for x in texts)
+            if isinstance(texts, list)
+            else texts["generated_text"]
+            for texts in output
+        ]
