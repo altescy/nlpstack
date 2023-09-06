@@ -195,8 +195,8 @@ class PretrainedTransformerTextGenerator(TextGenerator):
 
         self._pipeline = transformers.pipeline(
             task=task,
-            model=self.model,
-            tokenizer=self.tokenizer,
+            model=self.model if task is not None else pretrained_model_name,
+            tokenizer=self.tokenizer if task is not None else None,
             device=device,
             **kwargs,
         )
