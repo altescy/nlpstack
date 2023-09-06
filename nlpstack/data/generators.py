@@ -223,4 +223,4 @@ class PretrainedTransformerTextGenerator(TextGenerator):
             **self._kwargs,
             **kwargs,
         )
-        return [text[0]["generated_text"] for text in output]
+        return [output[0]["generated_text"] for text in output]
