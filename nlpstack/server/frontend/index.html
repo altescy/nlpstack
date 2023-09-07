@@ -193,7 +193,7 @@
       // Handle anyOf
       if (schema.anyOf) {
         const select = document.createElement('select');
-        select.name = `${parentKey}.type`
+        select.name = `${parentKey}.__TYPE__`
         const subschemas = new Map();
         for (const acceptableSchema of schema.anyOf) {
           const option = document.createElement('option');
@@ -328,6 +328,7 @@
         for(var i = 0 ; i < elements.length ; i++){
           var item = elements.item(i);
           if (item.name){
+            if (/.+\.__TYPE__/.test(item.name)) continue;
             if (item.required && item.value) {
               object[item.name] = parseFormValue(item.value, item.type);
             } else if (!item.required && item.value !== "") {
