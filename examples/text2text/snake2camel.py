@@ -33,7 +33,7 @@ dataset = generate_dataset(1000)
 model = Text2Text(
     source_tokenizer=CharacterTokenizer(),
     batch_size=32,
-    max_epochs=20,
+    max_epochs=30,
     learning_rate=1e-2,
     metric=[Perplexity(), BLEU()],
 )
