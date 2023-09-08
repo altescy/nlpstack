@@ -354,6 +354,12 @@ class RuneMlflowWorkflow(Workflow):
                 model = rune_config.model
                 model.train(train_examples, valid_examples)
 
+                if valid_examples is not None:
+                    logger.info("Start evaluation with valid dataset...")
+                    metrics = model.evaluate(valid_examples)
+                    metrics = {f"valid_{key}": value for key, value in metrics.items()}
+                    mlflow.log_metrics(metrics)
+
                 logger.info("Saving artifacts...")
                 archive = RuneArchive(model, metadata={"config": config})
                 with tempfile.TemporaryDirectory() as _tmpdir:
