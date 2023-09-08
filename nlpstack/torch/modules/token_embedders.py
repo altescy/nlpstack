@@ -233,7 +233,7 @@ class PretrainedTransformerEmbedder(TokenEmbedder):
     def get_weight(self) -> Optional[torch.FloatTensor]:
         if isinstance(self._model, PretrainedTransformerEmbedder._Embedding):
             return cast(torch.FloatTensor, self._model.embedding.weight)
-        return None
+        return cast(torch.FloatTensor, self._model.get_input_embeddings().weight)
 
     def forward(
         self,
