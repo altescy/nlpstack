@@ -116,11 +116,19 @@ class SequenceAccuracy(Metric[Text2TextInference]):
         assert inference.gold_mask is not None
 
         batch_size = len(inference.pred_token_ids)
-        pred_token_ids = inference.pred_token_ids[:, 0] * inference.pred_mask[:, 0]
-        gold_token_ids = inference.gold_token_ids * inference.gold_mask
+        pred_token_ids = inference.pred_token_ids[:, 0]
+        gold_token_ids = inference.gold_token_ids
+        pred_mask = inference.pred_mask[:, 0]
+        gold_mask = inference.gold_mask
 
-        self._num_correct += (pred_token_ids == gold_token_ids).all(axis=1).sum()
-        self._total_count += batch_size
+        for batch_index in range(batch_size):
+            pred = pred_token_ids[batch_index][pred_mask[batch_index]]
+            gold = gold_token_ids[batch_index][gold_mask[batch_index]]
+
+            if len(pred) == len(gold):
+                self._num_correct += int(numpy.all(pred == gold))
+
+            self._total_count += 1
 
     def compute(self) -> Mapping[str, float]:
         return {"sequence_accuracy": self._num_correct / self._total_count if self._total_count > 0 else 0.0}
