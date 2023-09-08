@@ -99,3 +99,32 @@ class BLEU(Metric[Text2TextInference]):
 
     def reset(self) -> None:
         self._bleu.reset()
+
+
+class SequenceAccuracy(Metric[Text2TextInference]):
+    """
+    Accuracy metric for text-to-text task, which computes the percentage
+    of exact match between prediction and gold.
+    """
+
+    def __init__(self) -> None:
+        self._num_correct = 0
+        self._total_count = 0
+
+    def update(self, inference: Text2TextInference) -> None:
+        assert inference.gold_token_ids is not None
+        assert inference.gold_mask is not None
+
+        batch_size = len(inference.pred_token_ids)
+        pred_token_ids = inference.pred_token_ids[:, 0] * inference.pred_mask[:, 0]
+        gold_token_ids = inference.gold_token_ids * inference.gold_mask
+
+        self._num_correct += (pred_token_ids == gold_token_ids).all(axis=1).sum()
+        self._total_count += batch_size
+
+    def compute(self) -> Mapping[str, float]:
+        return {"sequence_accuracy": self._num_correct / self._total_count if self._total_count > 0 else 0.0}
+
+    def reset(self) -> None:
+        self._num_correct = 0
+        self._total_count = 0
