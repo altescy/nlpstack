@@ -131,7 +131,7 @@ class SequenceAccuracy(Metric[Text2TextInference]):
             self._total_count += 1
 
     def compute(self) -> Mapping[str, float]:
-        return {"sequence_accuracy": self._num_correct / self._total_count if self._total_count > 0 else 0.0}
+        return {"accuracy": self._num_correct / self._total_count if self._total_count > 0 else 0.0}
 
     def reset(self) -> None:
         self._num_correct = 0
