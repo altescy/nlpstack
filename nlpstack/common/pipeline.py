@@ -23,20 +23,29 @@ class Pipeline(Generic[S, T]):
     applies the pipeline to a single input. The `apply_batch` method is implemented
     in terms of `apply`, and can be overridden for efficiency.
 
+    Here is an example of pipeline that tokenizes a string by splitting on spaces:
+
+    Example:
+        >>> class MyPipeline(Pipeline[str, List[str]]):
+        >>>     def apply(self, input: str) -> List[str]:
+        >>>         return input.split()
+
     To apply the pipeline to a sequence of inputs, call the pipeline object as a
     function. The `batch_size` argument controls the number of inputs to process
     at a time. The `max_workers` argument controls the number of threads to use
     for multi-thread processing. For example, to apply the pipeline to a sequence
     of inputs, 100 at a time, using 4 threads, do the following:
 
+    Example:
         >>> pipeline = MyPipeline()
-        >>> inputs = ...
+        >>> inputs = ["This is a test.", "This is another test.", ...]
         >>> outputs = pipeline(inputs, batch_size=100, max_workers=4)
 
     Chaining pipelines together is done using the `|` operator. For example, to
     create a pipeline consisting of three steps, `first_step`, `second_step`, and
     `third_step`, do the following:
 
+    Example:
         >>> first_step = FirstPipeline()
         >>> second_step = SecondPipeline()
         >>> third_step = ThirdPipeline()
