@@ -30,6 +30,8 @@ class BasicClassificationDataModule(
         token_indexers: The token indexers to index the tokens. Defaults to
             `{"tokens": SingleIdTokenIndexer()}`.
         label_namespace: The vocabulary namespace for the labels. Defaults to `"labels"`.
+        labels: The set of labels. If not given, the labels will be collected from the
+            training dataset. Defaults to `None`.
     """
 
     def __init__(
@@ -38,11 +40,13 @@ class BasicClassificationDataModule(
         tokenizer: Optional[Tokenizer] = None,
         token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
         label_namespace: str = "labels",
+        labels: Optional[Sequence[str]] = None,
     ) -> None:
         self._vocab = vocab
         self._tokenizer = tokenizer or WhitespaceTokenizer()
         self._token_indexers = token_indexers or {"tokens": SingleIdTokenIndexer()}
         self._label_namespace = label_namespace
+        self._labels = sorted(set(labels)) if labels else None
 
     @property
     def vocab(self) -> Vocabulary:
@@ -51,6 +55,12 @@ class BasicClassificationDataModule(
     @property
     def label_namespace(self) -> str:
         return self._label_namespace
+
+    @property
+    def labels(self) -> Sequence[str]:
+        if self._labels is None:
+            return sorted(self._vocab.get_token_to_index(self.label_namespace))
+        return self._labels
 
     def setup(
         self,
@@ -105,10 +115,13 @@ class BasicClassificationDataModule(
                 yield example.text
 
         def label_iterator() -> Iterator[List[str]]:
-            for example in dataset:
-                label = example.label
-                assert label is not None, "Dataset must have labels."
-                yield [label]
+            if self._labels is not None:
+                yield self._labels
+            else:
+                for example in dataset:
+                    label = example.label
+                    assert label is not None, "Dataset must have labels."
+                    yield [label]
 
         for name, token_indexer in self._token_indexers.items():
             token_indexer.build_vocab(self.vocab, text_iterator())
