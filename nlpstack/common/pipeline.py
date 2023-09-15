@@ -6,7 +6,7 @@ itself is also a `Pipeline` object, so pipelines can be composed together.
 
 from collections import abc
 from concurrent.futures import ThreadPoolExecutor
-from typing import Generic, Iterable, Iterator, List, Sequence, TypeVar
+from typing import Callable, Generic, Iterable, Iterator, List, Sequence, TypeVar
 
 from nlpstack.common.iterutil import SizedIterator, batched
 
@@ -115,6 +115,20 @@ class Pipeline(Generic[S, T]):
     def __or__(self, other: "Pipeline[T, U]") -> "Pipeline[S, U]":
         return ComposePipeline(self, other)
 
+    @classmethod
+    def from_callable(cls, func: Callable[[S], T]) -> "Pipeline[S, T]":
+        """
+        Create a pipeline from a callable.
+
+        Args:
+            func: The callable.
+
+        Returns:
+            The pipeline.
+        """
+
+        return CallablePipeline(func)
+
 
 class ComposePipeline(Pipeline[S, U]):
     """
@@ -134,3 +148,43 @@ class ComposePipeline(Pipeline[S, U]):
 
     def apply_batch(self, batch: Sequence[S]) -> List[U]:
         return self.second.apply_batch(self.first.apply_batch(batch))
+
+
+class CallablePipeline(Pipeline[S, T]):
+    """
+    A pipeline that can be created from a callable.
+
+    Args:
+        func: The callable.
+    """
+
+    def __init__(self, func: Callable[[S], T]) -> None:
+        self._func = func
+
+    def apply(self, input: S) -> T:
+        return self._func(input)
+
+
+class ChainPipeline(Pipeline[S, S]):
+    """
+    A pipeline that is the composition of multiple pipelines.
+    Note that each pipeline must have the same input and output types.
+
+    Args:
+        steps: The pipelines.
+    """
+
+    def __init__(self, *steps: Pipeline[S, S]) -> None:
+        self._steps = steps
+
+    def apply(self, input: S) -> S:
+        output = input
+        for step in self._steps:
+            output = step.apply(output)
+        return output
+
+    def apply_batch(self, batch: Sequence[S]) -> List[S]:
+        output = list(batch)
+        for step in self._steps:
+            output = step.apply_batch(output)
+        return output
