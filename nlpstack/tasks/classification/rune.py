@@ -98,12 +98,38 @@ class BasicClassifier(
         **kwargs: Any,
     ) -> None:
         if datamodule is None:
+            if tokenizer is None:
+                tokenizer = WhitespaceTokenizer()
+
+            if token_indexers is None:
+                token_indexers = {"tokens": SingleIdTokenIndexer()}
+
             if vocab is None:
-                default_token_namespace = "tokens"
-                min_df = {default_token_namespace: min_df} if isinstance(min_df, (int, float)) else min_df
-                max_df = {default_token_namespace: max_df} if isinstance(max_df, (int, float)) else max_df
-                pad_token = {default_token_namespace: pad_token} if isinstance(pad_token, str) else pad_token
-                oov_token = {default_token_namespace: oov_token} if isinstance(oov_token, str) else oov_token
+                token_namespaces = {
+                    namespace
+                    for namespace in (indexer.get_vocab_namespace() for indexer in token_indexers.values())
+                    if namespace
+                }
+                min_df = (
+                    {namespace: min_df for namespace in token_namespaces}
+                    if isinstance(min_df, (int, float))
+                    else min_df
+                )
+                max_df = (
+                    {namespace: max_df for namespace in token_namespaces}
+                    if isinstance(max_df, (int, float))
+                    else max_df
+                )
+                pad_token = (
+                    {namespace: pad_token for namespace in token_namespaces}
+                    if isinstance(pad_token, str)
+                    else pad_token
+                )
+                oov_token = (
+                    {namespace: oov_token for namespace in token_namespaces}
+                    if isinstance(oov_token, str)
+                    else oov_token
+                )
                 special_tokens: Dict[str, Set[str]] = {}
                 for namespace, token in pad_token.items():
                     special_tokens.setdefault(namespace, set()).add(token)
@@ -122,12 +148,6 @@ class BasicClassifier(
                         "Ignoring min_df, max_df, pad_token, and oov_token because vocab is given.",
                         UserWarning,
                     )
-
-            if tokenizer is None:
-                tokenizer = WhitespaceTokenizer()
-
-            if token_indexers is None:
-                token_indexers = {"tokens": SingleIdTokenIndexer()}
 
             datamodule = BasicClassificationDataModule(
                 vocab=vocab,
