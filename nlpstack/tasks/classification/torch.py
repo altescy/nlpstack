@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from nlpstack.torch.model import TorchModel
 from nlpstack.torch.modules.feedforward import FeedForward
-from nlpstack.torch.modules.lazy import LazyLinearOutput
+from nlpstack.torch.modules.heads import ClassificationHead, Head
 from nlpstack.torch.modules.seq2seq_encoders import Seq2SeqEncoder
 from nlpstack.torch.modules.seq2vec_encoders import Seq2VecEncoder
 from nlpstack.torch.modules.text_embedders import TextEmbedder
@@ -35,6 +35,7 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
             `None`.
         feedforward: The feedforward layer applied to the text representation. This is applied after
             the encoder. If `None`, no feedforward layer is applied. Defaults to `None`.
+        head: The head for the classifier. If not given, `ClassificationHead` is used. Defaults to `None`.
         dropout: The dropout rate. Defaults to `None`.
         class_weights: The class weights. If `None`, no class weights are used. If `"balanced"`, the
             class weights are set to be inversely proportional to the class frequencies. Otherwise,
@@ -51,6 +52,7 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
         encoder: Seq2VecEncoder,
         contextualizer: Optional[Seq2SeqEncoder] = None,
         feedforward: Optional[FeedForward] = None,
+        head: Optional[Head] = None,
         dropout: Optional[float] = None,
         class_weights: Optional[Union[Literal["balanced"], Mapping[str, float]]] = None,
         threshold: Optional[float] = None,
@@ -59,12 +61,12 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
         super().__init__()
         self._embedder = embedder
         self._encoder = encoder
-        self._classifier = LazyLinearOutput(
-            encoder.get_output_dim() if feedforward is None else feedforward.get_output_dim()
-        )
-
         self._contextualizer = contextualizer
         self._feedforward = feedforward
+        self._head = head or ClassificationHead(
+            input_dim=(feedforward or encoder).get_output_dim(),
+            namespace=label_namespace,
+        )
         self._dropout = torch.nn.Dropout(dropout) if dropout is not None else None
 
         self._class_weights = class_weights
@@ -84,7 +86,6 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
         super().setup(*args, datamodule=datamodule, vocab=datamodule.vocab, **kwargs)
         vocab = datamodule.vocab
         num_labels = vocab.get_vocab_size(self._label_namespace)
-        self._classifier.initialize_parameters(out_features=num_labels)
         if self._class_weights is not None and self._loss_weight is not None:
             self._loss_weight.materialize((num_labels,))
             if self._class_weights == "balanced":
@@ -125,7 +126,7 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
         if self._dropout is not None:
             encodings = self._dropout(encodings)
 
-        logits = cast(torch.FloatTensor, self._classifier(encodings))
+        logits = cast(torch.FloatTensor, self._head(encodings))
         probs = cast(torch.FloatTensor, torch.nn.functional.softmax(logits, dim=-1))
 
         inference = ClassificationInference(
