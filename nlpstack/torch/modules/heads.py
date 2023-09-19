@@ -7,7 +7,7 @@ import numpy
 import torch
 
 from nlpstack.data import Vocabulary
-from nlpstack.data.embeddings import WordEmbedding
+from nlpstack.data.embeddings import TextEmbedding, WordEmbedding
 from nlpstack.torch.modules.lazy import LazyLinearOutput
 
 
@@ -41,22 +41,34 @@ class ClassificationHead(Head):
         input_dim: The dimension of the input.
         bias: Whether to use bias. Defaults to `True`.
         namespace: The vocabulary namespace of the labels. Defaults to `"labels"`.
+        label_embedder: The text embedder to get the initial label embeddings. If given,
+            the label embeddings are used as the initial weights of the projection layer.
+            Defaults to `None`.
     """
 
     def __init__(
         self,
         input_dim: int,
         bias: bool = True,
+        freeze: bool = False,
         namespace: str = "labels",
+        label_embedder: Optional[TextEmbedding] = None,
     ) -> None:
         super().__init__()
         self._input_dim = input_dim
         self._output_dim: Optional[int] = None
-        self._projection = LazyLinearOutput(input_dim)
+        self._projection = LazyLinearOutput(input_dim, bias, freeze)
         self._namespace = namespace
+        self._label_embedder = label_embedder
 
     def setup(self, *args: Any, vocab: Vocabulary, **kwargs: Any) -> None:
-        self._projection.initialize_parameters(out_features=vocab.get_vocab_size(self._namespace))
+        num_labels = vocab.get_vocab_size(self._namespace)
+        weight: Optional[torch.FloatTensor] = None
+        if self._label_embedder is not None:
+            weight = torch.FloatTensor(num_labels, self._input_dim)
+            for index, label in vocab.get_index_to_token(self._namespace).items():
+                weight[index] = torch.FloatTensor(self._label_embedder([label])[0])
+        self._projection.initialize_parameters(out_features=num_labels, weight=weight)
 
     def get_input_dim(self) -> int:
         return self._input_dim

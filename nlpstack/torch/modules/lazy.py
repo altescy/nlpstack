@@ -20,15 +20,19 @@ class LazyLinearOutput(torch.nn.modules.lazy.LazyModuleMixin, torch.nn.Linear):
         self,
         in_features: int,
         bias: bool = True,
+        freeze: bool = False,
     ) -> None:
         super().__init__(in_features=in_features, out_features=0, bias=bias)
-        self.weight = torch.nn.UninitializedParameter()
+        self.weight = torch.nn.UninitializedParameter(requires_grad=not freeze)
         if bias:
-            self.bias = torch.nn.UninitializedParameter()
+            self.bias = torch.nn.UninitializedParameter(requires_grad=not freeze)
 
-    def reset_parameters(self) -> None:
+    def reset_parameters(self, weight: Optional[torch.Tensor] = None) -> None:
         if not self.has_uninitialized_params() and self.out_features != 0:
-            super().reset_parameters()
+            if weight is None:
+                super().reset_parameters()
+            else:
+                self.weight.copy_(weight)
 
     def initialize_parameters(
         self,
@@ -43,12 +47,13 @@ class LazyLinearOutput(torch.nn.modules.lazy.LazyModuleMixin, torch.nn.Linear):
         """
         if self.has_uninitialized_params():
             num_embeddings = kwargs.get("out_features", 0)
+            weight = kwargs.get("weight", None)
             with torch.no_grad():
                 self.out_features = num_embeddings
                 self.weight.materialize((self.out_features, self.in_features))
                 if self.bias is not None:
                     self.bias.materialize((self.out_features,))
-                self.reset_parameters()
+                self.reset_parameters(weight)
 
 
 class LazyEmbedding(torch.nn.modules.lazy.LazyModuleMixin, torch.nn.Embedding):
