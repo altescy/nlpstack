@@ -46,6 +46,8 @@ class BasicClassifier(
             namespace by passing a mapping from namespace to padding token. Defaults to `"@@PADDING@@"`.
         oov_token: The out-of-vocabulary (OOV) token. You can specify a different OOV token
             for each namespace by passing a mapping from namespace to OOV token. Defaults to `"@@UNKNOWN@@"`.
+        labels: The set of labels. If not given, the labels will be collected from the training dataset.
+            Defaults to `None`.
         vocab: The vocabulary. If given, the vocabulary-related arguments will be ignored, otherwise
             the vocabulary will be constructed from the data. Defaults to `None`.
         tokenizer: The tokenizer.
@@ -74,6 +76,7 @@ class BasicClassifier(
         max_df: Union[int, float, Mapping[str, Union[int, float]]] = 1.0,
         pad_token: Union[str, Mapping[str, str]] = "@@PADDING@@",
         oov_token: Union[str, Mapping[str, str]] = "@@UNKNOWN@@",
+        labels: Optional[Sequence[str]] = None,
         vocab: Optional[Vocabulary] = None,
         tokenizer: Optional[Tokenizer] = None,
         token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
@@ -130,7 +133,14 @@ class BasicClassifier(
                 vocab=vocab,
                 tokenizer=tokenizer,
                 token_indexers=token_indexers,
+                labels=labels,
             )
+        else:
+            if (vocab, tokenizer, token_indexers, labels) != (None, None, None, None):
+                warnings.warn(
+                    "Ignoring vocab, tokenizer, token_indexers, and labels because datamodule is given.",
+                    UserWarning,
+                )
 
         if classifier is None:
             classifier = TorchBasicClassifier(
