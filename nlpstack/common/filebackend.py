@@ -239,6 +239,8 @@ class FileBackendMapping(Mapping[K, V]):
             pageio.close()
 
     def __del__(self) -> None:
+        self.flush()
+        self.close()
         if self._delete_on_exit and self._path.exists():
             shutil.rmtree(self._path)
 
@@ -287,6 +289,8 @@ class FileBackendSequence(Sequence[T]):
             self._pageios[page] = page_filename.open("rb+")
 
     def __del__(self) -> None:
+        self.flush()
+        self.close()
         if self._delete_on_exit:
             shutil.rmtree(self._path)
 
