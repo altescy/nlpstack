@@ -244,3 +244,12 @@ class ChainPipeline(Pipeline[S, S]):
         for step in self._steps:
             output = step.apply_batch(output)
         return output
+
+
+class PassThroughPipeline(Pipeline[S, S]):
+    """
+    A pipeline that does nothing.
+    """
+
+    def apply(self, input: S) -> S:
+        return input
