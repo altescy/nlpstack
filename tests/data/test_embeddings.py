@@ -20,7 +20,7 @@ def test_text_embedding(text_embedding: TextEmbedding) -> None:
         "this is a third test sentence",
     ]
 
-    embeddings = text_embedding(texts)
+    embeddings = numpy.array(list(text_embedding(texts)))
     assert embeddings.shape == (3, text_embedding.get_output_dim())
     assert not numpy.any(numpy.isinf(embeddings))
     assert not numpy.any(numpy.isnan(embeddings))

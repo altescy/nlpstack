@@ -67,7 +67,7 @@ class ClassificationHead(Head):
         if self._label_embedder is not None:
             weight = torch.FloatTensor(num_labels, self._input_dim)
             for index, label in vocab.get_index_to_token(self._namespace).items():
-                weight[index] = torch.FloatTensor(self._label_embedder([label])[0])
+                weight[index] = torch.FloatTensor(self._label_embedder.apply(label))
         self._projection.initialize_parameters(out_features=num_labels, weight=weight)
 
     def get_input_dim(self) -> int:

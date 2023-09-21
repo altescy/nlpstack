@@ -9,7 +9,7 @@ import minato
 import numpy
 import requests
 
-from nlpstack.common import FileBackendMapping, cached_property, murmurhash3
+from nlpstack.common import FileBackendMapping, Pipeline, cached_property, murmurhash3
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 from nlpstack.data.vocabulary import Vocabulary
 from nlpstack.transformers import cache as transformers_cache
@@ -279,7 +279,7 @@ class PretrainedTransformerWordEmbedding(WordEmbedding):
         vocab.extend_vocab(namespace, self.tokenizer.vocab.keys())
 
 
-class TextEmbedding:
+class TextEmbedding(Pipeline[str, numpy.ndarray]):
     """
     A text embedding model.
     """
@@ -290,8 +290,11 @@ class TextEmbedding:
     def get_output_dim(self) -> int:
         raise NotImplementedError
 
-    def __call__(self, texts: Sequence[str]) -> numpy.ndarray:
+    def apply_batch(self, batch: Sequence[str]) -> List[numpy.ndarray]:
         raise NotImplementedError
+
+    def apply(self, input: str) -> numpy.ndarray:
+        return self.apply_batch([input])[0]
 
 
 class BagOfEmbeddingsTextEmbedding(TextEmbedding):
@@ -321,12 +324,14 @@ class BagOfEmbeddingsTextEmbedding(TextEmbedding):
         pooling: Literal["mean", "max", "min", "sum", "hier"] = "mean",
         normalize: bool = False,
         window_size: Optional[int] = None,
+        **kwargs: Any,
     ) -> None:
         if pooling not in ("mean", "max", "min", "sum", "hier"):
             raise ValueError(f"pooling must be one of 'mean', 'max', 'min', 'sum', or 'hier', but got {pooling}")
         if pooling == "hier" and window_size is None:
             raise ValueError("window_size must be specified when pooling is 'hier'")
 
+        super().__init__(**kwargs)
         self._word_embedding = word_embedding
         self._tokenizer = tokenizer or WhitespaceTokenizer()
         self._pooling = pooling
@@ -336,15 +341,17 @@ class BagOfEmbeddingsTextEmbedding(TextEmbedding):
     def get_output_dim(self) -> int:
         return self._word_embedding.get_output_dim()
 
-    def __call__(self, texts: Sequence[str]) -> numpy.ndarray:
-        if not texts:
-            return numpy.zeros((0, self.get_output_dim()), dtype=numpy.float32)
+    def apply_batch(self, batch: Sequence[str]) -> List[numpy.ndarray]:
+        if not batch:
+            return list(numpy.zeros((0, self.get_output_dim()), dtype=numpy.float32))
 
-        batch_tokens = [self._tokenizer.tokenize(text) for text in texts]
+        batch_size = len(batch)
+
+        batch_tokens = [self._tokenizer.tokenize(text) for text in batch]
         max_length = max(len(tokens) for tokens in batch_tokens)
 
-        embeddings = numpy.zeros((len(texts), max_length, self.get_output_dim()), dtype=float)
-        mask = numpy.zeros((len(texts), max_length), dtype=bool)
+        embeddings = numpy.zeros((batch_size, max_length, self.get_output_dim()), dtype=float)
+        mask = numpy.zeros((batch_size, max_length), dtype=bool)
 
         for batch_index, tokens in enumerate(batch_tokens):
             for token_index, token in enumerate(tokens):
@@ -353,12 +360,14 @@ class BagOfEmbeddingsTextEmbedding(TextEmbedding):
                     embeddings[batch_index, token_index] = embedding
                     mask[batch_index, token_index] = True
 
-        return masked_pool(
-            embeddings,
-            mask,
-            pooling=self._pooling,
-            normalize=self._normalize,
-            window_size=self._window_size,
+        return list(
+            masked_pool(
+                embeddings,
+                mask,
+                pooling=self._pooling,
+                normalize=self._normalize,
+                window_size=self._window_size,
+            )
         )
 
 
@@ -381,12 +390,14 @@ class PretrainedTransformerTextEmbedding(TextEmbedding):
         pooling: Literal["mean", "max", "min", "sum", "hier", "first", "last"] = "mean",
         normalize: bool = False,
         window_size: Optional[int] = None,
+        **kwargs: Any,
     ) -> None:
         if pooling == "hier" and window_size is None:
             raise ValueError("window_size must be specified when pooling is 'hier'")
 
         from transformers import pipeline
 
+        super().__init__(**kwargs)
         self._pretrained_model_name = pretrained_model_name
         self._submodule = submodule
         self._pooling = pooling
@@ -415,20 +426,17 @@ class PretrainedTransformerTextEmbedding(TextEmbedding):
     def get_output_dim(self) -> int:
         return int(self.model.config.hidden_size)
 
-    def __call__(self, texts: Sequence[str]) -> numpy.ndarray:
-        features = self._pipeline(texts)
-        return numpy.concatenate(
-            [
-                masked_pool(
-                    numpy.array(x),
-                    pooling=self._pooling,
-                    normalize=self._normalize,
-                    window_size=self._window_size,
-                )
-                for x in features
-            ],
-            axis=0,
-        )
+    def apply_batch(self, batch: Sequence[str]) -> List[numpy.ndarray]:
+        features = self._pipeline(batch)
+        return [
+            masked_pool(
+                numpy.array(x),
+                pooling=self._pooling,
+                normalize=self._normalize,
+                window_size=self._window_size,
+            )
+            for x in features
+        ]
 
 
 class SentenceTransformerTextEmbedding(TextEmbedding):
@@ -446,10 +454,12 @@ class SentenceTransformerTextEmbedding(TextEmbedding):
         model_name: str = "all-MiniLM-L6-v2",
         normalize_embeddings: bool = False,
         device: str = "cpu",
+        **kwargs: Any,
     ) -> None:
         if sentence_transformers is None:
             raise ModuleNotFoundError("sentence-transformers is not installed")
 
+        super().__init__(**kwargs)
         self._model_name = model_name
         self._normalize_embeddings = normalize_embeddings
         self._device = device
@@ -464,15 +474,15 @@ class SentenceTransformerTextEmbedding(TextEmbedding):
     def get_output_dim(self) -> int:
         return int(self.model.get_sentence_embedding_dimension())
 
-    def __call__(self, texts: Sequence[str]) -> numpy.ndarray:
-        if not texts:
-            return numpy.zeros((0, self.get_output_dim()), dtype=numpy.float32)
+    def apply_batch(self, batch: Sequence[str]) -> List[numpy.ndarray]:
+        if not batch:
+            return list(numpy.zeros((0, self.get_output_dim()), dtype=numpy.float32))
         embeddings = self.model.encode(
-            texts,
+            batch,
             convert_to_numpy=True,
             normalize_embeddings=self._normalize_embeddings,
         )
-        return cast(numpy.ndarray, embeddings)
+        return cast(List[numpy.ndarray], list(embeddings))
 
 
 class OpenAITextEmbedding(TextEmbedding):
@@ -496,6 +506,7 @@ class OpenAITextEmbedding(TextEmbedding):
         api_base: Optional[str] = None,
         api_type: Optional[str] = None,
         api_version: Optional[str] = None,
+        **kwargs: Any,
     ) -> None:
         api_key = os.environ.get("OPENAI_API_KEY")
 
@@ -519,14 +530,15 @@ class OpenAITextEmbedding(TextEmbedding):
         if organization_id is not None:
             openai.organization = organization_id
 
+        super().__init__(**kwargs)
         self._client = openai.Embedding
         self._model_name = model_name
 
-    def __call__(self, texts: Sequence[str]) -> numpy.ndarray:
-        texts = [t.replace("\n", " ") for t in texts]
-        embeddings = self._client.create(input=texts, engine=self._model_name)["data"]  # type: ignore[no-untyped-call]
+    def apply_batch(self, batch: Sequence[str]) -> List[numpy.ndarray]:
+        batch = [t.replace("\n", " ") for t in batch]
+        embeddings = self._client.create(input=batch, engine=self._model_name)["data"]  # type: ignore[no-untyped-call]
         sorted_embeddings = sorted(embeddings, key=lambda e: e["index"])  # type: ignore
-        return numpy.array([result["embedding"] for result in sorted_embeddings])
+        return [numpy.array(result["embedding"]) for result in sorted_embeddings]
 
 
 class HuggingFaceTextEmbedding(TextEmbedding):
@@ -542,7 +554,9 @@ class HuggingFaceTextEmbedding(TextEmbedding):
     def __init__(
         self,
         model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
+        **kwargs: Any,
     ) -> None:
+        super().__init__(**kwargs)
         self._api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_name}"
         self._session
 
@@ -555,10 +569,12 @@ class HuggingFaceTextEmbedding(TextEmbedding):
         session.headers.update({"Authorization": f"Bearer {api_key}"})
         return session
 
-    def __call__(self, texts: Sequence[str]) -> numpy.ndarray:
+    def apply_batch(self, batch: Sequence[str]) -> List[numpy.ndarray]:
         # Call HuggingFace Embedding API for each document
-        return numpy.array(
-            self._session.post(  # type: ignore
-                self._api_url, json={"inputs": texts, "options": {"wait_for_model": True}}
-            ).json()
+        return list(
+            numpy.array(
+                self._session.post(  # type: ignore
+                    self._api_url, json={"inputs": batch, "options": {"wait_for_model": True}}
+                ).json()
+            )
         )
