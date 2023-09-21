@@ -1,3 +1,4 @@
+import itertools
 from logging import getLogger
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence
 
@@ -106,15 +107,21 @@ class BasicClassificationDataModule(
         if not dataset:
             return []
 
+        def get_text_to_tokenize(example: ClassificationExample) -> str:
+            if isinstance(example.text, str):
+                return example.text
+            return ""
+
         def tokenized_document_generator() -> Iterator[ClassificationExample]:
-            for example in dataset:
-                if isinstance(example.text, str):
-                    tokenized_text = self._tokenizer.tokenize(example.text)
-                else:
-                    tokenized_text = list(example.text)
+            nonlocal dataset
+            dataset, dataset_for_text = itertools.tee(dataset)
+            tokenized_texts = self._tokenizer(map(get_text_to_tokenize, dataset_for_text))
+            for example, tokenized_text in zip(dataset, tokenized_texts):
+                tokenized_text = tokenized_text if isinstance(example.text, str) else list(example.text)
                 yield ClassificationExample(
                     text=tokenized_text,
                     label=example.label,
+                    metadata=example.metadata,
                 )
 
         return FileBackendSequence.from_iterable(tokenized_document_generator())
