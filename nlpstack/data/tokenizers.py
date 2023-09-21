@@ -15,7 +15,7 @@ from typing import Callable, Iterator, List, NamedTuple, Optional, Sequence, Uni
 import minato
 import numpy
 
-from nlpstack.common import cached_property
+from nlpstack.common import Pipeline, cached_property
 from nlpstack.transformers import cache as transformers_cache
 
 try:
@@ -52,7 +52,7 @@ class Token(NamedTuple):
     vector: Optional[numpy.ndarray] = None
 
 
-class Tokenizer:
+class Tokenizer(Pipeline[str, List[Token]]):
     """
     A base class for tokenizers.
     """
@@ -62,6 +62,9 @@ class Tokenizer:
 
     def detokenize(self, tokens: Union[Sequence[str], Sequence[Token]]) -> str:
         raise NotImplementedError
+
+    def apply(self, input: str) -> List[Token]:
+        return self.tokenize(input)
 
 
 class WhitespaceTokenizer(Tokenizer):
