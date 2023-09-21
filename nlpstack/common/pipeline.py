@@ -6,7 +6,7 @@ itself is also a `Pipeline` object, so pipelines can be composed together.
 
 from collections import abc
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable, Generic, Iterable, Iterator, List, Sequence, TypeVar
+from typing import Callable, Generic, Iterable, Iterator, List, Optional, Sequence, TypeVar
 
 from nlpstack.common.iterutil import SizedIterator, batched
 
@@ -50,7 +50,26 @@ class Pipeline(Generic[S, T]):
         >>> second_step = SecondPipeline()
         >>> third_step = ThirdPipeline()
         >>> pipeline = first_step | second_step | third_step
+
+    Args:
+        batch_size: The batch size. Defaults to `1`.
+        max_workers: The maximum number of workers to use for multi-thread
+            processing. Defaults to `1`.
     """
+
+    def __init__(
+        self,
+        *,
+        batch_size: int = 1,
+        max_workers: int = 1,
+    ) -> None:
+        if batch_size < 1:
+            raise ValueError("batch_size must be at least 1")
+        if max_workers < 1:
+            raise ValueError("max_workers must be at least 1")
+
+        self._batch_size = batch_size
+        self._max_workers = max_workers
 
     def apply(self, input: S) -> T:
         """
@@ -82,8 +101,8 @@ class Pipeline(Generic[S, T]):
         self,
         inputs: Iterable[S],
         *,
-        batch_size: int = 1,
-        max_workers: int = 1,
+        batch_size: Optional[int] = None,
+        max_workers: Optional[int] = None,
     ) -> Iterator[T]:
         """
         Apply the pipeline to a sequence of inputs.
@@ -97,6 +116,14 @@ class Pipeline(Generic[S, T]):
         Returns:
             An iterator over the outputs.
         """
+
+        batch_size = batch_size or self._batch_size
+        max_workers = max_workers or self._max_workers
+
+        if batch_size < 1:
+            raise ValueError("batch_size must be at least 1")
+        if max_workers < 1:
+            raise ValueError("max_workers must be at least 1")
 
         def iterator() -> Iterator[T]:
             if max_workers < 2:
@@ -137,9 +164,20 @@ class ComposePipeline(Pipeline[S, U]):
     Args:
         first: The first pipeline.
         second: The second pipeline.
+        batch_size: The batch size. Defaults to `1`.
+        max_workers: The maximum number of workers to use for multi-thread
+            processing. Defaults to `1`.
     """
 
-    def __init__(self, first: Pipeline[S, T], second: Pipeline[T, U]):
+    def __init__(
+        self,
+        first: Pipeline[S, T],
+        second: Pipeline[T, U],
+        *,
+        batch_size: int = 1,
+        max_workers: int = 1,
+    ):
+        super().__init__(batch_size=batch_size, max_workers=max_workers)
         self.first = first
         self.second = second
 
@@ -156,9 +194,19 @@ class CallablePipeline(Pipeline[S, T]):
 
     Args:
         func: The callable.
+        batch_size: The batch size. Defaults to `1`.
+        max_workers: The maximum number of workers to use for multi-thread
+            processing. Defaults to `1`.
     """
 
-    def __init__(self, func: Callable[[S], T]) -> None:
+    def __init__(
+        self,
+        func: Callable[[S], T],
+        *,
+        batch_size: int = 1,
+        max_workers: int = 1,
+    ) -> None:
+        super().__init__(batch_size=batch_size, max_workers=max_workers)
         self._func = func
 
     def apply(self, input: S) -> T:
@@ -172,9 +220,17 @@ class ChainPipeline(Pipeline[S, S]):
 
     Args:
         steps: The pipelines.
+        batch_size: The batch size. Defaults to `1`.
+        max_workers: The maximum number of workers to use for multi-thread
     """
 
-    def __init__(self, *steps: Pipeline[S, S]) -> None:
+    def __init__(
+        self,
+        *steps: Pipeline[S, S],
+        batch_size: int = 1,
+        max_workers: int = 1,
+    ) -> None:
+        super().__init__(batch_size=batch_size, max_workers=max_workers)
         self._steps = steps
 
     def apply(self, input: S) -> S:

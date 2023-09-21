@@ -14,6 +14,7 @@ Submodules
    nlpstack.common.hashutil
    nlpstack.common.jsonnet
    nlpstack.common.jsonschema
+   nlpstack.common.pipeline
    nlpstack.common.progressbar
 
 
