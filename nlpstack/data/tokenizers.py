@@ -10,7 +10,7 @@ Example:
 
 from contextlib import suppress
 from os import PathLike
-from typing import Callable, Iterator, List, NamedTuple, Optional, Sequence, Union
+from typing import Any, Callable, Iterator, List, NamedTuple, Optional, Sequence, Union
 
 import minato
 import numpy
@@ -104,7 +104,13 @@ class SpacyTokenizer(Tokenizer):
             by using `detokenize()` method. Defaults to `False`.
     """
 
-    def __init__(self, lang: str, with_whitespace: bool = False) -> None:
+    def __init__(
+        self,
+        lang: str,
+        with_whitespace: bool = False,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
         self._lang = lang
         self._with_whitespace = with_whitespace
 
@@ -140,7 +146,12 @@ class PretrainedTransformerTokenizer(Tokenizer):
         pretrained_model_name: The name, path or URL of the pretrained model.
     """
 
-    def __init__(self, pretrained_model_name: Union[str, PathLike]) -> None:
+    def __init__(
+        self,
+        pretrained_model_name: Union[str, PathLike],
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
         self._pretrained_model_name = pretrained_model_name
 
     @cached_property
@@ -178,10 +189,12 @@ class FugashiTokenizer(Tokenizer):
         system_dictionary_path: Optional[Union[str, PathLike]] = None,
         user_dictionary_path: Optional[Union[str, PathLike]] = None,
         with_whitespace: bool = False,
+        **kwargs: Any,
     ) -> None:
         if fugashi is None:
             raise ModuleNotFoundError("fugashi is not installed.")
 
+        super().__init__(**kwargs)
         self._system_dictionary_path = system_dictionary_path or "unidic-lite"
         self._user_dictionary_path = user_dictionary_path
         self._with_whitespace = with_whitespace
