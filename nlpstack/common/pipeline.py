@@ -219,14 +219,14 @@ class ChainPipeline(Pipeline[S, S]):
     Note that each pipeline must have the same input and output types.
 
     Args:
-        steps: The pipelines.
+        steps: The sequence of pipelines.
         batch_size: The batch size. Defaults to `1`.
         max_workers: The maximum number of workers to use for multi-thread
     """
 
     def __init__(
         self,
-        *steps: Pipeline[S, S],
+        steps: Sequence[Pipeline[S, S]],
         batch_size: int = 1,
         max_workers: int = 1,
     ) -> None:
