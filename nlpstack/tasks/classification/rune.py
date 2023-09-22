@@ -19,7 +19,7 @@ from nlpstack.torch.training import TorchTrainer
 from nlpstack.torch.training.callbacks import Callback
 from nlpstack.torch.training.optimizers import AdamFactory
 
-from .datamodules import BasicClassificationDataModule
+from .datamodules import BasicClassificationDataModule, ClassificationPostprocessor, ClassificationPreprocessor
 from .metrics import Accuracy, ClassificationMetric
 from .torch import TorchBasicClassifier
 from .types import ClassificationExample, ClassificationInference, ClassificationPrediction
@@ -52,6 +52,10 @@ class BasicClassifier(
             the vocabulary will be constructed from the data. Defaults to `None`.
         tokenizer: The tokenizer.
         token_indexers: The token indexers to index the tokens.
+        preprocessors: The preprocessors to apply to the dataset before tokenization.
+            Defaults to `None`.
+        postprocessors: The postprocessors to apply to the predictions after inference.
+            Defaults to `None`.
         datamodule: The data module. If given, the data module related arguments will be ignored,
         dropout: The dropout rate. Defaults to `None`.
         class_weights: The class weights. If `"balanced"`, the class weights will be set to
@@ -80,6 +84,8 @@ class BasicClassifier(
         vocab: Optional[Vocabulary] = None,
         tokenizer: Optional[Tokenizer] = None,
         token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
+        preprocessor: Optional[ClassificationPreprocessor] = None,
+        postprocessor: Optional[ClassificationPostprocessor] = None,
         datamodule: Optional[BasicClassificationDataModule] = None,
         # model configuration
         dropout: Optional[float] = None,
@@ -154,11 +160,20 @@ class BasicClassifier(
                 tokenizer=tokenizer,
                 token_indexers=token_indexers,
                 labels=labels,
+                preprocessor=preprocessor,
+                postprocessor=postprocessor,
             )
         else:
-            if (vocab, tokenizer, token_indexers, labels) != (None, None, None, None):
+            if (vocab, tokenizer, token_indexers, labels, preprocessor, postprocessor) != (
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            ):
                 warnings.warn(
-                    "Ignoring vocab, tokenizer, token_indexers, and labels because datamodule is given.",
+                    "Ignoring vocab, tokenizer, token_indexers, labels, preprocessor and postprocessor because datamodule is given.",
                     UserWarning,
                 )
 
