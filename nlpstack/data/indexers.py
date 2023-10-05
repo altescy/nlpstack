@@ -83,6 +83,8 @@ class SingleIdTokenIndexer(TokenIndexer):
         namespace: Vocabulary namespace. Defaults to `"tokens"`.
         feature_name: The feature name of tokens to use. Defaults to `"surface"`.
         lowercase: Whether to lowercase tokens. Defaults to `False`.
+        default_value: Default value to use when the feature is `None`. If not given,
+            `ValueError` is raised. Defaults to `None`.
     """
 
     def __init__(
@@ -100,7 +102,7 @@ class SingleIdTokenIndexer(TokenIndexer):
     def _get_token_feature(self, token: Token) -> str:
         feature = getattr(token, self._feature_name)
         if not isinstance(feature, str):
-            if self._default_value is not None:
+            if feature is None and self._default_value is not None:
                 return self._default_value
             raise ValueError(f"token.{self._feature_name} must be str, but got {type(feature)}")
         if self._lowercase:
@@ -152,6 +154,8 @@ class TokenCharactersIndexer(TokenIndexer):
         feature_name: The feature name of tokens to use. Defaults to `"surface"`.
         lowercase: Whether to lowercase tokens. Defaults to `False`.
         min_padding_length: Minimum padding length. Defaults to `0`.
+        default_value: Default value to use when the feature is `None`. If not given,
+            `ValueError` is raised. Defaults to `None`.
     """
 
     def __init__(
@@ -171,7 +175,7 @@ class TokenCharactersIndexer(TokenIndexer):
     def _get_token_feature(self, token: Token) -> str:
         feature = getattr(token, self._feature_name)
         if not isinstance(feature, str):
-            if self._default_value is not None:
+            if feature is None and self._default_value is not None:
                 return self._default_value
             raise ValueError(f"token.{self._feature_name} must be str, but got {type(feature)}")
         if self._lowercase:
@@ -271,6 +275,8 @@ class PretrainedEmbeddingIndexer(TokenIndexer):
         feature_name: The feature name of tokens to use. Defaults to `"surface"`.
         lowercase: Whether to lowercase tokens. Defaults to `False`.
         namespace: Vocabulary namespace. Defaults to `None`.
+        default_value: Default value to use when the feature is `None`. If not given,
+            `ValueError` is raised. Defaults to `None`.
     """
 
     def __init__(
@@ -290,7 +296,7 @@ class PretrainedEmbeddingIndexer(TokenIndexer):
     def _get_token_feature(self, token: Token) -> str:
         feature = getattr(token, self._feature_name)
         if not isinstance(feature, str):
-            if self._default_value is not None:
+            if feature is None and self._default_value is not None:
                 return self._default_value
             raise ValueError(f"token.{self._feature_name} must be str, but got {type(feature)}")
         if self._lowercase:
