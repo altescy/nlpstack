@@ -228,6 +228,19 @@ class TokenCharactersIndexer(TokenIndexer):
 
 
 class TokenCharacterNgramsIndexer(TokenIndexer):
+    """
+    A TokenIndexer represents tokens as sequences of character-level ngram indices.
+
+    Args:
+        ngram_range: The range of ngrams to use. Defaults to `(1, 5)`.
+        namespace: Vocabulary namespace. Defaults to `"token_character_ngrams"`.
+        feature_name: The feature name of tokens to use. Defaults to `"surface"`.
+        lowercase: Whether to lowercase tokens. Defaults to `False`.
+        min_padding_length: Minimum padding length. Defaults to `0`.
+        default_value: Default value to use when the feature is `None`. If not given,
+            `ValueError` is raised. Defaults to `None`.
+    """
+
     def __init__(
         self,
         ngram_range: Tuple[int, int] = (1, 5),
