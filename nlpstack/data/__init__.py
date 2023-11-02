@@ -25,6 +25,7 @@ from nlpstack.data.indexers import (  # noqa: F401
     PretrainedEmbeddingIndexer,
     PretrainedTransformerIndexer,
     SingleIdTokenIndexer,
+    TokenCharacterNgramsIndexer,
     TokenCharactersIndexer,
     TokenIndexer,
     TokenVectorIndexer,
