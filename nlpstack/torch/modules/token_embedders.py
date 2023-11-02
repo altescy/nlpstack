@@ -40,10 +40,10 @@ class PassThroughTokenEmbedder(TokenEmbedder):
 
 
 class FeedForwardTokenEmbedder(TokenEmbedder):
-    def __init__(self, embedding_dim: int, feedforwrad: FeedForward) -> None:
+    def __init__(self, embedding_dim: int, feedforward: FeedForward) -> None:
         super().__init__()
         self._embedding_dim = embedding_dim
-        self._feedforward = feedforwrad
+        self._feedforward = feedforward
 
     def forward(self, embeddings: torch.Tensor, **kwargs: Any) -> torch.FloatTensor:
         return cast(torch.FloatTensor, self._feedforward(embeddings))
