@@ -46,7 +46,7 @@ class FeedForwardTokenEmbedder(TokenEmbedder):
         self._feedforward = feedforward
 
     def forward(self, embeddings: torch.Tensor, **kwargs: Any) -> torch.FloatTensor:
-        return cast(torch.FloatTensor, self._feedforward(embeddings))
+        return cast(torch.FloatTensor, self._feedforward(embeddings.float()))
 
     def get_output_dim(self) -> int:
         return self._feedforward.get_output_dim()
