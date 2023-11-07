@@ -8,8 +8,9 @@ from typing import Any, Iterator, List, Literal, Mapping, Optional, Sequence, Tu
 import minato
 import numpy
 import requests
+from sklearn.utils import murmurhash3_32
 
-from nlpstack.common import FileBackendMapping, Pipeline, cached_property, murmurhash3
+from nlpstack.common import FileBackendMapping, Pipeline, cached_property
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 from nlpstack.data.vocabulary import Vocabulary
 from nlpstack.transformers import cache as transformers_cache
@@ -93,7 +94,7 @@ class MinhashWordEmbedding(WordEmbedding):
 
     def _compute_fingerprint(self, text: str) -> List[int]:
         ngrams = set(self._iter_character_ngrams(text))
-        return [min(murmurhash3(ngram, seed) for ngram in ngrams) for seed in range(self._num_hashes)]
+        return [min(murmurhash3_32(ngram, seed) for ngram in ngrams) for seed in range(self._num_hashes)]
 
     def __getitem__(self, word: str) -> numpy.ndarray:
         embedding = numpy.zeros(self._num_features, dtype=float)
