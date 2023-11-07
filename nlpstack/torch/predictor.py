@@ -2,7 +2,7 @@ from typing import Any, Generic, Iterable, Iterator, Optional, Sequence, TypeVar
 
 import torch
 
-from nlpstack.common import batched
+from nlpstack.common import ProgressBar, batched
 from nlpstack.data import Collator, DataModule
 from nlpstack.torch.model import TorchModel
 from nlpstack.torch.util import move_to_device
@@ -49,7 +49,7 @@ class TorchPredictor(Generic[Example, Inference, Prediction]):
         collator = Collator()
         self.model.eval()
         self.model.to(device)
-        with torch.inference_mode():
+        with torch.inference_mode(), ProgressBar(examples, desc="Predicting") as examples:
             for batched_examples in batched(examples, self._batch_size):
                 instances = [self.datamodule.build_instance(example) for example in batched_examples]
                 batch = move_to_device(collator(instances), device)
