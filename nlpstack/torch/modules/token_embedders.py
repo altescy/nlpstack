@@ -8,6 +8,7 @@ import torch
 
 from nlpstack.data import Vocabulary
 from nlpstack.data.embeddings import WordEmbedding
+from nlpstack.torch.modules.feedforward import FeedForward
 from nlpstack.torch.modules.lazy import LazyEmbedding
 from nlpstack.torch.modules.scalarmix import ScalarMix
 from nlpstack.torch.modules.seq2vec_encoders import BagOfEmbeddings, Seq2VecEncoder
@@ -36,6 +37,19 @@ class PassThroughTokenEmbedder(TokenEmbedder):
 
     def get_output_dim(self) -> int:
         return self._embedding_dim
+
+
+class FeedForwardTokenEmbedder(TokenEmbedder):
+    def __init__(self, embedding_dim: int, feedforward: FeedForward) -> None:
+        super().__init__()
+        self._embedding_dim = embedding_dim
+        self._feedforward = feedforward
+
+    def forward(self, embeddings: torch.Tensor, **kwargs: Any) -> torch.FloatTensor:
+        return cast(torch.FloatTensor, self._feedforward(embeddings.float()))
+
+    def get_output_dim(self) -> int:
+        return self._feedforward.get_output_dim()
 
 
 class Embedding(TokenEmbedder):

@@ -3,13 +3,14 @@ import warnings
 from contextlib import suppress
 from logging import getLogger
 from os import PathLike
-from typing import Any, Iterator, List, Literal, Mapping, Optional, Sequence, Union, cast
+from typing import Any, Iterator, List, Literal, Mapping, Optional, Sequence, Tuple, Union, cast
 
 import minato
 import numpy
 import requests
+from sklearn.utils import murmurhash3_32
 
-from nlpstack.common import FileBackendMapping, Pipeline, cached_property, murmurhash3
+from nlpstack.common import FileBackendMapping, Pipeline, cached_property
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 from nlpstack.data.vocabulary import Vocabulary
 from nlpstack.transformers import cache as transformers_cache
@@ -67,29 +68,33 @@ class MinhashWordEmbedding(WordEmbedding):
     Args:
         num_features: The number of features of the embedding.
         num_hashes: The number of hashes to use.
-        ngram_size: The size of the character n-grams to use.
+        ngram_range: The range of n-grams to use. Defaults to (3, 3).
     """
 
     def __init__(
         self,
         num_features: int,
         num_hashes: int = 64,
-        ngram_size: int = 3,
+        ngram_range: Union[int, Tuple[int, int]] = 3,
     ) -> None:
-        if ngram_size < 1:
+        if isinstance(ngram_range, int):
+            ngram_range = (ngram_range, ngram_range)
+        if ngram_range[0] > ngram_range[1]:
+            raise ValueError("ngram_range[0] must be less than or equal to ngram_range[1]")
+        if min(ngram_range) < 1:
             raise ValueError("ngram_size must be greater than or equal to 1")
         self._num_features = num_features
         self._num_hashes = num_hashes
-        self._ngram_size = ngram_size
+        self._ngram_range = ngram_range
 
     def _iter_character_ngrams(self, text: str) -> Iterator[str]:
-        length = max(len(text), self._ngram_size)
-        for start, end in zip(range(0, length), range(self._ngram_size, length + 1)):
-            yield text[start:end]
+        for n in range(self._ngram_range[0], self._ngram_range[1] + 1):
+            for i in range(len(text) - n + 1):
+                yield text[i : i + n]
 
     def _compute_fingerprint(self, text: str) -> List[int]:
         ngrams = set(self._iter_character_ngrams(text))
-        return [min(murmurhash3(ngram, seed) for ngram in ngrams) for seed in range(self._num_hashes)]
+        return [min(murmurhash3_32(ngram, seed) for ngram in ngrams) for seed in range(self._num_hashes)]
 
     def __getitem__(self, word: str) -> numpy.ndarray:
         embedding = numpy.zeros(self._num_features, dtype=float)

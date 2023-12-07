@@ -227,6 +227,97 @@ class TokenCharactersIndexer(TokenIndexer):
         }
 
 
+class TokenCharacterNgramsIndexer(TokenIndexer):
+    """
+    A TokenIndexer represents tokens as sequences of character-level ngram indices.
+
+    Args:
+        ngram_range: The range of ngrams to use. Defaults to `(1, 5)`.
+        namespace: Vocabulary namespace. Defaults to `"token_character_ngrams"`.
+        feature_name: The feature name of tokens to use. Defaults to `"surface"`.
+        lowercase: Whether to lowercase tokens. Defaults to `False`.
+        min_padding_length: Minimum padding length. Defaults to `0`.
+        default_value: Default value to use when the feature is `None`. If not given,
+            `ValueError` is raised. Defaults to `None`.
+    """
+
+    def __init__(
+        self,
+        ngram_range: Tuple[int, int] = (1, 5),
+        namespace: str = "token_characters",
+        feature_name: str = "surface",
+        lowercase: bool = False,
+        min_padding_length: int = 0,
+        default_value: Optional[str] = None,
+    ) -> None:
+        self._ngram_range = ngram_range
+        self._namespace = namespace
+        self._feature_name = feature_name
+        self._lowercase = lowercase
+        self._min_padding_length = min_padding_length
+        self._default_value = default_value
+
+    def _get_token_feature(self, token: Token) -> str:
+        feature = getattr(token, self._feature_name)
+        if not isinstance(feature, str):
+            if feature is None and self._default_value is not None:
+                return self._default_value
+            raise ValueError(f"token.{self._feature_name} must be str, but got {type(feature)}")
+        if self._lowercase:
+            feature = feature.lower()
+        return feature
+
+    def _get_ngrams(self, token: Token) -> List[str]:
+        feature = self._get_token_feature(token)
+        ngrams: List[str] = []
+        for n in range(self._ngram_range[0], self._ngram_range[1] + 1):
+            ngrams.extend(feature[i : i + n] for i in range(len(feature) - n + 1))
+        return ngrams
+
+    def build_vocab(self, vocab: Vocabulary, documents: Iterable[Sequence[Token]]) -> None:
+        def document_iterator() -> Iterator[List[str]]:
+            for tokens in documents:
+                for token in tokens:
+                    yield self._get_ngrams(token)
+
+        vocab.build_vocab_from_documents(self._namespace, document_iterator())
+
+    def get_vocab_namespace(self) -> Optional[str]:
+        return self._namespace
+
+    def get_pad_index(self, vocab: Vocabulary) -> int:
+        return vocab.get_pad_index(self._namespace)
+
+    def __call__(self, tokens: Sequence[Token], vocab: Vocabulary) -> Dict[str, Any]:
+        """
+        Convert tokens into indices.
+
+        Args:
+            tokens: Tokens to convert.
+            vocab: Vocabulary to use.
+
+        Returns:
+            Dictionary of indices containing `"token_ids"`, `"mask"`, and `"subword_mask"`.
+        """
+
+        token_ids = [
+            [vocab.get_index_by_token(self._namespace, ngram) for ngram in self._get_ngrams(token)] for token in tokens
+        ]
+        mask = [True] * len(tokens)
+        max_token_length = max(self._min_padding_length, max(len(token_id) for token_id in token_ids))
+        token_ids = [
+            token_ids_ + [self.get_pad_index(vocab)] * (max_token_length - len(token_ids_)) for token_ids_ in token_ids
+        ]
+        subword_mask = [
+            [True] * len(token_ids_) + [False] * (max_token_length - len(token_ids_)) for token_ids_ in token_ids
+        ]
+        return {
+            "token_ids": numpy.array(token_ids, dtype=int),
+            "mask": numpy.array(mask, dtype=bool),
+            "subword_mask": numpy.array(subword_mask, dtype=bool),
+        }
+
+
 class TokenVectorIndexer(TokenIndexer):
     """
     A TokenIndexer represents tokens as vectors. This indexer does not support building vectors and vocabulary.

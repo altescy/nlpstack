@@ -40,6 +40,7 @@ from .time_distributed import TimeDistributed  # noqa: F401
 from .token_embedders import (  # noqa: F401
     AggregativeTokenEmbedder,
     Embedding,
+    FeedForwardTokenEmbedder,
     PassThroughTokenEmbedder,
     PretrainedTransformerEmbedder,
     TokenEmbedder,
