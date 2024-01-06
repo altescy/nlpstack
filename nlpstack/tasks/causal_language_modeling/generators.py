@@ -26,8 +26,8 @@ class CausalLanguageModelingTextGenerator(TextGenerator):
         self._context = context
         self._kwargs = kwargs
 
-    def __call__(self, inputs: Sequence[str], **kwargs: Any) -> List[str]:
+    def apply_batch(self, inputs: Sequence[str]) -> List[str]:
         context = self._context or ""
         examples = [CausalLanguageModelingExample(context + text) for text in inputs]
-        predictions = self._model.predict(examples, **self._kwargs, **kwargs)
+        predictions = self._model.predict(examples, **self._kwargs)
         return [prediction.text for prediction in predictions]
