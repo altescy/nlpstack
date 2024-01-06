@@ -18,12 +18,16 @@ class Text2TextGenerator(TextGenerator):
     def __init__(
         self,
         model: Rune[Text2TextExample, Text2TextPrediction],
+        *,
+        batch_size: int = 1,
+        max_workers: int = 1,
         **kwargs: Any,
     ) -> None:
+        super().__init__(batch_size=batch_size, max_workers=max_workers)
         self._model = model
         self._kwargs = kwargs
 
-    def __call__(self, inputs: Sequence[str], **kwargs: Any) -> List[str]:
+    def apply_batch(self, inputs: Sequence[str]) -> List[str]:
         examples = [Text2TextExample(text) for text in inputs]
-        predictions = self._model.predict(examples, **self._kwargs, **kwargs)
+        predictions = self._model.predict(examples, **self._kwargs)
         return [prediction.text for prediction in predictions]

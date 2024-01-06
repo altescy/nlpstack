@@ -3,12 +3,12 @@ import json
 import os
 from contextlib import suppress
 from os import PathLike
-from typing import Any, List, Literal, Optional, Sequence, Union
+from typing import Any, Iterable, Iterator, List, Literal, Optional, Sequence, Union
 
 import minato
 import requests
 
-from nlpstack.common import cached_property
+from nlpstack.common import Pipeline, cached_property
 from nlpstack.transformers import cache as transformers_cache
 
 try:
@@ -22,24 +22,14 @@ except ModuleNotFoundError:
     openai = None  # type: ignore[assignment]
 
 
-class TextGenerator:
+class TextGenerator(Pipeline[str, str]):
     """
     A base class for text generators.
     Text generators are callable objects that take a list of strings as input and return a list of strings as output.
     """
 
-    def __call__(self, inputs: Sequence[str], **kwargs: Any) -> List[str]:
-        """
-        Generate text from a list of strings.
-
-        Args:
-            inputs: A list of prompt/context strings.
-            **kwargs: Additional keyword arguments.
-
-        Returns:
-            A list of generated strings.
-        """
-        raise NotImplementedError
+    def apply(self, input: str) -> str:
+        return self.apply_batch([input])[0]
 
 
 class OpenAIChatTextGenerator(TextGenerator):
@@ -60,13 +50,19 @@ class OpenAIChatTextGenerator(TextGenerator):
 
     def __init__(
         self,
+        *,
         model_name: str = "gpt-3.5-turbo",
         context: Optional[Union[str, Sequence["openai.types.chat.ChatCompletionMessageParam"]]] = None,
         organization: Optional[str] = None,
         base_url: Optional[str] = None,
         max_retries: int = 3,
+        batch_size: int = 1,
+        max_workers: int = 1,
         **kwargs: Any,
     ) -> None:
+        if max_workers > 1:
+            raise ValueError("OpenAIChatTextGenerator does not support parallel processing.")
+        super().__init__(batch_size=batch_size, max_workers=max_workers)
         if openai is None:
             raise ModuleNotFoundError(
                 "OpenAI API is not installed. Please make sure `openai` is successfully installed."
@@ -82,8 +78,6 @@ class OpenAIChatTextGenerator(TextGenerator):
         self._max_retries = max_retries
         self._kwargs = kwargs
 
-        self._client
-
     @cached_property
     def _client(self) -> "openai.AsyncOpenAI":
         assert openai is not None
@@ -93,13 +87,12 @@ class OpenAIChatTextGenerator(TextGenerator):
             max_retries=self._max_retries,
         )
 
-    def __call__(self, inputs: Sequence[str], **kwargs: Any) -> List[str]:
+    def apply_batch(self, inputs: Sequence[str]) -> List[str]:
         async def task(text: str) -> str:
             response = await self._client.chat.completions.create(
                 model=self._model_name,
                 messages=list(self._context or []) + [{"role": "user", "content": text}],
                 **self._kwargs,
-                **kwargs,
             )
             return str(response.choices[0].message.content)
 
@@ -107,6 +100,17 @@ class OpenAIChatTextGenerator(TextGenerator):
             return await asyncio.gather(*[task(text) for text in inputs])
 
         return asyncio.run(main())
+
+    def __call__(
+        self,
+        inputs: Iterable[str],
+        *,
+        batch_size: Optional[int] = None,
+        max_workers: Optional[int] = None,
+    ) -> Iterator[str]:
+        if max_workers is not None and max_workers > 1:
+            raise ValueError("OpenAIChatTextGenerator does not support parallel processing.")
+        return super().__call__(inputs, batch_size=batch_size, max_workers=max_workers)
 
 
 class HuggingfaceTextGenerator(TextGenerator):
@@ -123,11 +127,15 @@ class HuggingfaceTextGenerator(TextGenerator):
 
     def __init__(
         self,
+        *,
         model_name: str = "gpt2",
         max_retries: int = 3,
         retry_interval: float = 10.0,
+        batch_size: int = 1,
+        max_workers: int = 1,
         **kwargs: Any,
     ) -> None:
+        super().__init__(batch_size=batch_size, max_workers=max_workers)
         self._api_url = f"https://api-inference.huggingface.co/models/{model_name}"
         self._max_retries = max_retries
         self._retry_interval = retry_interval
@@ -143,9 +151,9 @@ class HuggingfaceTextGenerator(TextGenerator):
         session.headers.update({"Authorization": f"Bearer {api_key}"})
         return session
 
-    def __call__(self, inputs: Sequence[str], **kwargs: Any) -> List[str]:
+    def apply_batch(self, inputs: Sequence[str]) -> List[str]:
         async def task(text: str) -> str:
-            data = json.dumps({"inputs": text, "parameters": {**self._kwargs, **kwargs}})
+            data = json.dumps({"inputs": text, "parameters": {**self._kwargs}})
             loop = asyncio.get_running_loop()
             for _ in range(self._max_retries):
                 response = await loop.run_in_executor(None, self._session.post, self._api_url, data)
@@ -178,22 +186,28 @@ class PretrainedTransformerTextGenerator(TextGenerator):
 
     def __init__(
         self,
+        *,
         pretrained_model_name: Union[str, PathLike] = "gpt2",
         task: Optional[Task] = None,
         device: str = "cpu",
+        batch_size: int = 1,
+        max_workers: int = 1,
         **kwargs: Any,
     ) -> None:
+        super().__init__(batch_size=batch_size, max_workers=max_workers)
         self._pretrained_model_name = pretrained_model_name
         self._task = task
         self._device = device
         self._kwargs = kwargs
 
+    @cached_property
+    def _pipeline(self) -> "transformers.Pipeline":
         self._pipeline = transformers.pipeline(
-            task=task,
-            model=self.model if task is not None else pretrained_model_name,
-            tokenizer=self.tokenizer if task is not None else None,
-            device=device,
-            **kwargs,
+            task=self._task,
+            model=self.model if self._task is not None else self._pretrained_model_name,
+            tokenizer=self.tokenizer if self._task is not None else None,
+            device=self._device,
+            **self._kwargs,
         )
 
     @cached_property
@@ -212,13 +226,12 @@ class PretrainedTransformerTextGenerator(TextGenerator):
         model = transformers_cache.get_pretrained_model(pretrained_model_name, auto_cls=auto_cls)
         return model
 
-    def __call__(self, inputs: Sequence[str], **kwargs: Any) -> List[str]:
+    def apply_batch(self, inputs: Sequence[str]) -> List[str]:
         output = self._pipeline(
             inputs,
             **self._kwargs,
-            **kwargs,
         )
-        sequence_delimiter = {**self._kwargs, **kwargs}.get("sequence_delimiter", "\n")
+        sequence_delimiter = {**self._kwargs}.get("sequence_delimiter", "\n")
         return [
             sequence_delimiter.join(x["generated_text"] for x in texts)
             if isinstance(texts, list)
