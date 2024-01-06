@@ -5,7 +5,7 @@ itself is also a `Pipeline` object, so pipelines can be composed together.
 """
 
 from collections import abc
-from concurrent.futures import ThreadPoolExecutor
+from multiprocessing import Pool
 from typing import Callable, Generic, Iterable, Iterator, List, Optional, Sequence, TypeVar
 
 from nlpstack.common.iterutil import SizedIterator, batched
@@ -130,8 +130,8 @@ class Pipeline(Generic[S, T]):
                 for batch in batched(inputs, batch_size):
                     yield from self.apply_batch(batch)
             else:
-                with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    for results in executor.map(self.apply_batch, batched(inputs, batch_size)):
+                with Pool(processes=max_workers) as pool:
+                    for results in pool.imap(self.apply_batch, batched(inputs, batch_size)):
                         yield from results
 
         if isinstance(inputs, abc.Sized):
