@@ -3,7 +3,7 @@ import json
 import os
 from contextlib import suppress
 from os import PathLike
-from typing import Any, List, Literal, Optional, Sequence, Type, TypedDict, Union
+from typing import Any, List, Literal, Optional, Sequence, Union
 
 import minato
 import requests
@@ -58,16 +58,13 @@ class OpenAIChatTextGenerator(TextGenerator):
 
     Role = Literal["system", "assistant", "user"]
 
-    class Message(TypedDict):
-        role: "OpenAIChatTextGenerator.Role"
-        content: str
-
     def __init__(
         self,
         model_name: str = "gpt-3.5-turbo",
-        context: Optional[Union[str, Sequence[Message]]] = None,
+        context: Optional[Union[str, Sequence["openai.types.chat.ChatCompletionMessageParam"]]] = None,
+        organization: Optional[str] = None,
+        base_url: Optional[str] = None,
         max_retries: int = 3,
-        retry_interval: float = 10.0,
         **kwargs: Any,
     ) -> None:
         if openai is None:
@@ -79,34 +76,32 @@ class OpenAIChatTextGenerator(TextGenerator):
             context = [{"role": "system", "content": context}]
 
         self._model_name = model_name
+        self._organization = organization
+        self._base_url = base_url
         self._context = context
         self._max_retries = max_retries
-        self._retry_interval = retry_interval
         self._kwargs = kwargs
 
         self._client
 
     @cached_property
-    def _client(self) -> Type["openai.ChatCompletion"]:
+    def _client(self) -> "openai.AsyncOpenAI":
         assert openai is not None
-        return openai.ChatCompletion
+        return openai.AsyncOpenAI(
+            organization=self._organization,
+            base_url=self._base_url,
+            max_retries=self._max_retries,
+        )
 
     def __call__(self, inputs: Sequence[str], **kwargs: Any) -> List[str]:
         async def task(text: str) -> str:
-            for _ in range(self._max_retries):
-                response = await self._client.acreate(
-                    model=self._model_name,
-                    messages=list(self._context or []) + [{"role": "user", "content": text}],
-                    **self._kwargs,
-                    **kwargs,
-                )
-                if response.status_code == 200:
-                    return str(response["choices"][0]["message"]["content"])
-                elif 500 <= response.status_code < 600:
-                    await asyncio.sleep(self._retry_interval)
-                    continue
-            response.raise_for_status()
-            return str(response["choices"][0]["message"]["content"])
+            response = await self._client.chat.completions.create(
+                model=self._model_name,
+                messages=list(self._context or []) + [{"role": "user", "content": text}],
+                **self._kwargs,
+                **kwargs,
+            )
+            return str(response.choices[0].message.content)
 
         async def main() -> List[str]:
             return await asyncio.gather(*[task(text) for text in inputs])

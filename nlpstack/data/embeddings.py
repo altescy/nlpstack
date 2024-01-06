@@ -507,43 +507,36 @@ class OpenAITextEmbedding(TextEmbedding):
     def __init__(
         self,
         model_name: str = "text-embedding-ada-002",
-        organization_id: Optional[str] = None,
-        api_base: Optional[str] = None,
-        api_type: Optional[str] = None,
-        api_version: Optional[str] = None,
+        organization: Optional[str] = None,
+        base_url: Optional[str] = None,
+        max_retries: int = 3,
         **kwargs: Any,
     ) -> None:
-        api_key = os.environ.get("OPENAI_API_KEY")
-
         if openai is None:
             raise ModuleNotFoundError("openai is not installed")
 
-        if api_key is not None:
-            openai.api_key = api_key
-        elif openai.api_key is None:
-            raise ValueError("Please provide an OpenAI API key.")
-
-        if api_base is not None:
-            openai.api_base = api_base
-
-        if api_version is not None:
-            openai.api_version = api_version
-
-        if api_type is not None:
-            openai.api_type = api_type
-
-        if organization_id is not None:
-            openai.organization = organization_id
-
         super().__init__(**kwargs)
-        self._client = openai.Embedding
+        self._organization = organization
+        self._base_url = base_url
+        self._max_retries = max_retries
         self._model_name = model_name
+
+        self._client  # load client
+
+    @cached_property
+    def _client(self) -> "openai.OpenAI":
+        assert openai is not None
+        return openai.OpenAI(
+            organization=self._organization,
+            base_url=self._base_url,
+            max_retries=self._max_retries,
+        )
 
     def apply_batch(self, batch: Sequence[str]) -> List[numpy.ndarray]:
         batch = [t.replace("\n", " ") for t in batch]
-        embeddings = self._client.create(input=batch, engine=self._model_name)["data"]  # type: ignore[no-untyped-call]
-        sorted_embeddings = sorted(embeddings, key=lambda e: e["index"])  # type: ignore
-        return [numpy.array(result["embedding"]) for result in sorted_embeddings]
+        response = self._client.embeddings.create(input=batch, model=self._model_name)
+        embeddings = sorted(response.data, key=lambda e: e.index)  # type: ignore
+        return [numpy.array(embedding.embedding) for embedding in embeddings]
 
 
 class HuggingFaceTextEmbedding(TextEmbedding):
