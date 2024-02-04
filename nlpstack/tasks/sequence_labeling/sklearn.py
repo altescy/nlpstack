@@ -4,9 +4,9 @@ from typing import Any, Iterator, Mapping, Optional, Sequence, Union
 from nlpstack.data import Vocabulary
 from nlpstack.data.indexers import TokenIndexer
 from nlpstack.data.tokenizers import Token
+from nlpstack.integrations.torch.training import TorchTrainer
+from nlpstack.integrations.torch.training.callbacks import Callback
 from nlpstack.sklearn.rune import SklearnEstimatorForRune
-from nlpstack.torch.training import TorchTrainer
-from nlpstack.torch.training.callbacks import Callback
 
 from .datamodules import SequenceLabelingDataModule
 from .metrics import SequenceLabelingMetric

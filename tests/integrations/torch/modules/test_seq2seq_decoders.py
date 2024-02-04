@@ -1,7 +1,11 @@
 import pytest
 import torch
 
-from nlpstack.torch.modules.seq2seq_decoders import LstmSeq2SeqDecoder, Seq2SeqDecoder, TransformerSeq2SeqDecoder
+from nlpstack.integrations.torch.modules.seq2seq_decoders import (
+    LstmSeq2SeqDecoder,
+    Seq2SeqDecoder,
+    TransformerSeq2SeqDecoder,
+)
 
 
 @pytest.mark.parametrize(

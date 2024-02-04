@@ -1,8 +1,8 @@
 import pytest
 import torch
 
-from nlpstack.torch.modules.feedforward import FeedForward
-from nlpstack.torch.modules.seq2seq_encoders import (
+from nlpstack.integrations.torch.modules.feedforward import FeedForward
+from nlpstack.integrations.torch.modules.seq2seq_encoders import (
     ComposeSeq2SeqEncoder,
     FeedForwardSeq2SeqEncoder,
     GatedCnnSeq2SeqEncoder,

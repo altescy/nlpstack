@@ -10,8 +10,8 @@ import torch
 from nlpstack.mlflow.util import flatten_dict_for_mlflow_log
 
 if typing.TYPE_CHECKING:
-    from nlpstack.torch.model import TorchModelOutput
-    from nlpstack.torch.training.trainer import TorchTrainer, TrainingState
+    from nlpstack.integrations.torch.model import TorchModelOutput
+    from nlpstack.integrations.torch.training.trainer import TorchTrainer, TrainingState
 
 
 class StopEarly(Exception):

@@ -7,10 +7,10 @@ from nlpstack.data import BasicBatchSampler, DataLoader, Vocabulary
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 from nlpstack.evaluation import Metric
+from nlpstack.integrations.torch.training import TorchTrainer
+from nlpstack.integrations.torch.training.callbacks import Callback
+from nlpstack.integrations.torch.training.optimizers import AdamFactory
 from nlpstack.rune import RuneForTorch
-from nlpstack.torch.training import TorchTrainer
-from nlpstack.torch.training.callbacks import Callback
-from nlpstack.torch.training.optimizers import AdamFactory
 
 from .datamodules import TopicModelingDataModule
 from .metrics import Perplexity

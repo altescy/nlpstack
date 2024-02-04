@@ -3,12 +3,12 @@ from typing import Any, Mapping, Optional, Sequence
 
 import torch
 
-from nlpstack.torch.model import TorchModel
-from nlpstack.torch.modules.crf import CrfDecoder
-from nlpstack.torch.modules.lazy import LazyLinearOutput
-from nlpstack.torch.modules.seq2seq_encoders import Seq2SeqEncoder
-from nlpstack.torch.modules.text_embedders import TextEmbedder
-from nlpstack.torch.util import get_mask_from_text
+from nlpstack.integrations.torch.model import TorchModel
+from nlpstack.integrations.torch.modules.crf import CrfDecoder
+from nlpstack.integrations.torch.modules.lazy import LazyLinearOutput
+from nlpstack.integrations.torch.modules.seq2seq_encoders import Seq2SeqEncoder
+from nlpstack.integrations.torch.modules.text_embedders import TextEmbedder
+from nlpstack.integrations.torch.util import get_mask_from_text
 
 from .datamodules import SequenceLabelingDataModule
 from .types import SequenceLabelingInference

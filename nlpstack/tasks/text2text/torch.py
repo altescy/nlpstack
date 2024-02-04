@@ -6,13 +6,13 @@ import numpy
 import torch
 import torch.nn.functional as F
 
-from nlpstack.torch.generation import BeamSearch
-from nlpstack.torch.model import TorchModel
-from nlpstack.torch.modules.heads import Head
-from nlpstack.torch.modules.seq2seq_decoders import Seq2SeqDecoder, Seq2SeqDecoderState
-from nlpstack.torch.modules.seq2seq_encoders import Seq2SeqEncoder
-from nlpstack.torch.modules.token_embedders import TokenEmbedder
-from nlpstack.torch.util import get_mask_from_text, get_token_ids_from_text
+from nlpstack.integrations.torch.generation import BeamSearch
+from nlpstack.integrations.torch.model import TorchModel
+from nlpstack.integrations.torch.modules.heads import Head
+from nlpstack.integrations.torch.modules.seq2seq_decoders import Seq2SeqDecoder, Seq2SeqDecoderState
+from nlpstack.integrations.torch.modules.seq2seq_encoders import Seq2SeqEncoder
+from nlpstack.integrations.torch.modules.token_embedders import TokenEmbedder
+from nlpstack.integrations.torch.util import get_mask_from_text, get_token_ids_from_text
 
 from .datamodules import Text2TextDataModule
 from .types import Text2TextInference

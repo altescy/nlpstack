@@ -6,11 +6,11 @@ from nlpstack.common import FileBackendSequence
 from nlpstack.data import Instance
 from nlpstack.data.datamodule import DataModule
 from nlpstack.evaluation import EmptyMetric, Evaluator, Metric, MultiMetrics, SimpleEvaluator
-from nlpstack.torch.model import TorchModel
-from nlpstack.torch.picklable import TorchPicklable
-from nlpstack.torch.predictor import TorchPredictor
-from nlpstack.torch.training import TorchTrainer
-from nlpstack.torch.util import set_random_seed
+from nlpstack.integrations.torch.model import TorchModel
+from nlpstack.integrations.torch.picklable import TorchPicklable
+from nlpstack.integrations.torch.predictor import TorchPredictor
+from nlpstack.integrations.torch.training import TorchTrainer
+from nlpstack.integrations.torch.util import set_random_seed
 
 from .base import Rune, SetupMode
 

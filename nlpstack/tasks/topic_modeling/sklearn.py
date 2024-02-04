@@ -4,9 +4,9 @@ from nlpstack.data import Vocabulary
 from nlpstack.data.indexers import TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer
 from nlpstack.evaluation import Metric
+from nlpstack.integrations.torch.training import TorchTrainer
+from nlpstack.integrations.torch.training.callbacks import Callback
 from nlpstack.sklearn.rune import SklearnEstimatorForRune
-from nlpstack.torch.training import TorchTrainer
-from nlpstack.torch.training.callbacks import Callback
 
 from .datamodules import TopicModelingDataModule
 from .rune import ProdLDA

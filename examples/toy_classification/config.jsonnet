@@ -7,13 +7,13 @@
       embedder: {
         token_embedders: {
           tokens: {
-            type: 'nlpstack.torch.modules.token_embedders.Embedding',
+            type: 'nlpstack.integrations.torch.modules.token_embedders.Embedding',
             embedding_dim: 32,
           },
         },
       },
       encoder: {
-        type: 'nlpstack.torch.modules.seq2vec_encoders.BagOfEmbeddings',
+        type: 'nlpstack.integrations.torch.modules.seq2vec_encoders.BagOfEmbeddings',
         input_dim: 32,
       },
       dropout: 0.1,

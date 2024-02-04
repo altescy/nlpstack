@@ -7,7 +7,7 @@ from typing import Any, List, Literal, Mapping, Optional, Sequence, Tuple, Union
 
 import torch
 
-import nlpstack.torch.util as util
+import nlpstack.integrations.torch.util as util
 from nlpstack.data.vocabulary import Vocabulary
 
 ViterbiDecoding = Tuple[List[int], float]  # a list of tags, and a viterbi score
