@@ -7,7 +7,7 @@ from typing import Any, Dict, Mapping, Optional, Sequence
 
 import torch
 
-from nlpstack.mlflow.util import flatten_dict_for_mlflow_log
+from nlpstack.integrations.mlflow.util import flatten_dict_for_mlflow_log
 
 if typing.TYPE_CHECKING:
     from nlpstack.integrations.torch.model import TorchModelOutput

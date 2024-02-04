@@ -12,7 +12,7 @@ import colt
 import minato
 
 from nlpstack.common import FileBackendSequence, load_jsonnet
-from nlpstack.mlflow.util import flatten_dict_for_mlflow_log
+from nlpstack.integrations.mlflow.util import flatten_dict_for_mlflow_log
 from nlpstack.rune import Rune, RuneArchive
 
 from .workflow import Workflow

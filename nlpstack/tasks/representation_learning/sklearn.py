@@ -5,9 +5,9 @@ import numpy
 from nlpstack.data import Vocabulary
 from nlpstack.data.indexers import TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer
+from nlpstack.integrations.sklearn.rune import SklearnEstimatorForRune
 from nlpstack.integrations.torch.training import TorchTrainer
 from nlpstack.integrations.torch.training.callbacks import Callback
-from nlpstack.sklearn.rune import SklearnEstimatorForRune
 
 from .datamodules import RepresentationLearningDataModule
 from .rune import UnsupervisedSimCSE

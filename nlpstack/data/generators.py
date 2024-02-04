@@ -9,7 +9,7 @@ import minato
 import requests
 
 from nlpstack.common import Pipeline, cached_property
-from nlpstack.transformers import cache as transformers_cache
+from nlpstack.integrations.transformers import cache as transformers_cache
 
 try:
     import transformers

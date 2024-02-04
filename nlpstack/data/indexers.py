@@ -14,7 +14,7 @@ from nlpstack.common import cached_property
 from nlpstack.data.embeddings import WordEmbedding
 from nlpstack.data.tokenizers import Token
 from nlpstack.data.vocabulary import Vocabulary
-from nlpstack.transformers import cache as transformers_cache
+from nlpstack.integrations.transformers import cache as transformers_cache
 
 try:
     import fasttext

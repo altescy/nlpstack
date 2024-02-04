@@ -13,7 +13,7 @@ from sklearn.utils import murmurhash3_32
 from nlpstack.common import FileBackendMapping, Pipeline, cached_property
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 from nlpstack.data.vocabulary import Vocabulary
-from nlpstack.transformers import cache as transformers_cache
+from nlpstack.integrations.transformers import cache as transformers_cache
 
 from .util import masked_pool
 
