@@ -8,6 +8,7 @@ import torch
 import torch.nn.functional as F
 
 from nlpstack.torch.modules.feedforward import FeedForward
+from nlpstack.torch.modules.xlstm import XLSTM
 from nlpstack.torch.util import add_positional_features, convert_to_toeplitz, fold, unfold
 
 
@@ -750,3 +751,45 @@ class PretrainedTransformerSeq2SeqEncoder(Seq2SeqEncoder):
     def forward(self, inputs: torch.FloatTensor, mask: torch.BoolTensor) -> torch.FloatTensor:
         output = self._model(inputs_embeds=inputs, attention_mask=mask)
         return cast(torch.FloatTensor, output.last_hidden_state)
+
+
+class XLstmSeq2SeqEncoder(Seq2SeqEncoder):
+    def __init__(
+        self,
+        input_dim: int,
+        hidden_dim: int,
+        num_heads: int,
+        layers: Sequence[Literal["s", "m"]],
+        use_conv: bool = True,
+        kernel_size: int = 4,
+        projection_factors: Tuple[float, float] = (2.0, 4 / 3),
+        bidirectional: bool = False,
+        dropout: float = 0.0,
+    ) -> None:
+        super().__init__()
+
+        self._xlstm = XLSTM(
+            input_dim=input_dim,
+            hidden_dim=hidden_dim,
+            num_heads=num_heads,
+            layers=layers,
+            use_conv=use_conv,
+            kernel_size=kernel_size,
+            projection_factors=projection_factors,
+            bidirectional=bidirectional,
+            dropout=dropout,
+        )
+
+    def get_input_dim(self) -> int:
+        return self._xlstm.input_dim
+
+    def get_output_dim(self) -> int:
+        return self._xlstm.output_dim
+
+    def forward(
+        self,
+        inputs: torch.FloatTensor,
+        mask: torch.BoolTensor,
+    ) -> torch.FloatTensor:
+        output, _ = self._xlstm(inputs, mask=mask)
+        return cast(torch.FloatTensor, output)

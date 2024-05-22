@@ -16,6 +16,7 @@ from nlpstack.torch.modules.seq2seq_encoders import (
     Seq2SeqEncoder,
     TransformerSeq2SeqEncoder,
     WindowConcatEncoder,
+    XLstmSeq2SeqEncoder,
 )
 
 
@@ -40,6 +41,7 @@ from nlpstack.torch.modules.seq2seq_encoders import (
         MLPMixer(6, 2, max_length=16),  # for long sequence
         HyperMixer(6, 6, 2),
         GatedCnnSeq2SeqEncoder(6, [[GatedCnnSeq2SeqEncoder.Layer(3, 6)]], output_dim=6),
+        XLstmSeq2SeqEncoder(6, 6, 2, ("m", "s"), bidirectional=True),
     ],
 )
 def test_seq2seq_encoder(encoder: Seq2SeqEncoder) -> None:
