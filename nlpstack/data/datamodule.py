@@ -2,6 +2,8 @@ from typing import Any, Generic, Iterable, Iterator, TypeVar
 
 from collatable import Instance
 
+from nlpstack.common import wrap_iterator
+
 Example = TypeVar("Example")
 Inference = TypeVar("Inference")
 Prediction = TypeVar("Prediction")
@@ -12,7 +14,7 @@ class DataModule(Generic[Example, Inference, Prediction]):
         pass
 
     def preprocess(self, dataset: Iterable[Example], **kwargs: Any) -> Iterator[Example]:
-        return iter(dataset)
+        return wrap_iterator(iter, dataset)
 
     def build_instance(self, example: Example) -> Instance:
         raise NotImplementedError
