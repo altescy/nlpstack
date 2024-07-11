@@ -3,7 +3,7 @@ from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
 import numpy
 
-from nlpstack.common import FileBackendSequence, ProgressBar
+from nlpstack.common import PassThroughPipeline, Pipeline, ProgressBar, wrap_iterator
 from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, MultiLabelField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
@@ -45,12 +45,14 @@ class MultilabelClassificationDataModule(
         token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
         label_namespace: str = "labels",
         labels: Optional[Sequence[str]] = None,
+        preprocessor: Optional[Pipeline[MultilabelClassificationExample, MultilabelClassificationExample]] = None,
     ) -> None:
         self._vocab = vocab
         self._tokenizer = tokenizer or WhitespaceTokenizer()
         self._token_indexers = token_indexers or {"tokens": SingleIdTokenIndexer()}
         self._label_namespace = label_namespace
         self._labels = sorted(set(labels)) if labels else None
+        self._preprocessor = preprocessor or PassThroughPipeline()
 
     @property
     def vocab(self) -> Vocabulary:
@@ -75,18 +77,25 @@ class MultilabelClassificationDataModule(
         """
         Setup the data module.
 
-        This method tokenizes the dataset and builds the vocabulary.
+        This method builds the vocabulary from the given dataset.
 
         Args:
             dataset: The dataset to tokenize and build the vocabulary from.
         """
 
         if dataset:
-            logger.info("Tokenizing dataset and building vocabulary...")
-            dataset = self.tokenize(ProgressBar(dataset, desc="Tokenizing dataset"))
             self._build_vocab(dataset)
 
-    def tokenize(self, dataset: Iterable[MultilabelClassificationExample]) -> Sequence[MultilabelClassificationExample]:
+    def preprocess(
+        self,
+        dataset: Iterable[MultilabelClassificationExample],
+        **kwargs: Any,
+    ) -> Iterator[MultilabelClassificationExample]:
+        return self._tokenize(self._preprocessor(dataset))
+
+    def _tokenize(
+        self, dataset: Iterable[MultilabelClassificationExample]
+    ) -> Iterator[MultilabelClassificationExample]:
         """
         Tokenize the dataset and return the tokenized dataset.
 
@@ -98,9 +107,11 @@ class MultilabelClassificationDataModule(
         """
 
         if not dataset:
-            return []
+            return iter([])
 
-        def tokenized_document_generator() -> Iterator[MultilabelClassificationExample]:
+        def tokenized_document_generator(
+            dataset: Iterable[MultilabelClassificationExample],
+        ) -> Iterator[MultilabelClassificationExample]:
             for example in dataset:
                 if isinstance(example.text, str):
                     tokenized_text = self._tokenizer.tokenize(example.text)
@@ -111,7 +122,7 @@ class MultilabelClassificationDataModule(
                     labels=example.labels,
                 )
 
-        return FileBackendSequence.from_iterable(tokenized_document_generator())
+        return wrap_iterator(tokenized_document_generator, dataset)
 
     def _build_vocab(self, dataset: Sequence[MultilabelClassificationExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
@@ -201,5 +212,5 @@ class MultilabelClassificationDataModule(
         """
 
         logger.info("Building instances...")
-        for example in ProgressBar(dataset, desc="Building instances"):
+        for example in ProgressBar(self.preprocess(dataset), desc="Building instances"):
             yield self.build_instance(example)
