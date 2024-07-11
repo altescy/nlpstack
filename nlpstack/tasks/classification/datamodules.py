@@ -37,9 +37,9 @@ class BasicClassificationDataModule(
         label_namespace: The vocabulary namespace for the labels. Defaults to `"labels"`.
         labels: The set of labels. If not given, the labels will be collected from the
             training dataset. Defaults to `None`.
-        preprocessors: The preprocessors to apply to the dataset before tokenization.
+        preprocessor: The preprocessor to apply to the dataset before tokenization.
             Defaults to `None`.
-        postprocessors: The postprocessors to apply to the predictions after inference.
+        postprocessor: The postprocessor to apply to the predictions after inference.
             Defaults to `None`.
     """
 

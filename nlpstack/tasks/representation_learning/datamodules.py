@@ -27,6 +27,8 @@ class RepresentationLearningDataModule(
         tokenizer: The tokenizer. Defaults to `WhitespaceTokenizer()`
         token_indexers: The token indexers to index the tokens. Defaults to
             `{"tokens": SingleIdTokenIndexer()}`
+        preprocessor: The preprocessor to apply to the dataset before tokenization.
+            Defaults to `None`.
     """
 
     def __init__(

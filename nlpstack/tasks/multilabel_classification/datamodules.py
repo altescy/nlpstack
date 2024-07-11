@@ -36,6 +36,8 @@ class MultilabelClassificationDataModule(
         label_namespace: The vocabulary namespace for the labels. Defaults to `"labels"`.
         labels: The set of labels. If not given, the labels will be collected from the
             training dataset. Defaults to `None`.
+        preprocessor: The preprocessor to apply to the dataset before tokenization.
+            Defaults to `None`.
     """
 
     def __init__(

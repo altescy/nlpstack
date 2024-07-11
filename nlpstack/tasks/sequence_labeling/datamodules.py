@@ -30,6 +30,8 @@ class SequenceLabelingDataModule(
         token_indexers: The token indexers to index the tokens. Defaults to
             `{"tokens": SingleIdTokenIndexer()}`
         label_namespace: The vocabulary namespace for the labels. Defaults to `"labels"`.
+        preprocessor: The preprocessor to apply to the dataset before tokenization.
+            Defaults to `None`.
     """
 
     def __init__(
