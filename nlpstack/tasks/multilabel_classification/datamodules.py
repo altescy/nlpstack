@@ -17,6 +17,9 @@ from .types import (
 
 logger = getLogger(__name__)
 
+MultilabelClassificationPreprocessor = Pipeline[MultilabelClassificationExample, MultilabelClassificationExample]
+MultilabelClassificationPostprocessor = Pipeline[MultilabelClassificationPrediction, MultilabelClassificationPrediction]
+
 
 class MultilabelClassificationDataModule(
     DataModule[
@@ -38,6 +41,8 @@ class MultilabelClassificationDataModule(
             training dataset. Defaults to `None`.
         preprocessor: The preprocessor to apply to the dataset before tokenization.
             Defaults to `None`.
+        postprocessor: The postprocessor to apply to the predictions after inference.
+            Defaults to `None`.
     """
 
     def __init__(
@@ -47,7 +52,8 @@ class MultilabelClassificationDataModule(
         token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
         label_namespace: str = "labels",
         labels: Optional[Sequence[str]] = None,
-        preprocessor: Optional[Pipeline[MultilabelClassificationExample, MultilabelClassificationExample]] = None,
+        preprocessor: Optional[MultilabelClassificationPreprocessor] = None,
+        postprocessor: Optional[MultilabelClassificationPostprocessor] = None,
     ) -> None:
         self._vocab = vocab
         self._tokenizer = tokenizer or WhitespaceTokenizer()
@@ -55,6 +61,7 @@ class MultilabelClassificationDataModule(
         self._label_namespace = label_namespace
         self._labels = sorted(set(labels)) if labels else None
         self._preprocessor = preprocessor or PassThroughPipeline()
+        self._postprocessor = postprocessor or PassThroughPipeline()
 
     @property
     def vocab(self) -> Vocabulary:
@@ -186,18 +193,21 @@ class MultilabelClassificationDataModule(
             The predictions.
         """
 
-        sorted_indices = inference.probs.argsort(axis=1)[:, ::-1]
-        sorted_probs = numpy.take_along_axis(inference.probs, sorted_indices, axis=1)
-        for i, (top_indices, top_probs) in enumerate(zip(sorted_indices.tolist(), sorted_probs.tolist())):
-            num_labels_to_return = len(top_indices)
-            if inference.threshold is not None:
-                num_labels_to_return = sum(prob >= inference.threshold for prob in top_probs)
-            if inference.top_k is not None:
-                num_labels_to_return = min(num_labels_to_return, inference.top_k)
-            top_probs = top_probs[:num_labels_to_return]
-            top_indices = top_indices[:num_labels_to_return]
-            yield MultilabelClassificationPrediction(
-                top_probs=top_probs,
-                top_labels=[self.vocab.get_token_by_index(self.label_namespace, index) for index in top_indices],
-                metadata=inference.metadata[i] if inference.metadata is not None else None,
-            )
+        def prediction_iterator() -> Iterator[MultilabelClassificationPrediction]:
+            sorted_indices = inference.probs.argsort(axis=1)[:, ::-1]
+            sorted_probs = numpy.take_along_axis(inference.probs, sorted_indices, axis=1)
+            for i, (top_indices, top_probs) in enumerate(zip(sorted_indices.tolist(), sorted_probs.tolist())):
+                num_labels_to_return = len(top_indices)
+                if inference.threshold is not None:
+                    num_labels_to_return = sum(prob >= inference.threshold for prob in top_probs)
+                if inference.top_k is not None:
+                    num_labels_to_return = min(num_labels_to_return, inference.top_k)
+                top_probs = top_probs[:num_labels_to_return]
+                top_indices = top_indices[:num_labels_to_return]
+                yield MultilabelClassificationPrediction(
+                    top_probs=top_probs,
+                    top_labels=[self.vocab.get_token_by_index(self.label_namespace, index) for index in top_indices],
+                    metadata=inference.metadata[i] if inference.metadata is not None else None,
+                )
+
+        yield from self._postprocessor(prediction_iterator())

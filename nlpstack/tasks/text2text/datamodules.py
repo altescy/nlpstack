@@ -12,6 +12,9 @@ from .types import Text2TextExample, Text2TextInference, Text2TextPrediction
 
 logger = getLogger(__name__)
 
+Text2TextPreprocessor = Pipeline[Text2TextExample, Text2TextExample]
+Text2TextPostprocessor = Pipeline[Text2TextPrediction, Text2TextPrediction]
+
 
 class Text2TextDataModule(
     DataModule[
@@ -35,6 +38,8 @@ class Text2TextDataModule(
         target_namespace: The vocabulary namespace for target text. Defaults to `"tokens"`.
         preprocessor: The preprocessor to apply to the dataset before tokenization.
             Defaults to `None`.
+        postprocessor: The postprocessor to apply to the predictions after inference.
+            Defaults to `None`.
     """
 
     def __init__(
@@ -46,7 +51,8 @@ class Text2TextDataModule(
         target_token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
         source_namespace: str = "tokens",
         target_namespace: str = "tokens",
-        preprocessor: Optional[Pipeline[Text2TextExample, Text2TextExample]] = None,
+        preprocessor: Optional[Text2TextPreprocessor] = None,
+        postprocessor: Optional[Text2TextPostprocessor] = None,
     ) -> None:
         self._vocab = vocab
         self._source_tokenizer = source_tokenizer or WhitespaceTokenizer()
@@ -56,6 +62,7 @@ class Text2TextDataModule(
         self._source_namespace = source_namespace
         self._target_namespace = target_namespace
         self._preprocessor = preprocessor or PassThroughPipeline()
+        self._postprocessor = postprocessor or PassThroughPipeline()
 
     @property
     def vocab(self) -> Vocabulary:
@@ -180,19 +187,22 @@ class Text2TextDataModule(
             The predictions.
         """
 
-        token_indices_to_ignore = {self._vocab.get_pad_index(self._target_namespace)}
-        if self._vocab.has_bos_token(self._target_namespace):
-            token_indices_to_ignore.add(self._vocab.get_bos_index(self._target_namespace))
-        if self._vocab.has_eos_token(self._target_namespace):
-            token_indices_to_ignore.add(self._vocab.get_eos_index(self._target_namespace))
-        for top_token_ids, scores in zip(inference.pred_token_ids.tolist(), inference.scores.tolist()):
-            top_tokens = [
-                [
-                    self.vocab.get_token_by_index(self._target_namespace, token_id)
-                    for token_id in token_ids
-                    if token_id not in token_indices_to_ignore
+        def prediction_iterator() -> Iterator[Text2TextPrediction]:
+            token_indices_to_ignore = {self._vocab.get_pad_index(self._target_namespace)}
+            if self._vocab.has_bos_token(self._target_namespace):
+                token_indices_to_ignore.add(self._vocab.get_bos_index(self._target_namespace))
+            if self._vocab.has_eos_token(self._target_namespace):
+                token_indices_to_ignore.add(self._vocab.get_eos_index(self._target_namespace))
+            for top_token_ids, scores in zip(inference.pred_token_ids.tolist(), inference.scores.tolist()):
+                top_tokens = [
+                    [
+                        self.vocab.get_token_by_index(self._target_namespace, token_id)
+                        for token_id in token_ids
+                        if token_id not in token_indices_to_ignore
+                    ]
+                    for token_ids in top_token_ids
                 ]
-                for token_ids in top_token_ids
-            ]
-            top_texts = [self._target_tokenizer.detokenize(tokens) for tokens in top_tokens]
-            yield Text2TextPrediction(top_texts, top_tokens, scores)
+                top_texts = [self._target_tokenizer.detokenize(tokens) for tokens in top_tokens]
+                yield Text2TextPrediction(top_texts, top_tokens, scores)
+
+        yield from self._postprocessor(prediction_iterator())

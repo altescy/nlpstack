@@ -13,6 +13,9 @@ from .types import SequenceLabelingExample, SequenceLabelingInference, SequenceL
 
 logger = getLogger(__name__)
 
+SequenceLabelPreprocessor = Pipeline[SequenceLabelingExample, SequenceLabelingExample]
+SequenceLabelPostprocessor = Pipeline[SequenceLabelingPrediction, SequenceLabelingPrediction]
+
 
 class SequenceLabelingDataModule(
     DataModule[
@@ -32,6 +35,8 @@ class SequenceLabelingDataModule(
         label_namespace: The vocabulary namespace for the labels. Defaults to `"labels"`.
         preprocessor: The preprocessor to apply to the dataset before tokenization.
             Defaults to `None`.
+        postprocessor: The postprocessor to apply to the predictions after inference.
+            Defaults to `None`.
     """
 
     def __init__(
@@ -40,13 +45,15 @@ class SequenceLabelingDataModule(
         tokenizer: Optional[Tokenizer] = None,
         token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
         label_namespace: str = "labels",
-        preprocessor: Optional[Pipeline[SequenceLabelingExample, SequenceLabelingExample]] = None,
+        preprocessor: Optional[SequenceLabelPreprocessor] = None,
+        postprocessor: Optional[SequenceLabelPostprocessor] = None,
     ) -> None:
         self._vocab = vocab
         self._tokenizer = tokenizer or WhitespaceTokenizer()
         self._token_indexers = token_indexers or {"tokens": SingleIdTokenIndexer()}
         self._label_namespace = label_namespace
         self._preprocessor = preprocessor or PassThroughPipeline()
+        self._postprocessor = postprocessor or PassThroughPipeline()
 
     @property
     def vocab(self) -> Vocabulary:
@@ -175,27 +182,37 @@ class SequenceLabelingDataModule(
             The predictions.
         """
 
-        assert inference.metadata is not None, "Inference must have metadata."
+        def prediction_iterator() -> Iterator[SequenceLabelingPrediction]:
+            assert inference.metadata is not None, "Inference must have metadata."
 
-        top_label_indices: Sequence[Sequence[Sequence[int]]]
-        if inference.decodings is None:
-            mask = inference.mask if inference.mask is not None else numpy.ones(inference.probs.shape[:-1], dtype=bool)
-            lengths = mask.sum(axis=1).tolist()
-            top_label_indices = [
-                [label_indices[:length]]
-                for label_indices, length in zip(numpy.argmax(inference.probs, axis=-1).tolist(), lengths)
-            ]
-        else:
-            top_label_indices = [[label_indices for label_indices, _ in decodings] for decodings in inference.decodings]
+            top_label_indices: Sequence[Sequence[Sequence[int]]]
+            if inference.decodings is None:
+                mask = (
+                    inference.mask if inference.mask is not None else numpy.ones(inference.probs.shape[:-1], dtype=bool)
+                )
+                lengths = mask.sum(axis=1).tolist()
+                top_label_indices = [
+                    [label_indices[:length]]
+                    for label_indices, length in zip(numpy.argmax(inference.probs, axis=-1).tolist(), lengths)
+                ]
+            else:
+                top_label_indices = [
+                    [label_indices for label_indices, _ in decodings] for decodings in inference.decodings
+                ]
 
-        batch_size = len(top_label_indices)
-        for batch_index in range(batch_size):
-            top_labels = [
-                [self._vocab.get_token_by_index(self._label_namespace, label_index) for label_index in label_indices]
-                for label_indices in top_label_indices[batch_index]
-            ]
-            _metadata = dict(inference.metadata[batch_index])
-            _nlpstack_metadata = _metadata.pop("__nlpstack_metadata__")
-            tokens = _nlpstack_metadata["raw_tokens"]
-            metadata = None if _nlpstack_metadata["metadata_is_none"] else _metadata
-            yield SequenceLabelingPrediction(tokens=tokens, top_labels=top_labels, metadata=metadata)
+            batch_size = len(top_label_indices)
+            for batch_index in range(batch_size):
+                top_labels = [
+                    [
+                        self._vocab.get_token_by_index(self._label_namespace, label_index)
+                        for label_index in label_indices
+                    ]
+                    for label_indices in top_label_indices[batch_index]
+                ]
+                _metadata = dict(inference.metadata[batch_index])
+                _nlpstack_metadata = _metadata.pop("__nlpstack_metadata__")
+                tokens = _nlpstack_metadata["raw_tokens"]
+                metadata = None if _nlpstack_metadata["metadata_is_none"] else _metadata
+                yield SequenceLabelingPrediction(tokens=tokens, top_labels=top_labels, metadata=metadata)
+
+        yield from self._postprocessor(prediction_iterator())

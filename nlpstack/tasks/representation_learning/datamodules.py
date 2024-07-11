@@ -11,6 +11,9 @@ from .types import RepresentationLearningExample, RepresentationLearningInferenc
 
 logger = getLogger(__name__)
 
+RepresentationLearningPreprocessor = Pipeline[RepresentationLearningExample, RepresentationLearningExample]
+RepresentationLearningPostprocessor = Pipeline[RepresentationLearningPrediction, RepresentationLearningPrediction]
+
 
 class RepresentationLearningDataModule(
     DataModule[
@@ -29,6 +32,8 @@ class RepresentationLearningDataModule(
             `{"tokens": SingleIdTokenIndexer()}`
         preprocessor: The preprocessor to apply to the dataset before tokenization.
             Defaults to `None`.
+        postprocessor: The postprocessor to apply to the predictions after inference.
+            Defaults to `None`.
     """
 
     def __init__(
@@ -36,12 +41,14 @@ class RepresentationLearningDataModule(
         vocab: Vocabulary,
         tokenizer: Optional[Tokenizer] = None,
         token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
-        preprocessor: Optional[Pipeline[RepresentationLearningExample, RepresentationLearningExample]] = None,
+        preprocessor: Optional[RepresentationLearningPreprocessor] = None,
+        postprocessor: Optional[RepresentationLearningPostprocessor] = None,
     ) -> None:
         self._vocab = vocab
         self._tokenizer = tokenizer or WhitespaceTokenizer()
         self._token_indexers = token_indexers or {"tokens": SingleIdTokenIndexer()}
         self._preprocessor = preprocessor or PassThroughPipeline()
+        self._postprocessor = postprocessor or PassThroughPipeline()
 
     @property
     def vocab(self) -> Vocabulary:
@@ -140,5 +147,8 @@ class RepresentationLearningDataModule(
             The predictions.
         """
 
-        for embedding in inference.embeddings:
-            yield RepresentationLearningPrediction(embedding.tolist())
+        def prediction_iterator() -> Iterator[RepresentationLearningPrediction]:
+            for embedding in inference.embeddings:
+                yield RepresentationLearningPrediction(embedding.tolist())
+
+        yield from self._postprocessor(prediction_iterator())

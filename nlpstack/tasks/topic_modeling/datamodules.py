@@ -11,6 +11,9 @@ from .types import TopicModelingExample, TopicModelingInference, TopicModelingPr
 
 logger = getLogger(__name__)
 
+TopicModelingPreprocessor = Pipeline[TopicModelingExample, TopicModelingExample]
+TopicModelingPostprocessor = Pipeline[TopicModelingPrediction, TopicModelingPrediction]
+
 
 class TopicModelingDataModule(
     DataModule[
@@ -29,6 +32,8 @@ class TopicModelingDataModule(
             `{"tokens": SingleIdTokenIndexer()}`.
         preprocessor: The preprocessor to apply to the dataset before tokenization.
             Defaults to `None`.
+        postprocessor: The postprocessor to apply to the predictions after inference.
+            Defaults to `None`.
     """
 
     def __init__(
@@ -36,12 +41,14 @@ class TopicModelingDataModule(
         vocab: Vocabulary,
         tokenizer: Optional[Tokenizer] = None,
         token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
-        preprocessor: Optional[Pipeline[TopicModelingExample, TopicModelingExample]] = None,
+        preprocessor: Optional[TopicModelingPreprocessor] = None,
+        postprocessor: Optional[TopicModelingPostprocessor] = None,
     ) -> None:
         self._vocab = vocab
         self._tokenizer = tokenizer or WhitespaceTokenizer()
         self._token_indexers = token_indexers or {"tokens": SingleIdTokenIndexer()}
         self._preprocessor = preprocessor or PassThroughPipeline()
+        self._postprocessor = postprocessor or PassThroughPipeline()
 
     @property
     def vocab(self) -> Vocabulary:
@@ -129,5 +136,8 @@ class TopicModelingDataModule(
             The predictions.
         """
 
-        for topic_distribution in inference.topic_distribution:
-            yield TopicModelingPrediction(topic_distribution.tolist())
+        def prediction_iterator() -> Iterator[TopicModelingPrediction]:
+            for topic_distribution in inference.topic_distribution:
+                yield TopicModelingPrediction(topic_distribution.tolist())
+
+        yield from self._postprocessor(prediction_iterator())
