@@ -17,10 +17,7 @@ collatable = ">=0.3.2"
 colt = ">=0.11.1"
 dill = "*"
 minato = ">=0.12"
-numpy = [
-  {version = ">=1.26", python = ">=3.9"},
-  {version = "<1.25", python = "=3.8"},
-]
+numpy = "*"
 rjsonnet = ">=0.5"
 scikit-learn = ">=1.0,<2.0"
 torch = ">=1.9,<3.0"
