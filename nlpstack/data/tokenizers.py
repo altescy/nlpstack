@@ -64,7 +64,7 @@ class Tokenizer(Pipeline[str, List[Token], _T_Fixtures], Generic[_T_Fixtures]):
         return next(self([text], batch_size=1, max_workers=1))
 
     def detokenize(self, tokens: Union[Sequence[str], Sequence[Token]]) -> str:
-        raise NotImplementedError
+        raise next(self.detokenize_pipeline([tokens], batch_size=1, max_workers=1))
 
     def tokenize_batch(self, batch: Sequence[str], fixtures: _T_Fixtures) -> List[List[Token]]:
         raise NotImplementedError
