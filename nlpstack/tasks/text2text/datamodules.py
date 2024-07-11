@@ -2,7 +2,7 @@ import itertools
 from logging import getLogger
 from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
-from nlpstack.common import wrap_iterator
+from nlpstack.common import PassThroughPipeline, Pipeline, wrap_iterator
 from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
@@ -33,6 +33,8 @@ class Text2TextDataModule(
             `source_token_indexers` is used. Defaults to `None`.
         source_namespace: The vocabulary namespace for source text. Defaults to `"tokens"`.
         target_namespace: The vocabulary namespace for target text. Defaults to `"tokens"`.
+        preprocessor: The preprocessor to apply to the dataset before tokenization.
+            Defaults to `None`.
     """
 
     def __init__(
@@ -44,6 +46,7 @@ class Text2TextDataModule(
         target_token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
         source_namespace: str = "tokens",
         target_namespace: str = "tokens",
+        preprocessor: Optional[Pipeline[Text2TextExample, Text2TextExample]] = None,
     ) -> None:
         self._vocab = vocab
         self._source_tokenizer = source_tokenizer or WhitespaceTokenizer()
@@ -52,6 +55,7 @@ class Text2TextDataModule(
         self._target_token_indexers = target_token_indexers or self._source_token_indexers
         self._source_namespace = source_namespace
         self._target_namespace = target_namespace
+        self._preprocessor = preprocessor or PassThroughPipeline()
 
     @property
     def vocab(self) -> Vocabulary:
@@ -75,7 +79,7 @@ class Text2TextDataModule(
             self._build_vocab(dataset)
 
     def preprocess(self, dataset: Iterable[Text2TextExample], **kwargs: Any) -> Iterator[Text2TextExample]:
-        return self._tokenize(dataset)
+        return self._tokenize(self._preprocessor(dataset))
 
     def _tokenize(self, dataset: Iterable[Text2TextExample]) -> Iterator[Text2TextExample]:
         """
