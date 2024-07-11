@@ -1,7 +1,7 @@
 from logging import getLogger
 from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
-from nlpstack.common import FileBackendSequence, ProgressBar, iter_with_callback
+from nlpstack.common import PassThroughPipeline, Pipeline, ProgressBar, wrap_iterator
 from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
@@ -34,10 +34,12 @@ class RepresentationLearningDataModule(
         vocab: Vocabulary,
         tokenizer: Optional[Tokenizer] = None,
         token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
+        preprocessor: Optional[Pipeline[RepresentationLearningExample, RepresentationLearningExample]] = None,
     ) -> None:
         self._vocab = vocab
         self._tokenizer = tokenizer or WhitespaceTokenizer()
         self._token_indexers = token_indexers or {"tokens": SingleIdTokenIndexer()}
+        self._preprocessor = preprocessor or PassThroughPipeline()
 
     @property
     def vocab(self) -> Vocabulary:
@@ -52,20 +54,23 @@ class RepresentationLearningDataModule(
         """
         Setup the data module.
 
-        This method tokenizes the dataset and builds the vocabulary.
+        This method builds the vocabulary from the given dataset.
 
         Args:
             dataset: The dataset to tokenize and build the vocabulary from.
         """
 
         if dataset:
-            with ProgressBar[int](len(dataset) * 2) as progress:
-                progress.set_description("Tokenizing dataset")
-                dataset = self.tokenize(iter_with_callback(dataset, lambda _: progress.update()))
-                progress.set_description("Building vocab    ")
-                self._build_vocab(iter_with_callback(dataset, lambda _: progress.update()))
+            self._build_vocab(dataset)
 
-    def tokenize(self, dataset: Iterable[RepresentationLearningExample]) -> Sequence[RepresentationLearningExample]:
+    def preprocess(
+        self,
+        dataset: Iterable[RepresentationLearningExample],
+        **kwargs: Any,
+    ) -> Iterator[RepresentationLearningExample]:
+        return self._tokenize(self._preprocessor(dataset))
+
+    def _tokenize(self, dataset: Iterable[RepresentationLearningExample]) -> Iterator[RepresentationLearningExample]:
         """
         Tokenize the dataset and return the tokenized dataset.
 
@@ -76,10 +81,9 @@ class RepresentationLearningDataModule(
             The tokenized dataset.
         """
 
-        if not dataset:
-            return []
-
-        def tokenized_document_generator() -> Iterator[RepresentationLearningExample]:
+        def tokenized_document_generator(
+            dataset: Iterable[RepresentationLearningExample],
+        ) -> Iterator[RepresentationLearningExample]:
             for example in dataset:
                 if isinstance(example.text, str):
                     tokenized_text = self._tokenizer.tokenize(example.text)
@@ -87,7 +91,7 @@ class RepresentationLearningDataModule(
                     tokenized_text = list(example.text)
                 yield RepresentationLearningExample(text=tokenized_text)
 
-        return FileBackendSequence.from_iterable(tokenized_document_generator())
+        return wrap_iterator(tokenized_document_generator, dataset)
 
     def _build_vocab(self, dataset: Iterable[RepresentationLearningExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
@@ -149,5 +153,5 @@ class RepresentationLearningDataModule(
         """
 
         logger.info("Building instances...")
-        for example in ProgressBar(dataset, desc="Building instances"):
+        for example in ProgressBar(self.preprocess(dataset), desc="Building instances"):
             yield self.build_instance(example)

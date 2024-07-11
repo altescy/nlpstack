@@ -2,7 +2,7 @@ import itertools
 from logging import getLogger
 from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
-from nlpstack.common import FileBackendSequence, ProgressBar
+from nlpstack.common import ProgressBar, wrap_iterator
 from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
@@ -72,11 +72,12 @@ class Text2TextDataModule(
         **kwargs: Any,
     ) -> None:
         if dataset:
-            logger.info("Tokenizing dataset and building vocabulary...")
-            dataset = self.tokenize(ProgressBar(dataset, desc="Tokenizing dataset"))
             self._build_vocab(dataset)
 
-    def tokenize(self, dataset: Iterable[Text2TextExample]) -> Sequence[Text2TextExample]:
+    def preprocess(self, dataset: Iterable[Text2TextExample], **kwargs: Any) -> Iterator[Text2TextExample]:
+        return self._tokenize(dataset)
+
+    def _tokenize(self, dataset: Iterable[Text2TextExample]) -> Iterator[Text2TextExample]:
         """
         Setup the data module.
 
@@ -86,10 +87,7 @@ class Text2TextDataModule(
             dataset: The dataset to tokenize and build the vocabulary from.
         """
 
-        if not dataset:
-            return []
-
-        def tokenized_document_generator() -> Iterator[Text2TextExample]:
+        def tokenized_document_generator(dataset: Iterable[Text2TextExample]) -> Iterator[Text2TextExample]:
             for example in dataset:
                 if isinstance(example.source, str):
                     tokenized_source = self._source_tokenizer.tokenize(example.source)
@@ -104,7 +102,7 @@ class Text2TextDataModule(
                     tokenized_target = None
                 yield Text2TextExample(source=tokenized_source, target=tokenized_target)
 
-        return FileBackendSequence.from_iterable(tokenized_document_generator())
+        return wrap_iterator(tokenized_document_generator, dataset)
 
     def _build_vocab(self, dataset: Iterable[Text2TextExample]) -> None:
         def source_iterator() -> Iterator[Sequence[Token]]:
@@ -207,5 +205,5 @@ class Text2TextDataModule(
         """
 
         logger.info("Building instances...")
-        for example in ProgressBar(dataset, desc="Building instances"):
+        for example in ProgressBar(self.preprocess(dataset), desc="Building instances"):
             yield self.build_instance(example)

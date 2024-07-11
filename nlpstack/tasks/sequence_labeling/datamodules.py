@@ -3,7 +3,7 @@ from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
 import numpy
 
-from nlpstack.common import FileBackendSequence, ProgressBar
+from nlpstack.common import PassThroughPipeline, Pipeline, ProgressBar, wrap_iterator
 from nlpstack.data import DataModule, Instance, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, SequenceLabelField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, Token, TokenIndexer
@@ -38,11 +38,13 @@ class SequenceLabelingDataModule(
         tokenizer: Optional[Tokenizer] = None,
         token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
         label_namespace: str = "labels",
+        preprocessor: Optional[Pipeline[SequenceLabelingExample, SequenceLabelingExample]] = None,
     ) -> None:
         self._vocab = vocab
         self._tokenizer = tokenizer or WhitespaceTokenizer()
         self._token_indexers = token_indexers or {"tokens": SingleIdTokenIndexer()}
         self._label_namespace = label_namespace
+        self._preprocessor = preprocessor or PassThroughPipeline()
 
     @property
     def vocab(self) -> Vocabulary:
@@ -61,18 +63,24 @@ class SequenceLabelingDataModule(
         """
         Setup the data module.
 
-        This method tokenizes the dataset and builds the vocabulary.
+        This method builds the vocabulary from the given dataset.
 
         Args:
-            dataset: The dataset to tokenize and build the vocabulary from.
+            dataset: The dataset to be used to build the vocabulary. The dataset must be
+                tokenized before calling this method.
         """
 
         if dataset:
-            logger.info("Tokenizing dataset and building vocabulary...")
-            dataset = self.tokenize(ProgressBar(dataset, desc="Tokenizing dataset"))
             self._build_vocab(dataset)
 
-    def tokenize(self, dataset: Iterable[SequenceLabelingExample]) -> Sequence[SequenceLabelingExample]:
+    def preprocess(
+        self,
+        dataset: Iterable[SequenceLabelingExample],
+        **kwargs: Any,
+    ) -> Iterator[SequenceLabelingExample]:
+        return self._tokenize(self._preprocessor(dataset))
+
+    def _tokenize(self, dataset: Iterable[SequenceLabelingExample]) -> Iterator[SequenceLabelingExample]:
         """
         Tokenize the dataset and return the tokenized dataset.
 
@@ -83,10 +91,9 @@ class SequenceLabelingDataModule(
             The tokenized dataset.
         """
 
-        if not dataset:
-            return []
-
-        def tokenized_document_generator() -> Iterator[SequenceLabelingExample]:
+        def tokenized_document_generator(
+            dataset: Iterable[SequenceLabelingExample],
+        ) -> Iterator[SequenceLabelingExample]:
             for example in dataset:
                 if isinstance(example.text, str):
                     tokenized_text = self._tokenizer.tokenize(example.text)
@@ -97,7 +104,7 @@ class SequenceLabelingDataModule(
                     labels=example.labels,
                 )
 
-        return FileBackendSequence.from_iterable(tokenized_document_generator())
+        return wrap_iterator(tokenized_document_generator, dataset)
 
     def _build_vocab(self, dataset: Sequence[SequenceLabelingExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
@@ -203,5 +210,5 @@ class SequenceLabelingDataModule(
         """
 
         logger.info("Building instances...")
-        for example in ProgressBar(dataset, desc="Building instances"):
+        for example in ProgressBar(self.preprocess(dataset), desc="Building instances"):
             yield self.build_instance(example)

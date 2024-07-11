@@ -22,5 +22,13 @@ class DataModule(Generic[Example, Inference, Prediction]):
     def build_predictions(self, inference: Inference) -> Iterator[Prediction]:
         raise NotImplementedError
 
-    def read_dataset(self, dataset: Iterable[Example], **kwargs: Any) -> Iterator[Instance]:
-        raise NotImplementedError
+    def read_dataset(
+        self,
+        dataset: Iterable[Example],
+        *,
+        skip_preprocess: bool = False,
+    ) -> Iterator[Instance]:
+        if not skip_preprocess:
+            dataset = self.preprocess(dataset)
+        for example in dataset:
+            yield self.build_instance(example)
