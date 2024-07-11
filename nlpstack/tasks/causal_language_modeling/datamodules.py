@@ -1,7 +1,7 @@
 from logging import getLogger
 from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
-from nlpstack.common import FileBackendSequence, ProgressBar, iter_with_callback
+from nlpstack.common import PassThroughPipeline, Pipeline, wrap_iterator
 from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
@@ -35,11 +35,14 @@ class CausalLanguageModelingDataModule(
         tokenizer: Optional[Tokenizer] = None,
         token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
         namespace: str = "tokens",
+        preprocessor: Optional[Pipeline[CausalLanguageModelingExample, CausalLanguageModelingExample]] = None,
     ) -> None:
         self._vocab = vocab
         self._tokenizer = tokenizer or WhitespaceTokenizer()
         self._token_indexers = token_indexers or {"tokens": SingleIdTokenIndexer()}
         self._namespace = namespace
+        self._preprocessor = preprocessor or PassThroughPipeline()
+
         self._generation_mode = False
 
     @property
@@ -72,15 +75,19 @@ class CausalLanguageModelingDataModule(
         """
 
         if dataset is not None:
-            with ProgressBar[int](len(dataset) * 2) as progress:
-                progress.set_description("Tokenizing dataset")
-                dataset = self.tokenize(iter_with_callback(dataset, lambda _: progress.update()))
-                progress.set_description("Building vocab    ")
-                self._build_vocab(iter_with_callback(dataset, lambda _: progress.update()))
+            self._build_vocab(dataset)
+
         if generation_mode is not None:
             self._generation_mode = generation_mode
 
-    def tokenize(self, dataset: Iterable[CausalLanguageModelingExample]) -> Sequence[CausalLanguageModelingExample]:
+    def preprocess(
+        self,
+        dataset: Iterable[CausalLanguageModelingExample],
+        **kwargs: Any,
+    ) -> Iterator[CausalLanguageModelingExample]:
+        return self._tokenize(self._preprocessor(dataset))
+
+    def _tokenize(self, dataset: Iterable[CausalLanguageModelingExample]) -> Iterator[CausalLanguageModelingExample]:
         """
         Tokenize the dataset and return the tokenized dataset.
 
@@ -91,9 +98,11 @@ class CausalLanguageModelingDataModule(
             The tokenized dataset.
         """
         if not dataset:
-            return []
+            return iter([])
 
-        def tokenized_document_generator() -> Iterator[CausalLanguageModelingExample]:
+        def tokenized_document_generator(
+            dataset: Iterable[CausalLanguageModelingExample],
+        ) -> Iterator[CausalLanguageModelingExample]:
             for example in dataset:
                 if isinstance(example.text, str):
                     tokenized_text = self._tokenizer.tokenize(example.text)
@@ -101,7 +110,7 @@ class CausalLanguageModelingDataModule(
                     tokenized_text = list(example.text)
                 yield CausalLanguageModelingExample(text=tokenized_text)
 
-        return FileBackendSequence.from_iterable(tokenized_document_generator())
+        return wrap_iterator(tokenized_document_generator, dataset)
 
     def _build_vocab(self, dataset: Iterable[CausalLanguageModelingExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
@@ -177,22 +186,3 @@ class CausalLanguageModelingDataModule(
             ]
             top_texts = [self._tokenizer.detokenize(tokens) for tokens in top_tokens]
             yield CausalLanguageModelingPrediction(top_texts, top_tokens, scores)
-
-    def read_dataset(
-        self,
-        dataset: Iterable[CausalLanguageModelingExample],
-        **kwargs: Any,
-    ) -> Iterator[Instance]:
-        """
-        Read the dataset and return a generator of instances.
-
-        Args:
-            dataset: The dataset to read.
-
-        Returns:
-            A generator of instances.
-        """
-
-        logger.info("Building instances...")
-        for example in ProgressBar(dataset, desc="Building instances"):
-            yield self.build_instance(example)

@@ -2,7 +2,7 @@ import itertools
 from logging import getLogger
 from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
-from nlpstack.common import FileBackendSequence, ProgressBar
+from nlpstack.common import PassThroughPipeline, Pipeline, wrap_iterator
 from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
@@ -11,6 +11,9 @@ from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 from .types import Text2TextExample, Text2TextInference, Text2TextPrediction
 
 logger = getLogger(__name__)
+
+Text2TextPreprocessor = Pipeline[Text2TextExample, Text2TextExample]
+Text2TextPostprocessor = Pipeline[Text2TextPrediction, Text2TextPrediction]
 
 
 class Text2TextDataModule(
@@ -33,6 +36,10 @@ class Text2TextDataModule(
             `source_token_indexers` is used. Defaults to `None`.
         source_namespace: The vocabulary namespace for source text. Defaults to `"tokens"`.
         target_namespace: The vocabulary namespace for target text. Defaults to `"tokens"`.
+        preprocessor: The preprocessor to apply to the dataset before tokenization.
+            Defaults to `None`.
+        postprocessor: The postprocessor to apply to the predictions after inference.
+            Defaults to `None`.
     """
 
     def __init__(
@@ -44,6 +51,8 @@ class Text2TextDataModule(
         target_token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
         source_namespace: str = "tokens",
         target_namespace: str = "tokens",
+        preprocessor: Optional[Text2TextPreprocessor] = None,
+        postprocessor: Optional[Text2TextPostprocessor] = None,
     ) -> None:
         self._vocab = vocab
         self._source_tokenizer = source_tokenizer or WhitespaceTokenizer()
@@ -52,6 +61,8 @@ class Text2TextDataModule(
         self._target_token_indexers = target_token_indexers or self._source_token_indexers
         self._source_namespace = source_namespace
         self._target_namespace = target_namespace
+        self._preprocessor = preprocessor or PassThroughPipeline()
+        self._postprocessor = postprocessor or PassThroughPipeline()
 
     @property
     def vocab(self) -> Vocabulary:
@@ -72,11 +83,12 @@ class Text2TextDataModule(
         **kwargs: Any,
     ) -> None:
         if dataset:
-            logger.info("Tokenizing dataset and building vocabulary...")
-            dataset = self.tokenize(ProgressBar(dataset, desc="Tokenizing dataset"))
             self._build_vocab(dataset)
 
-    def tokenize(self, dataset: Iterable[Text2TextExample]) -> Sequence[Text2TextExample]:
+    def preprocess(self, dataset: Iterable[Text2TextExample], **kwargs: Any) -> Iterator[Text2TextExample]:
+        return self._tokenize(self._preprocessor(dataset))
+
+    def _tokenize(self, dataset: Iterable[Text2TextExample]) -> Iterator[Text2TextExample]:
         """
         Setup the data module.
 
@@ -86,10 +98,7 @@ class Text2TextDataModule(
             dataset: The dataset to tokenize and build the vocabulary from.
         """
 
-        if not dataset:
-            return []
-
-        def tokenized_document_generator() -> Iterator[Text2TextExample]:
+        def tokenized_document_generator(dataset: Iterable[Text2TextExample]) -> Iterator[Text2TextExample]:
             for example in dataset:
                 if isinstance(example.source, str):
                     tokenized_source = self._source_tokenizer.tokenize(example.source)
@@ -104,7 +113,7 @@ class Text2TextDataModule(
                     tokenized_target = None
                 yield Text2TextExample(source=tokenized_source, target=tokenized_target)
 
-        return FileBackendSequence.from_iterable(tokenized_document_generator())
+        return wrap_iterator(tokenized_document_generator, dataset)
 
     def _build_vocab(self, dataset: Iterable[Text2TextExample]) -> None:
         def source_iterator() -> Iterator[Sequence[Token]]:
@@ -178,34 +187,22 @@ class Text2TextDataModule(
             The predictions.
         """
 
-        token_indices_to_ignore = {self._vocab.get_pad_index(self._target_namespace)}
-        if self._vocab.has_bos_token(self._target_namespace):
-            token_indices_to_ignore.add(self._vocab.get_bos_index(self._target_namespace))
-        if self._vocab.has_eos_token(self._target_namespace):
-            token_indices_to_ignore.add(self._vocab.get_eos_index(self._target_namespace))
-        for top_token_ids, scores in zip(inference.pred_token_ids.tolist(), inference.scores.tolist()):
-            top_tokens = [
-                [
-                    self.vocab.get_token_by_index(self._target_namespace, token_id)
-                    for token_id in token_ids
-                    if token_id not in token_indices_to_ignore
+        def prediction_iterator() -> Iterator[Text2TextPrediction]:
+            token_indices_to_ignore = {self._vocab.get_pad_index(self._target_namespace)}
+            if self._vocab.has_bos_token(self._target_namespace):
+                token_indices_to_ignore.add(self._vocab.get_bos_index(self._target_namespace))
+            if self._vocab.has_eos_token(self._target_namespace):
+                token_indices_to_ignore.add(self._vocab.get_eos_index(self._target_namespace))
+            for top_token_ids, scores in zip(inference.pred_token_ids.tolist(), inference.scores.tolist()):
+                top_tokens = [
+                    [
+                        self.vocab.get_token_by_index(self._target_namespace, token_id)
+                        for token_id in token_ids
+                        if token_id not in token_indices_to_ignore
+                    ]
+                    for token_ids in top_token_ids
                 ]
-                for token_ids in top_token_ids
-            ]
-            top_texts = [self._target_tokenizer.detokenize(tokens) for tokens in top_tokens]
-            yield Text2TextPrediction(top_texts, top_tokens, scores)
+                top_texts = [self._target_tokenizer.detokenize(tokens) for tokens in top_tokens]
+                yield Text2TextPrediction(top_texts, top_tokens, scores)
 
-    def read_dataset(self, dataset: Iterable[Text2TextExample], **kwargs: Any) -> Iterator[Instance]:
-        """
-        Read the dataset and return a generator of instances.
-
-        Args:
-            dataset: The dataset to read.
-
-        Returns:
-            A generator of instances.
-        """
-
-        logger.info("Building instances...")
-        for example in ProgressBar(dataset, desc="Building instances"):
-            yield self.build_instance(example)
+        yield from self._postprocessor(prediction_iterator())

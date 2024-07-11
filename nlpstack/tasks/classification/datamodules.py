@@ -1,10 +1,11 @@
+import dataclasses
 import itertools
 from logging import getLogger
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence
 
 import numpy
 
-from nlpstack.common import FileBackendSequence, PassThroughPipeline, ProgressBar
+from nlpstack.common import PassThroughPipeline, wrap_iterator
 from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, LabelField, MetadataField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
@@ -36,9 +37,9 @@ class BasicClassificationDataModule(
         label_namespace: The vocabulary namespace for the labels. Defaults to `"labels"`.
         labels: The set of labels. If not given, the labels will be collected from the
             training dataset. Defaults to `None`.
-        preprocessors: The preprocessors to apply to the dataset before tokenization.
+        preprocessor: The preprocessor to apply to the dataset before tokenization.
             Defaults to `None`.
-        postprocessors: The postprocessors to apply to the predictions after inference.
+        postprocessor: The postprocessor to apply to the predictions after inference.
             Defaults to `None`.
     """
 
@@ -89,11 +90,12 @@ class BasicClassificationDataModule(
             dataset: The dataset to tokenize and build the vocabulary from.
         """
         if dataset:
-            logger.info("Tokenizing dataset and building vocabulary...")
-            dataset = self.tokenize(ProgressBar(self._preprocessor(dataset), desc="Tokenizing dataset"))
             self._build_vocab(dataset)
 
-    def tokenize(self, dataset: Iterable[ClassificationExample]) -> Sequence[ClassificationExample]:
+    def preprocess(self, dataset: Iterable[ClassificationExample], **kwargs: Any) -> Iterator[ClassificationExample]:
+        return self._tokenize(self._preprocessor(dataset))
+
+    def _tokenize(self, dataset: Iterable[ClassificationExample]) -> Iterator[ClassificationExample]:
         """
         Tokenize the dataset and return the tokenized dataset.
 
@@ -105,26 +107,21 @@ class BasicClassificationDataModule(
         """
 
         if not dataset:
-            return []
+            return iter([])
 
         def get_text_to_tokenize(example: ClassificationExample) -> str:
             if isinstance(example.text, str):
                 return example.text
             return ""
 
-        def tokenized_document_generator() -> Iterator[ClassificationExample]:
-            nonlocal dataset
+        def tokenized_document_generator(dataset: Iterable[ClassificationExample]) -> Iterator[ClassificationExample]:
             dataset, dataset_for_text = itertools.tee(dataset)
             tokenized_texts = self._tokenizer(map(get_text_to_tokenize, dataset_for_text))
             for example, tokenized_text in zip(dataset, tokenized_texts):
                 tokenized_text = tokenized_text if isinstance(example.text, str) else list(example.text)
-                yield ClassificationExample(
-                    text=tokenized_text,
-                    label=example.label,
-                    metadata=example.metadata,
-                )
+                yield dataclasses.replace(example, text=tokenized_text)
 
-        return FileBackendSequence.from_iterable(tokenized_document_generator())
+        return wrap_iterator(tokenized_document_generator, dataset)
 
     def _build_vocab(self, dataset: Sequence[ClassificationExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
@@ -202,18 +199,3 @@ class BasicClassificationDataModule(
                 )
 
         yield from self._postprocessor(prediction_iterator())
-
-    def read_dataset(self, dataset: Iterable[ClassificationExample], **kwargs: Any) -> Iterator[Instance]:
-        """
-        Read the dataset and return a generator of instances.
-
-        Args:
-            dataset: The dataset to read.
-
-        Returns:
-            A generator of instances.
-        """
-
-        logger.info("Building instances...")
-        for example in ProgressBar(self._preprocessor(dataset), desc="Building instances"):
-            yield self.build_instance(example)

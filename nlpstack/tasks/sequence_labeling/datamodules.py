@@ -3,7 +3,7 @@ from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
 import numpy
 
-from nlpstack.common import FileBackendSequence, ProgressBar
+from nlpstack.common import PassThroughPipeline, Pipeline, wrap_iterator
 from nlpstack.data import DataModule, Instance, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, SequenceLabelField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, Token, TokenIndexer
@@ -12,6 +12,9 @@ from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 from .types import SequenceLabelingExample, SequenceLabelingInference, SequenceLabelingPrediction
 
 logger = getLogger(__name__)
+
+SequenceLabelPreprocessor = Pipeline[SequenceLabelingExample, SequenceLabelingExample]
+SequenceLabelPostprocessor = Pipeline[SequenceLabelingPrediction, SequenceLabelingPrediction]
 
 
 class SequenceLabelingDataModule(
@@ -30,6 +33,10 @@ class SequenceLabelingDataModule(
         token_indexers: The token indexers to index the tokens. Defaults to
             `{"tokens": SingleIdTokenIndexer()}`
         label_namespace: The vocabulary namespace for the labels. Defaults to `"labels"`.
+        preprocessor: The preprocessor to apply to the dataset before tokenization.
+            Defaults to `None`.
+        postprocessor: The postprocessor to apply to the predictions after inference.
+            Defaults to `None`.
     """
 
     def __init__(
@@ -38,11 +45,15 @@ class SequenceLabelingDataModule(
         tokenizer: Optional[Tokenizer] = None,
         token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
         label_namespace: str = "labels",
+        preprocessor: Optional[SequenceLabelPreprocessor] = None,
+        postprocessor: Optional[SequenceLabelPostprocessor] = None,
     ) -> None:
         self._vocab = vocab
         self._tokenizer = tokenizer or WhitespaceTokenizer()
         self._token_indexers = token_indexers or {"tokens": SingleIdTokenIndexer()}
         self._label_namespace = label_namespace
+        self._preprocessor = preprocessor or PassThroughPipeline()
+        self._postprocessor = postprocessor or PassThroughPipeline()
 
     @property
     def vocab(self) -> Vocabulary:
@@ -61,18 +72,24 @@ class SequenceLabelingDataModule(
         """
         Setup the data module.
 
-        This method tokenizes the dataset and builds the vocabulary.
+        This method builds the vocabulary from the given dataset.
 
         Args:
-            dataset: The dataset to tokenize and build the vocabulary from.
+            dataset: The dataset to be used to build the vocabulary. The dataset must be
+                tokenized before calling this method.
         """
 
         if dataset:
-            logger.info("Tokenizing dataset and building vocabulary...")
-            dataset = self.tokenize(ProgressBar(dataset, desc="Tokenizing dataset"))
             self._build_vocab(dataset)
 
-    def tokenize(self, dataset: Iterable[SequenceLabelingExample]) -> Sequence[SequenceLabelingExample]:
+    def preprocess(
+        self,
+        dataset: Iterable[SequenceLabelingExample],
+        **kwargs: Any,
+    ) -> Iterator[SequenceLabelingExample]:
+        return self._tokenize(self._preprocessor(dataset))
+
+    def _tokenize(self, dataset: Iterable[SequenceLabelingExample]) -> Iterator[SequenceLabelingExample]:
         """
         Tokenize the dataset and return the tokenized dataset.
 
@@ -83,10 +100,9 @@ class SequenceLabelingDataModule(
             The tokenized dataset.
         """
 
-        if not dataset:
-            return []
-
-        def tokenized_document_generator() -> Iterator[SequenceLabelingExample]:
+        def tokenized_document_generator(
+            dataset: Iterable[SequenceLabelingExample],
+        ) -> Iterator[SequenceLabelingExample]:
             for example in dataset:
                 if isinstance(example.text, str):
                     tokenized_text = self._tokenizer.tokenize(example.text)
@@ -97,7 +113,7 @@ class SequenceLabelingDataModule(
                     labels=example.labels,
                 )
 
-        return FileBackendSequence.from_iterable(tokenized_document_generator())
+        return wrap_iterator(tokenized_document_generator, dataset)
 
     def _build_vocab(self, dataset: Sequence[SequenceLabelingExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
@@ -166,42 +182,37 @@ class SequenceLabelingDataModule(
             The predictions.
         """
 
-        assert inference.metadata is not None, "Inference must have metadata."
+        def prediction_iterator() -> Iterator[SequenceLabelingPrediction]:
+            assert inference.metadata is not None, "Inference must have metadata."
 
-        top_label_indices: Sequence[Sequence[Sequence[int]]]
-        if inference.decodings is None:
-            mask = inference.mask if inference.mask is not None else numpy.ones(inference.probs.shape[:-1], dtype=bool)
-            lengths = mask.sum(axis=1).tolist()
-            top_label_indices = [
-                [label_indices[:length]]
-                for label_indices, length in zip(numpy.argmax(inference.probs, axis=-1).tolist(), lengths)
-            ]
-        else:
-            top_label_indices = [[label_indices for label_indices, _ in decodings] for decodings in inference.decodings]
+            top_label_indices: Sequence[Sequence[Sequence[int]]]
+            if inference.decodings is None:
+                mask = (
+                    inference.mask if inference.mask is not None else numpy.ones(inference.probs.shape[:-1], dtype=bool)
+                )
+                lengths = mask.sum(axis=1).tolist()
+                top_label_indices = [
+                    [label_indices[:length]]
+                    for label_indices, length in zip(numpy.argmax(inference.probs, axis=-1).tolist(), lengths)
+                ]
+            else:
+                top_label_indices = [
+                    [label_indices for label_indices, _ in decodings] for decodings in inference.decodings
+                ]
 
-        batch_size = len(top_label_indices)
-        for batch_index in range(batch_size):
-            top_labels = [
-                [self._vocab.get_token_by_index(self._label_namespace, label_index) for label_index in label_indices]
-                for label_indices in top_label_indices[batch_index]
-            ]
-            _metadata = dict(inference.metadata[batch_index])
-            _nlpstack_metadata = _metadata.pop("__nlpstack_metadata__")
-            tokens = _nlpstack_metadata["raw_tokens"]
-            metadata = None if _nlpstack_metadata["metadata_is_none"] else _metadata
-            yield SequenceLabelingPrediction(tokens=tokens, top_labels=top_labels, metadata=metadata)
+            batch_size = len(top_label_indices)
+            for batch_index in range(batch_size):
+                top_labels = [
+                    [
+                        self._vocab.get_token_by_index(self._label_namespace, label_index)
+                        for label_index in label_indices
+                    ]
+                    for label_indices in top_label_indices[batch_index]
+                ]
+                _metadata = dict(inference.metadata[batch_index])
+                _nlpstack_metadata = _metadata.pop("__nlpstack_metadata__")
+                tokens = _nlpstack_metadata["raw_tokens"]
+                metadata = None if _nlpstack_metadata["metadata_is_none"] else _metadata
+                yield SequenceLabelingPrediction(tokens=tokens, top_labels=top_labels, metadata=metadata)
 
-    def read_dataset(self, dataset: Iterable[SequenceLabelingExample], **kwargs: Any) -> Iterator[Instance]:
-        """
-        Read the dataset and return a generator of instances.
-
-        Args:
-            dataset: The dataset to read.
-
-        Returns:
-            A generator of instances.
-        """
-
-        logger.info("Building instances...")
-        for example in ProgressBar(dataset, desc="Building instances"):
-            yield self.build_instance(example)
+        yield from self._postprocessor(prediction_iterator())

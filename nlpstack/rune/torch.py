@@ -2,7 +2,7 @@ from functools import cached_property
 from logging import getLogger
 from typing import Any, Callable, Generic, Iterable, Iterator, Mapping, Optional, Sequence, TypeVar, Union
 
-from nlpstack.common import FileBackendSequence
+from nlpstack.common import FileBackendSequence, ProgressBar
 from nlpstack.data import Instance
 from nlpstack.data.datamodule import DataModule
 from nlpstack.evaluation import EmptyMetric, Evaluator, Metric, MultiMetrics, SimpleEvaluator
@@ -88,6 +88,16 @@ class RuneForTorch(
         if self.random_seed is not None:
             set_random_seed(self.random_seed)
 
+        logger.info("Preprocessing training dataset...")
+        train_dataset = FileBackendSequence.from_iterable(
+            self.datamodule.preprocess(ProgressBar(train_dataset, desc="Preprocessing training dataset"))
+        )
+        if valid_dataset is not None:
+            logger.info("Preprocessing validation dataset...")
+            valid_dataset = FileBackendSequence.from_iterable(
+                self.datamodule.preprocess(ProgressBar(valid_dataset, desc="Preprocessing validation dataset"))
+            )
+
         logger.info("Setup datamodule...")
         self.datamodule.setup(dataset=train_dataset, **self.kwargs, **kwargs)
 
@@ -99,12 +109,18 @@ class RuneForTorch(
 
         logger.info("Reading training dataset...")
         train_instances: Sequence[Instance] = FileBackendSequence.from_iterable(
-            self.datamodule.read_dataset(train_dataset)
+            self.datamodule.read_dataset(
+                ProgressBar(train_dataset, desc="Reading training dataset"), skip_preprocess=True
+            )
         )
         valid_instances: Optional[Sequence[Instance]] = None
         if valid_dataset is not None:
             logger.info("Reading validation dataset...")
-            valid_instances = FileBackendSequence.from_iterable(self.datamodule.read_dataset(valid_dataset))
+            valid_instances = FileBackendSequence.from_iterable(
+                self.datamodule.read_dataset(
+                    ProgressBar(valid_dataset, desc="Reading validation dataset"), skip_preprocess=True
+                )
+            )
 
         logger.info("Start training...")
         self.trainer.train(
