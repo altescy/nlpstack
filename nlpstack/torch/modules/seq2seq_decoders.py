@@ -21,7 +21,6 @@ Example:
     ...     output = outputs[:, -1:]  # Shape: (batch_size, 1, input_dim)
 """
 
-
 import dataclasses
 from contextlib import suppress
 from functools import lru_cache

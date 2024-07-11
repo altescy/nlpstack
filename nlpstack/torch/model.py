@@ -8,8 +8,7 @@ Inference = TypeVar("Inference")
 
 @typing.runtime_checkable
 class LazySetup(Protocol):
-    def setup(self, *args: Any, **kwargs: Any) -> None:
-        ...
+    def setup(self, *args: Any, **kwargs: Any) -> None: ...
 
 
 @typing.runtime_checkable

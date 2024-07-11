@@ -93,7 +93,7 @@ def logsumexp(tensor: torch.Tensor, dim: int = -1, keepdim: bool = False) -> tor
         stable_vec = tensor - max_score
     else:
         stable_vec = tensor - max_score.unsqueeze(dim)
-    return cast(torch.Tensor, max_score + (stable_vec.exp().sum(dim, keepdim=keepdim)).log())
+    return max_score + (stable_vec.exp().sum(dim, keepdim=keepdim)).log()
 
 
 def sequence_cross_entropy_with_logits(
@@ -508,8 +508,7 @@ def viterbi_decode(
     tag_observations: Optional[List[int]] = ...,
     allowed_start_transitions: Optional[torch.Tensor] = ...,
     allowed_end_transitions: Optional[torch.Tensor] = ...,
-) -> Tuple[List[List[int]], torch.Tensor]:
-    ...
+) -> Tuple[List[List[int]], torch.Tensor]: ...
 
 
 @overload
@@ -520,8 +519,7 @@ def viterbi_decode(
     tag_observations: Optional[List[int]] = ...,
     allowed_start_transitions: Optional[torch.Tensor] = ...,
     allowed_end_transitions: Optional[torch.Tensor] = ...,
-) -> Tuple[List[int], torch.Tensor]:
-    ...
+) -> Tuple[List[int], torch.Tensor]: ...
 
 
 def viterbi_decode(
@@ -678,7 +676,7 @@ def viterbi_decode(
     viterbi_scores, best_paths = torch.topk(path_scores_v, k=max_k, dim=0)
     viterbi_paths = []
     for i in range(max_k):
-        viterbi_path = [best_paths[i]]
+        viterbi_path = [int(best_paths[i].item())]
         for backward_timestep in reversed(path_indices):
             viterbi_path.append(int(backward_timestep.view(-1)[viterbi_path[-1]]))
         # Reverse the backward path.

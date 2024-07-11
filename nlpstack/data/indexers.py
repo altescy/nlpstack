@@ -2,7 +2,6 @@
 Indexers for converting tokens into indices.
 """
 
-
 from contextlib import suppress
 from os import PathLike
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple, Union

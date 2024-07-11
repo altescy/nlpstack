@@ -107,7 +107,7 @@ class CausalTransformerDecoderLayer(torch.nn.Module):
             k,
             v,
             attn_mask=attn_mask,
-            is_causal=attn_mask is None,
+            is_causal=attn_mask is not None,
             need_weights=False,
         )[0]
         return cast(torch.Tensor, self.dropout1(x))
