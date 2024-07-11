@@ -10,7 +10,7 @@ Example:
 
 from contextlib import suppress
 from os import PathLike
-from typing import Any, Callable, Iterator, List, NamedTuple, Optional, Sequence, Union
+from typing import Any, Callable, Generic, Iterator, List, NamedTuple, Optional, Sequence, TypeVar, Union
 
 import minato
 import numpy
@@ -35,6 +35,9 @@ except ModuleNotFoundError:
     fugashi = None
 
 
+_T_Fixtures = TypeVar("_T_Fixtures")
+
+
 class Token(NamedTuple):
     """
     A token in a text.
@@ -52,48 +55,69 @@ class Token(NamedTuple):
     vector: Optional[numpy.ndarray] = None
 
 
-class Tokenizer(Pipeline[str, List[Token]]):
+class Tokenizer(Pipeline[str, List[Token], _T_Fixtures], Generic[_T_Fixtures]):
     """
     A base class for tokenizers.
     """
 
     def tokenize(self, text: str) -> List[Token]:
-        raise NotImplementedError
+        return next(self([text], batch_size=1, max_workers=1))
 
     def detokenize(self, tokens: Union[Sequence[str], Sequence[Token]]) -> str:
         raise NotImplementedError
 
-    def apply(self, input: str) -> List[Token]:
-        return self.tokenize(input)
+    def tokenize_batch(self, batch: Sequence[str], fixtures: _T_Fixtures) -> List[List[Token]]:
+        raise NotImplementedError
+
+    def detokenize_batch(
+        self, batch: Sequence[Union[Sequence[str], Sequence[Token]]], fixtures: _T_Fixtures
+    ) -> List[str]:
+        raise NotImplementedError
+
+    def apply_batch(self, batch: Sequence[str], fixtures: _T_Fixtures) -> List[List[Token]]:
+        return self.tokenize_batch(batch, fixtures)
+
+    def tokenize_pipeline(self) -> Pipeline[str, List[Token], _T_Fixtures]:
+        return self
+
+    @cached_property
+    def detokenize_pipeline(self) -> Pipeline[Union[Sequence[str], Sequence[Token]], str, Any]:
+        return Pipeline.from_callable(self.detokenize_batch, self.fixtures)
 
 
-class WhitespaceTokenizer(Tokenizer):
+class WhitespaceTokenizer(Tokenizer[None]):
     """
     A tokenizer that splits a text into tokens by whitespace.
     """
 
-    def tokenize(self, text: str) -> List[Token]:
-        return [Token(surface) for surface in text.split()]
+    fixtures = None
 
-    def detokenize(self, tokens: Union[Sequence[str], Sequence[Token]]) -> str:
+    def tokenize_batch(self, batch: Sequence[str], fixtures: None) -> List[List[Token]]:
+        return [[Token(surface) for surface in text.split()] for text in batch]
+
+    def detokenize(self, tokens: Union[Sequence[str], Sequence[Token]], **kwargs: Any) -> str:
+        del kwargs
         tokens = [token.surface if isinstance(token, Token) else token for token in tokens]
         return " ".join(tokens)
 
 
-class CharacterTokenizer(Tokenizer):
+class CharacterTokenizer(Tokenizer[None]):
     """
     A tokenizer that splits a text into character tokens.
     """
 
-    def tokenize(self, text: str) -> List[Token]:
-        return [Token(surface) for surface in text]
+    fixtures = None
 
-    def detokenize(self, tokens: Union[Sequence[str], Sequence[Token]]) -> str:
+    def tokenize_batch(self, batch: Sequence[str], fixtures: None) -> List[List[Token]]:
+        return [[Token(surface) for surface in text] for text in batch]
+
+    def detokenize(self, tokens: Union[Sequence[str], Sequence[Token]], **kwargs: Any) -> str:
+        del kwargs
         tokens = [token.surface if isinstance(token, Token) else token for token in tokens]
         return "".join(tokens)
 
 
-class SpacyTokenizer(Tokenizer):
+class SpacyTokenizer(Tokenizer["SpacyTokenizer.Fixture"]):
     """
     A tokenizer that uses spaCy.
 
@@ -103,6 +127,9 @@ class SpacyTokenizer(Tokenizer):
             Please set `True` if you want reconstruct the original text from tokens
             by using `detokenize()` method. Defaults to `False`.
     """
+
+    class Fixture(NamedTuple):
+        nlp: "spacy.language.Language"
 
     def __init__(
         self,
@@ -114,22 +141,29 @@ class SpacyTokenizer(Tokenizer):
         self._lang = lang
         self._with_whitespace = with_whitespace
 
-    @cached_property
-    def nlp(self) -> "spacy.language.Language":
-        if spacy is None:
-            raise ModuleNotFoundError("spacy is not installed.")
+    def get_nlp(self) -> "spacy.language.Language":
         return spacy.load(self._lang)
 
-    def tokenize(self, text: str) -> List[Token]:
-        doc = self.nlp(text)
+    @cached_property
+    def fixtures(self) -> "SpacyTokenizer.Fixture":  # type: ignore[override]
+        return SpacyTokenizer.Fixture(self.get_nlp())
+
+    def tokenize_batch(
+        self,
+        batch: Sequence[str],
+        fixtures: "SpacyTokenizer.Fixture",
+    ) -> List[List[Token]]:
         return [
-            Token(
-                t.text_with_ws if self._with_whitespace else t.text,
-                t.pos_,
-                t.lemma_,
-                vector=numpy.array(t.vector) if t.has_vector else None,
-            )
-            for t in doc
+            [
+                Token(
+                    t.text_with_ws if self._with_whitespace else t.text,
+                    t.pos_,
+                    t.lemma_,
+                    vector=numpy.array(t.vector) if t.has_vector else None,
+                )
+                for t in fixtures.nlp(text)
+            ]
+            for text in batch
         ]
 
     def detokenize(self, tokens: Union[Sequence[str], Sequence[Token]]) -> str:
@@ -137,7 +171,7 @@ class SpacyTokenizer(Tokenizer):
         return "".join(tokens)
 
 
-class PretrainedTransformerTokenizer(Tokenizer):
+class PretrainedTransformerTokenizer(Tokenizer["PretrainedTransformerTokenizer.Fixture"]):
     """
     A tokenizer uses a model from Huggingface's transformers library.
     We take a model name as an argument, which will pass to `AutoTokenizer.from_pretrained`
@@ -145,6 +179,9 @@ class PretrainedTransformerTokenizer(Tokenizer):
     Args:
         pretrained_model_name: The name, path or URL of the pretrained model.
     """
+
+    class Fixture(NamedTuple):
+        tokenizer: "transformers.PreTrainedTokenizer"
 
     def __init__(
         self,
@@ -154,8 +191,7 @@ class PretrainedTransformerTokenizer(Tokenizer):
         super().__init__(**kwargs)
         self._pretrained_model_name = pretrained_model_name
 
-    @cached_property
-    def tokenizer(self) -> "transformers.PreTrainedTokenizer":
+    def get_tokenizer(self) -> "transformers.PreTrainedTokenizer":
         if transformers is None:
             raise ModuleNotFoundError("transformers is not installed.")
         pretrained_model_name = self._pretrained_model_name
@@ -163,16 +199,28 @@ class PretrainedTransformerTokenizer(Tokenizer):
             pretrained_model_name = minato.cached_path(pretrained_model_name)
         return transformers_cache.get_pretrained_tokenizer(pretrained_model_name)
 
-    def tokenize(self, text: str) -> List[Token]:
-        tokens = self.tokenizer.tokenize(text)  # type: ignore
-        return [Token(t) for t in tokens]
+    @cached_property
+    def fixtures(self) -> "PretrainedTransformerTokenizer.Fixture":  # type: ignore[override]
+        return PretrainedTransformerTokenizer.Fixture(self.get_tokenizer())
 
-    def detokenize(self, tokens: Union[Sequence[str], Sequence[Token]]) -> str:
+    def tokenize_batch(
+        self,
+        batch: Sequence[str],
+        fixtures: "PretrainedTransformerTokenizer.Fixture",
+    ) -> List[List[Token]]:
+        return [[Token(t) for t in fixtures.tokenizer.tokenize(text)] for text in batch]
+
+    def detokenize(  # type: ignore[override]
+        self,
+        tokens: Union[Sequence[str], Sequence[Token]],
+        *,
+        tokenizer: "transformers.PreTrainedTokenizer",
+    ) -> str:
         tokens = [token.surface if isinstance(token, Token) else token for token in tokens]
-        return str(self.tokenizer.convert_tokens_to_string(tokens))
+        return str(tokenizer.convert_tokens_to_string(tokens))
 
 
-class FugashiTokenizer(Tokenizer):
+class FugashiTokenizer(Tokenizer["FugashiTokenizer.Fixture"]):
     """
     A tokenizer that uses fugashi for Japanese text.
 
@@ -183,6 +231,10 @@ class FugashiTokenizer(Tokenizer):
             tokens. Please set `True` if you want reconstruct the original text from
             tokens by using `detokenize()` method. Defaults to `False`.
     """
+
+    class Fixture(NamedTuple):
+        tagger: "fugashi.GenericTagger"
+        parser: Callable[["fugashi.fugashi.Node"], Iterator[Token]]
 
     def __init__(
         self,
@@ -199,11 +251,7 @@ class FugashiTokenizer(Tokenizer):
         self._user_dictionary_path = user_dictionary_path
         self._with_whitespace = with_whitespace
 
-        self.tagger  # load tagger
-        self.parse_feature  # load parse_feature
-
-    @cached_property
-    def tagger(self) -> "fugashi.GenericTagger":
+    def get_tagger(self) -> "fugashi.GenericTagger":
         system_dictionary_path = self._system_dictionary_path
         user_dictionary_path = self._user_dictionary_path
         if system_dictionary_path == "ipadic":
@@ -225,8 +273,7 @@ class FugashiTokenizer(Tokenizer):
 
         return fugashi.GenericTagger(" ".join(options))
 
-    @cached_property
-    def parse_feature(self) -> Callable[["fugashi.fugashi.Node"], Iterator[Token]]:
+    def get_parser(self) -> Callable[["fugashi.fugashi.Node"], Iterator[Token]]:
         def parse_feature_for_ipadic(node: fugashi.fugashi.Node) -> Iterator[Token]:
             """
             Details about the ipadic parsed result:
@@ -263,9 +310,17 @@ class FugashiTokenizer(Tokenizer):
 
         raise ValueError("system_dictionary_path must contain 'ipadic' or 'unidic'")
 
-    def tokenize(self, text: str) -> List[Token]:
-        return [token for node in self.tagger(text) for token in self.parse_feature(node)]
+    @cached_property
+    def fixtures(self) -> "FugashiTokenizer.Fixture":  # type: ignore[override]
+        return FugashiTokenizer.Fixture(self.get_tagger(), self.get_parser())
 
-    def detokenize(self, tokens: Union[Sequence[str], Sequence[Token]]) -> str:
+    def tokenize_batch(
+        self,
+        batch: Sequence[str],
+        fixtures: "FugashiTokenizer.Fixture",
+    ) -> List[List[Token]]:
+        return [[token for node in fixtures.tagger(text) for token in fixtures.parser(node)] for text in batch]
+
+    def detokenize(self, tokens: Union[Sequence[str], Sequence[Token]], **kwargs: Any) -> str:
         tokens = [token.surface if isinstance(token, Token) else token for token in tokens]
         return "".join(tokens)
