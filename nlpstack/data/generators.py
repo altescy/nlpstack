@@ -233,8 +233,10 @@ class PretrainedTransformerTextGenerator(TextGenerator):
         )
         sequence_delimiter = {**self._kwargs}.get("sequence_delimiter", "\n")
         return [
-            sequence_delimiter.join(x["generated_text"] for x in texts)
-            if isinstance(texts, list)
-            else texts["generated_text"]
+            (
+                sequence_delimiter.join(x["generated_text"] for x in texts)
+                if isinstance(texts, list)
+                else texts["generated_text"]
+            )
             for texts in output
         ]

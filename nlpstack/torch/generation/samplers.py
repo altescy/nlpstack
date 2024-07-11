@@ -48,7 +48,7 @@ class Sampler(Generic[SamplerState]):
     ) -> Tuple[torch.Tensor, torch.LongTensor, SamplerState]:
         size = min(size, log_probs.size(-1))
         selected_log_probs, selected_indices = torch.topk(log_probs, size, dim=-1)
-        return selected_log_probs, selected_indices, state
+        return selected_log_probs, cast(torch.LongTensor, selected_indices), state
 
 
 class DeterministicSampler(Sampler[None]):
@@ -64,7 +64,7 @@ class DeterministicSampler(Sampler[None]):
     ) -> Tuple[torch.Tensor, torch.LongTensor, None]:
         size = min(size, log_probs.size(-1))
         selected_log_probs, selected_indices = torch.topk(log_probs, size, dim=-1)
-        return selected_log_probs, selected_indices, state
+        return selected_log_probs, cast(torch.LongTensor, selected_indices), state
 
 
 class MultinomialSampler(Sampler[None]):
@@ -134,7 +134,10 @@ class MultinomialSampler(Sampler[None]):
                 torch.multinomial(probabilities, size, replacement=with_replacement),
             )
         else:
-            selected_indices = probabilities.topk(size, dim=-1, sorted=True)[1]
+            selected_indices = cast(
+                torch.LongTensor,
+                probabilities.topk(size, dim=-1, sorted=True)[1],
+            )
         selected_log_probs = flattened_log_probs.gather(1, selected_indices)
 
         selected_indices = cast(torch.LongTensor, selected_indices.view(*dims, size))

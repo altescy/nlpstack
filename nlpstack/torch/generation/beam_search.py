@@ -224,9 +224,11 @@ class BeamSearch:
         # Shape: (batch_size, beam_size, max_steps)
         final_mask = cast(
             torch.BoolTensor,
-            torch.ones_like(final_token_ids, dtype=torch.bool)
-            if self._eos_index is None
-            else (final_token_ids != self._eos_index),
+            (
+                torch.ones_like(final_token_ids, dtype=torch.bool)
+                if self._eos_index is None
+                else (final_token_ids != self._eos_index)
+            ),
         )
         # Shape: (batch_size, beam_size)
         final_scores = scorer.finalize(scorer_state, final_token_ids, final_mask)

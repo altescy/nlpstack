@@ -2,7 +2,6 @@
 Run pretrained GPT-2 model
 """
 
-
 from nlpstack.data import PretrainedTransformerIndexer, PretrainedTransformerTokenizer
 from nlpstack.tasks.causal_language_modeling import SklearnCausalLanguageModel, TorchCausalLanguageModel
 from nlpstack.torch.generation import BeamSearch, LengthConstraint, NoRepeatNgramConstraint

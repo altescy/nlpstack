@@ -8,8 +8,7 @@ if sys.version_info >= (3, 10):
     from types import UnionType
 else:
 
-    class UnionType:
-        ...
+    class UnionType: ...
 
 
 JsonType = Literal["string", "number", "integer", "boolean", "object", "array", "null"]
