@@ -3,7 +3,21 @@ import warnings
 from contextlib import suppress
 from logging import getLogger
 from os import PathLike
-from typing import Any, Iterator, List, Literal, Mapping, Optional, Sequence, Tuple, Union, cast
+from typing import (
+    Any,
+    Generic,
+    Iterator,
+    List,
+    Literal,
+    Mapping,
+    NamedTuple,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+    cast,
+)
 
 import minato
 import numpy
@@ -39,6 +53,8 @@ except ModuleNotFoundError:
 
 
 logger = getLogger(__name__)
+
+_T_Fixtures = TypeVar("_T_Fixtures")
 
 
 class WordEmbedding:
@@ -284,7 +300,7 @@ class PretrainedTransformerWordEmbedding(WordEmbedding):
         vocab.extend_vocab(namespace, self.tokenizer.vocab.keys())
 
 
-class TextEmbedding(Pipeline[str, numpy.ndarray]):
+class TextEmbedding(Pipeline[str, numpy.ndarray, _T_Fixtures], Generic[_T_Fixtures]):
     """
     A text embedding model.
     """
@@ -295,14 +311,8 @@ class TextEmbedding(Pipeline[str, numpy.ndarray]):
     def get_output_dim(self) -> int:
         raise NotImplementedError
 
-    def apply_batch(self, batch: Sequence[str]) -> List[numpy.ndarray]:
-        raise NotImplementedError
 
-    def apply(self, input: str) -> numpy.ndarray:
-        return self.apply_batch([input])[0]
-
-
-class BagOfEmbeddingsTextEmbedding(TextEmbedding):
+class BagOfEmbeddingsTextEmbedding(TextEmbedding["BagOfEmbeddingsTextEmbedding.Fixtures"]):
     """
     A text embedding model using bag-of-embeddings.
 
@@ -322,6 +332,10 @@ class BagOfEmbeddingsTextEmbedding(TextEmbedding):
         window_size: A window size for hierarchical pooling. Defaults to `None`.
     """
 
+    class Fixtures(NamedTuple):
+        word_embedding: WordEmbedding
+        tokenizer: Tokenizer
+
     def __init__(
         self,
         word_embedding: WordEmbedding,
@@ -337,22 +351,33 @@ class BagOfEmbeddingsTextEmbedding(TextEmbedding):
             raise ValueError("window_size must be specified when pooling is 'hier'")
 
         super().__init__(**kwargs)
-        self._word_embedding = word_embedding
-        self._tokenizer = tokenizer or WhitespaceTokenizer()
         self._pooling = pooling
         self._normalize = normalize
         self._window_size = window_size
+        self._output_dim = word_embedding.get_output_dim()
+        self._fixtures = BagOfEmbeddingsTextEmbedding.Fixtures(
+            word_embedding,
+            tokenizer or WhitespaceTokenizer(),
+        )
 
     def get_output_dim(self) -> int:
-        return self._word_embedding.get_output_dim()
+        return self._output_dim
 
-    def apply_batch(self, batch: Sequence[str]) -> List[numpy.ndarray]:
+    @property
+    def fixtures(self) -> "BagOfEmbeddingsTextEmbedding.Fixtures":  # type: ignore[override]
+        return self._fixtures
+
+    def apply_batch(
+        self,
+        batch: Sequence[str],
+        fixtures: "BagOfEmbeddingsTextEmbedding.Fixtures",
+    ) -> List[numpy.ndarray]:
         if not batch:
             return list(numpy.zeros((0, self.get_output_dim()), dtype=numpy.float32))
 
         batch_size = len(batch)
 
-        batch_tokens = [self._tokenizer.tokenize(text) for text in batch]
+        batch_tokens = [fixtures.tokenizer.tokenize(text) for text in batch]
         max_length = max(len(tokens) for tokens in batch_tokens)
 
         embeddings = numpy.zeros((batch_size, max_length, self.get_output_dim()), dtype=float)
@@ -360,8 +385,8 @@ class BagOfEmbeddingsTextEmbedding(TextEmbedding):
 
         for batch_index, tokens in enumerate(batch_tokens):
             for token_index, token in enumerate(tokens):
-                if token.surface in self._word_embedding:
-                    embedding = self._word_embedding[token.surface]
+                if token.surface in fixtures.word_embedding:
+                    embedding = fixtures.word_embedding[token.surface]
                     embeddings[batch_index, token_index] = embedding
                     mask[batch_index, token_index] = True
 
@@ -376,7 +401,7 @@ class BagOfEmbeddingsTextEmbedding(TextEmbedding):
         )
 
 
-class PretrainedTransformerTextEmbedding(TextEmbedding):
+class PretrainedTransformerTextEmbedding(TextEmbedding["PretrainedTransformerTextEmbedding.Fixtures"]):
     """
     A text embedding model using pretrained transformer models.
 
@@ -388,6 +413,9 @@ class PretrainedTransformerTextEmbedding(TextEmbedding):
         window_size: A window size for hierarchical pooling. Defaults to `None`.
     """
 
+    class Fixtures(NamedTuple):
+        pipeline: "transformers.Pipeline"
+
     def __init__(
         self,
         pretrained_model_name: Union[str, PathLike],
@@ -395,12 +423,14 @@ class PretrainedTransformerTextEmbedding(TextEmbedding):
         pooling: Literal["mean", "max", "min", "sum", "hier", "first", "last"] = "mean",
         normalize: bool = False,
         window_size: Optional[int] = None,
+        device: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
+        if transformers is None:
+            raise ModuleNotFoundError("transformers is not installed")
+
         if pooling == "hier" and window_size is None:
             raise ValueError("window_size must be specified when pooling is 'hier'")
-
-        from transformers import pipeline
 
         super().__init__(**kwargs)
         self._pretrained_model_name = pretrained_model_name
@@ -408,18 +438,15 @@ class PretrainedTransformerTextEmbedding(TextEmbedding):
         self._pooling = pooling
         self._normalize = normalize
         self._window_size = window_size
+        self._device = device
 
-        self._pipeline = pipeline("feature-extraction", model=self.model, tokenizer=self.tokenizer)
-
-    @cached_property
-    def tokenizer(self) -> "transformers.PreTrainedTokenizer":
+    def get_tokenizer(self) -> "transformers.PreTrainedTokenizer":
         pretrained_model_name = self._pretrained_model_name
         with suppress(FileNotFoundError):
             pretrained_model_name = minato.cached_path(pretrained_model_name)
         return transformers_cache.get_pretrained_tokenizer(pretrained_model_name)
 
-    @cached_property
-    def model(self) -> "transformers.PreTrainedModel":
+    def get_model(self) -> "transformers.PreTrainedModel":
         pretrained_model_name = self._pretrained_model_name
         with suppress(FileNotFoundError):
             pretrained_model_name = minato.cached_path(pretrained_model_name)
@@ -429,10 +456,25 @@ class PretrainedTransformerTextEmbedding(TextEmbedding):
         return model
 
     def get_output_dim(self) -> int:
-        return int(self.model.config.hidden_size)
+        return int(self.fixtures.pipeline.model.config.hidden_size)
 
-    def apply_batch(self, batch: Sequence[str]) -> List[numpy.ndarray]:
-        features = self._pipeline(batch)
+    @cached_property
+    def fixtures(self) -> "PretrainedTransformerTextEmbedding.Fixtures":  # type: ignore[override]
+        return PretrainedTransformerTextEmbedding.Fixtures(
+            transformers.pipeline(
+                "feature-extraction",
+                model=self.get_model(),
+                tokenizer=self.get_tokenizer(),
+                device=self._device,
+            )
+        )
+
+    def apply_batch(
+        self,
+        batch: Sequence[str],
+        fixtures: "PretrainedTransformerTextEmbedding.Fixtures",
+    ) -> List[numpy.ndarray]:
+        features = fixtures.pipeline(list(batch))
         return [
             masked_pool(
                 numpy.array(x),
@@ -444,7 +486,7 @@ class PretrainedTransformerTextEmbedding(TextEmbedding):
         ]
 
 
-class SentenceTransformerTextEmbedding(TextEmbedding):
+class SentenceTransformerTextEmbedding(TextEmbedding["SentenceTransformerTextEmbedding.Fixtures"]):
     """
     A text embedding model using sentence-transformers.
 
@@ -453,6 +495,9 @@ class SentenceTransformerTextEmbedding(TextEmbedding):
         normalize_embeddings: Whether to normalize output embeddings. Defaults to `False`.
         device: A device to use. Defaults to `"cpu"`.
     """
+
+    class Fixtures(NamedTuple):
+        model: "sentence_transformers.SentenceTransformer"
 
     def __init__(
         self,
@@ -469,28 +514,33 @@ class SentenceTransformerTextEmbedding(TextEmbedding):
         self._normalize_embeddings = normalize_embeddings
         self._device = device
 
-        self.model  # load model
-
-    @cached_property
-    def model(self) -> "sentence_transformers.SentenceTransformer":
+    def get_model(self) -> "sentence_transformers.SentenceTransformer":
         assert sentence_transformers is not None
         return sentence_transformers.SentenceTransformer(self._model_name, device=self._device)
 
-    def get_output_dim(self) -> int:
-        return int(self.model.get_sentence_embedding_dimension())
+    @cached_property
+    def fixtures(self) -> "SentenceTransformerTextEmbedding.Fixtures":  # type: ignore[override]
+        return SentenceTransformerTextEmbedding.Fixtures(self.get_model())
 
-    def apply_batch(self, batch: Sequence[str]) -> List[numpy.ndarray]:
+    def get_output_dim(self) -> int:
+        return int(self.fixtures.model.get_sentence_embedding_dimension())
+
+    def apply_batch(
+        self,
+        batch: Sequence[str],
+        fixtures: "SentenceTransformerTextEmbedding.Fixtures",
+    ) -> List[numpy.ndarray]:
         if not batch:
             return list(numpy.zeros((0, self.get_output_dim()), dtype=numpy.float32))
-        embeddings = self.model.encode(
-            batch,
+        embeddings = fixtures.model.encode(
+            list(batch),
             convert_to_numpy=True,
             normalize_embeddings=self._normalize_embeddings,
         )
         return cast(List[numpy.ndarray], list(embeddings))
 
 
-class OpenAITextEmbedding(TextEmbedding):
+class OpenAITextEmbedding(TextEmbedding["OpenAITextEmbedding.Fixtures"]):
     """
     A text embedding model using OpenAI API.
 
@@ -504,11 +554,15 @@ class OpenAITextEmbedding(TextEmbedding):
         api_version: The version of the API. Defaults to `None`.
     """
 
+    class Fixtures(NamedTuple):
+        client: "openai.OpenAI"
+
     def __init__(
         self,
         model_name: str = "text-embedding-ada-002",
         organization: Optional[str] = None,
         base_url: Optional[str] = None,
+        api_key: Optional[str] = None,
         max_retries: int = 3,
         **kwargs: Any,
     ) -> None:
@@ -518,28 +572,35 @@ class OpenAITextEmbedding(TextEmbedding):
         super().__init__(**kwargs)
         self._organization = organization
         self._base_url = base_url
+        self._api_key = api_key
         self._max_retries = max_retries
         self._model_name = model_name
 
-        self._client  # load client
-
-    @cached_property
-    def _client(self) -> "openai.OpenAI":
+    def get_client(self) -> "openai.OpenAI":
         assert openai is not None
         return openai.OpenAI(
             organization=self._organization,
             base_url=self._base_url,
+            api_key=self._api_key,
             max_retries=self._max_retries,
         )
 
-    def apply_batch(self, batch: Sequence[str]) -> List[numpy.ndarray]:
+    @cached_property
+    def fixtures(self) -> "OpenAITextEmbedding.Fixtures":  # type: ignore[override]
+        return OpenAITextEmbedding.Fixtures(self.get_client())
+
+    def apply_batch(
+        self,
+        batch: Sequence[str],
+        fixtures: "OpenAITextEmbedding.Fixtures",
+    ) -> List[numpy.ndarray]:
         batch = [t.replace("\n", " ") for t in batch]
-        response = self._client.embeddings.create(input=batch, model=self._model_name)
+        response = fixtures.client.embeddings.create(input=batch, model=self._model_name)
         embeddings = sorted(response.data, key=lambda e: e.index)  # type: ignore
         return [numpy.array(embedding.embedding) for embedding in embeddings]
 
 
-class HuggingFaceTextEmbedding(TextEmbedding):
+class HuggingFaceTextEmbedding(TextEmbedding["HuggingFaceTextEmbedding.Fixtures"]):
     """
     A text embedding model using HuggingFace API.
 
@@ -549,6 +610,9 @@ class HuggingFaceTextEmbedding(TextEmbedding):
         model_name: A model name. Defaults to `"sentence-transformers/all-MiniLM-L6-v2"`.
     """
 
+    class Fixtures(NamedTuple):
+        session: requests.Session
+
     def __init__(
         self,
         model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
@@ -556,10 +620,8 @@ class HuggingFaceTextEmbedding(TextEmbedding):
     ) -> None:
         super().__init__(**kwargs)
         self._api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_name}"
-        self._session
 
-    @cached_property
-    def _session(self) -> requests.Session:
+    def get_session(self) -> requests.Session:
         api_key = os.environ.get("HUGGINGFACE_API_KEY")
         if api_key is None:
             raise ValueError("Please provide an HuggingFace API key.")
@@ -567,11 +629,19 @@ class HuggingFaceTextEmbedding(TextEmbedding):
         session.headers.update({"Authorization": f"Bearer {api_key}"})
         return session
 
-    def apply_batch(self, batch: Sequence[str]) -> List[numpy.ndarray]:
+    @cached_property
+    def fixtures(self) -> "HuggingFaceTextEmbedding.Fixtures":  # type: ignore[override]
+        return HuggingFaceTextEmbedding.Fixtures(self.get_session())
+
+    def apply_batch(
+        self,
+        batch: Sequence[str],
+        fixtures: "HuggingFaceTextEmbedding.Fixtures",
+    ) -> List[numpy.ndarray]:
         # Call HuggingFace Embedding API for each document
         return list(
             numpy.array(
-                self._session.post(  # type: ignore
+                fixtures.session.post(  # type: ignore
                     self._api_url, json={"inputs": batch, "options": {"wait_for_model": True}}
                 ).json()
             )
