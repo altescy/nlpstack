@@ -8,15 +8,17 @@ Example:
     >>> detokenized_text = tokenizer.detokenize(tokens)
 """
 
+import dataclasses
 from contextlib import suppress
 from os import PathLike
-from typing import Any, Callable, Generic, Iterator, List, NamedTuple, Optional, Sequence, TypeVar, Union
+from typing import Any, Callable, Generic, Iterator, List, Mapping, NamedTuple, Optional, Sequence, TypeVar, Union
 
 import minato
 import numpy
 
 from nlpstack.common import Pipeline, cached_property
 from nlpstack.transformers import cache as transformers_cache
+from nlpstack.types import T_Dataclass
 
 try:
     import transformers
@@ -324,3 +326,55 @@ class FugashiTokenizer(Tokenizer["FugashiTokenizer.Fixture"]):
     def detokenize(self, tokens: Union[Sequence[str], Sequence[Token]], **kwargs: Any) -> str:
         tokens = [token.surface if isinstance(token, Token) else token for token in tokens]
         return "".join(tokens)
+
+
+class DataclassTokenizer(
+    Pipeline[T_Dataclass, T_Dataclass, "DataclassTokenizer.Fixtures"],
+    Generic[T_Dataclass],
+):
+    class Fixtures(NamedTuple):
+        tokenizers: Mapping[str, Tokenizer]
+        fixtures: Mapping[str, Any]
+
+    def __init__(
+        self,
+        tokenizers: Mapping[str, Tokenizer[Any]],
+        **kwargs: Any,
+    ) -> None:
+        min_batch_size = min(tok._batch_size for tok in tokenizers.values())
+        min_max_workers = min(tok._max_workers for tok in tokenizers.values())
+        super().__init__(batch_size=min_batch_size, max_workers=min_max_workers, **kwargs)
+        self._tokenizers = tokenizers
+
+    @property
+    def fixtures(self) -> "DataclassTokenizer.Fixtures":
+        return DataclassTokenizer.Fixtures(
+            self._tokenizers,
+            {key: tok.fixtures for key, tok in self._tokenizers.items()},
+        )
+
+    def apply_batch(
+        self,
+        batch: Sequence[T_Dataclass],
+        fixtures: "DataclassTokenizer.Fixtures",
+    ) -> List[T_Dataclass]:
+        field_values = {key: [getattr(item, key) for item in batch] for key in fixtures.tokenizers.keys()}
+        for key, values in field_values.items():
+            tokenizer = fixtures.tokenizers[key]
+            tokenizer_fixtures = fixtures.fixtures[key]
+            untokenized_indices = [index for index, value in enumerate(values) if isinstance(value, str)]
+            applyed_values = tokenizer.apply_batch([values[i] for i in untokenized_indices], tokenizer_fixtures)
+
+            offset = 0
+            new_values = []
+            for i, value in enumerate(values):
+                if untokenized_indices and untokenized_indices[offset] == i:
+                    new_values.append(applyed_values[offset])
+                    offset += 1
+                else:
+                    new_values.append(value)
+
+            field_values[key] = new_values
+
+        new_field_values = [{key: values[i] for key, values in field_values.items()} for i in range(len(batch))]
+        return [dataclasses.replace(item, **updates) for item, updates in zip(batch, new_field_values)]

@@ -2,11 +2,11 @@ import itertools
 from logging import getLogger
 from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
-from nlpstack.common import PassThroughPipeline, Pipeline, wrap_iterator
+from nlpstack.common import PassThroughPipeline, Pipeline
 from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
-from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
+from nlpstack.data.tokenizers import DataclassTokenizer, Tokenizer, WhitespaceTokenizer
 
 from .types import Text2TextExample, Text2TextInference, Text2TextPrediction
 
@@ -86,34 +86,10 @@ class Text2TextDataModule(
             self._build_vocab(dataset)
 
     def preprocess(self, dataset: Iterable[Text2TextExample], **kwargs: Any) -> Iterator[Text2TextExample]:
-        return self._tokenize(self._preprocessor(dataset))
-
-    def _tokenize(self, dataset: Iterable[Text2TextExample]) -> Iterator[Text2TextExample]:
-        """
-        Setup the data module.
-
-        This method tokenizes the dataset and builds the vocabulary.
-
-        Args:
-            dataset: The dataset to tokenize and build the vocabulary from.
-        """
-
-        def tokenized_document_generator(dataset: Iterable[Text2TextExample]) -> Iterator[Text2TextExample]:
-            for example in dataset:
-                if isinstance(example.source, str):
-                    tokenized_source = self._source_tokenizer.tokenize(example.source)
-                else:
-                    tokenized_source = list(example.source)
-                if example.target is not None:
-                    if isinstance(example.target, str):
-                        tokenized_target = self._target_tokenizer.tokenize(example.target)
-                    else:
-                        tokenized_target = list(example.target)
-                else:
-                    tokenized_target = None
-                yield Text2TextExample(source=tokenized_source, target=tokenized_target)
-
-        return wrap_iterator(tokenized_document_generator, dataset)
+        pipeline = self._preprocessor | DataclassTokenizer[Text2TextExample](
+            {"source": self._source_tokenizer, "target": self._target_tokenizer},
+        )
+        return pipeline(dataset)
 
     def _build_vocab(self, dataset: Iterable[Text2TextExample]) -> None:
         def source_iterator() -> Iterator[Sequence[Token]]:

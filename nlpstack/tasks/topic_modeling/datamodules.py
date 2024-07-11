@@ -1,11 +1,11 @@
 from logging import getLogger
 from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
-from nlpstack.common import PassThroughPipeline, Pipeline, wrap_iterator
+from nlpstack.common import PassThroughPipeline, Pipeline
 from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
-from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
+from nlpstack.data.tokenizers import DataclassTokenizer, Tokenizer, WhitespaceTokenizer
 
 from .types import TopicModelingExample, TopicModelingInference, TopicModelingPrediction
 
@@ -73,25 +73,8 @@ class TopicModelingDataModule(
             self._build_vocab(dataset)
 
     def preprocess(self, dataset: Iterable[TopicModelingExample], **kwargs: Any) -> Iterator[TopicModelingExample]:
-        return wrap_iterator(self._tokenize, self._preprocessor(dataset))
-
-    def _tokenize(self, dataset: Iterable[TopicModelingExample]) -> Iterator[TopicModelingExample]:
-        """
-        Tokenize the dataset and return the tokenized dataset.
-
-        Args:
-            dataset: The dataset to tokenize.
-
-        Returns:
-            The tokenized dataset.
-        """
-
-        for example in dataset:
-            if isinstance(example.text, str):
-                tokenized_text = self._tokenizer.tokenize(example.text)
-            else:
-                tokenized_text = list(example.text)
-            yield TopicModelingExample(text=tokenized_text)
+        pipeline = self._preprocessor | DataclassTokenizer[TopicModelingExample]({"text": self._tokenizer})
+        return pipeline(dataset)
 
     def _build_vocab(self, dataset: Iterable[TopicModelingExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:

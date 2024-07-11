@@ -3,11 +3,11 @@ from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
 import numpy
 
-from nlpstack.common import PassThroughPipeline, Pipeline, wrap_iterator
+from nlpstack.common import PassThroughPipeline, Pipeline
 from nlpstack.data import DataModule, Instance, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, SequenceLabelField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, Token, TokenIndexer
-from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
+from nlpstack.data.tokenizers import DataclassTokenizer, Tokenizer, WhitespaceTokenizer
 
 from .types import SequenceLabelingExample, SequenceLabelingInference, SequenceLabelingPrediction
 
@@ -87,33 +87,8 @@ class SequenceLabelingDataModule(
         dataset: Iterable[SequenceLabelingExample],
         **kwargs: Any,
     ) -> Iterator[SequenceLabelingExample]:
-        return self._tokenize(self._preprocessor(dataset))
-
-    def _tokenize(self, dataset: Iterable[SequenceLabelingExample]) -> Iterator[SequenceLabelingExample]:
-        """
-        Tokenize the dataset and return the tokenized dataset.
-
-        Args:
-            dataset: The dataset to tokenize.
-
-        Returns:
-            The tokenized dataset.
-        """
-
-        def tokenized_document_generator(
-            dataset: Iterable[SequenceLabelingExample],
-        ) -> Iterator[SequenceLabelingExample]:
-            for example in dataset:
-                if isinstance(example.text, str):
-                    tokenized_text = self._tokenizer.tokenize(example.text)
-                else:
-                    tokenized_text = list(example.text)
-                yield SequenceLabelingExample(
-                    text=tokenized_text,
-                    labels=example.labels,
-                )
-
-        return wrap_iterator(tokenized_document_generator, dataset)
+        pipeline = self._preprocessor | DataclassTokenizer[SequenceLabelingExample]({"text": self._tokenizer})
+        return pipeline(dataset)
 
     def _build_vocab(self, dataset: Sequence[SequenceLabelingExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:

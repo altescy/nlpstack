@@ -32,6 +32,7 @@ from nlpstack.data.indexers import (  # noqa: F401
 )
 from nlpstack.data.tokenizers import (  # noqa: F401
     CharacterTokenizer,
+    DataclassTokenizer,
     FugashiTokenizer,
     PretrainedTransformerTokenizer,
     SpacyTokenizer,

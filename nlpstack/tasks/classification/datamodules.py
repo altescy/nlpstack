@@ -1,22 +1,20 @@
-import dataclasses
-import itertools
 from logging import getLogger
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence
+from typing import Any, Dict, Iterable, Iterator, List, Mapping, Optional, Sequence
 
 import numpy
 
-from nlpstack.common import PassThroughPipeline, wrap_iterator
+from nlpstack.common import PassThroughPipeline, Pipeline
 from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, LabelField, MetadataField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
-from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
+from nlpstack.data.tokenizers import DataclassTokenizer, Tokenizer, WhitespaceTokenizer
 
 from .types import ClassificationExample, ClassificationInference, ClassificationPrediction
 
 logger = getLogger(__name__)
 
-ClassificationPreprocessor = Callable[[Iterable[ClassificationExample]], Iterable[ClassificationExample]]
-ClassificationPostprocessor = Callable[[Iterable[ClassificationPrediction]], Iterable[ClassificationPrediction]]
+ClassificationPreprocessor = Pipeline[ClassificationExample, ClassificationExample, Any]
+ClassificationPostprocessor = Pipeline[ClassificationPrediction, ClassificationPrediction, Any]
 
 
 class BasicClassificationDataModule(
@@ -93,35 +91,8 @@ class BasicClassificationDataModule(
             self._build_vocab(dataset)
 
     def preprocess(self, dataset: Iterable[ClassificationExample], **kwargs: Any) -> Iterator[ClassificationExample]:
-        return self._tokenize(self._preprocessor(dataset))
-
-    def _tokenize(self, dataset: Iterable[ClassificationExample]) -> Iterator[ClassificationExample]:
-        """
-        Tokenize the dataset and return the tokenized dataset.
-
-        Args:
-            dataset: The dataset to tokenize.
-
-        Returns:
-            The tokenized dataset.
-        """
-
-        if not dataset:
-            return iter([])
-
-        def get_text_to_tokenize(example: ClassificationExample) -> str:
-            if isinstance(example.text, str):
-                return example.text
-            return ""
-
-        def tokenized_document_generator(dataset: Iterable[ClassificationExample]) -> Iterator[ClassificationExample]:
-            dataset, dataset_for_text = itertools.tee(dataset)
-            tokenized_texts = self._tokenizer(map(get_text_to_tokenize, dataset_for_text))
-            for example, tokenized_text in zip(dataset, tokenized_texts):
-                tokenized_text = tokenized_text if isinstance(example.text, str) else list(example.text)
-                yield dataclasses.replace(example, text=tokenized_text)
-
-        return wrap_iterator(tokenized_document_generator, dataset)
+        pipeline = self._preprocessor | DataclassTokenizer[ClassificationExample]({"text": self._tokenizer})
+        return pipeline(dataset)
 
     def _build_vocab(self, dataset: Sequence[ClassificationExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:

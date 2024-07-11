@@ -3,11 +3,11 @@ from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
 import numpy
 
-from nlpstack.common import PassThroughPipeline, Pipeline, wrap_iterator
+from nlpstack.common import PassThroughPipeline, Pipeline
 from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, MultiLabelField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
-from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
+from nlpstack.data.tokenizers import DataclassTokenizer, Tokenizer, WhitespaceTokenizer
 
 from .types import (
     MultilabelClassificationExample,
@@ -102,38 +102,8 @@ class MultilabelClassificationDataModule(
         dataset: Iterable[MultilabelClassificationExample],
         **kwargs: Any,
     ) -> Iterator[MultilabelClassificationExample]:
-        return self._tokenize(self._preprocessor(dataset))
-
-    def _tokenize(
-        self, dataset: Iterable[MultilabelClassificationExample]
-    ) -> Iterator[MultilabelClassificationExample]:
-        """
-        Tokenize the dataset and return the tokenized dataset.
-
-        Args:
-            dataset: The dataset to tokenize.
-
-        Returns:
-            The tokenized dataset.
-        """
-
-        if not dataset:
-            return iter([])
-
-        def tokenized_document_generator(
-            dataset: Iterable[MultilabelClassificationExample],
-        ) -> Iterator[MultilabelClassificationExample]:
-            for example in dataset:
-                if isinstance(example.text, str):
-                    tokenized_text = self._tokenizer.tokenize(example.text)
-                else:
-                    tokenized_text = list(example.text)
-                yield MultilabelClassificationExample(
-                    text=tokenized_text,
-                    labels=example.labels,
-                )
-
-        return wrap_iterator(tokenized_document_generator, dataset)
+        pipeline = self._preprocessor | DataclassTokenizer[MultilabelClassificationExample]({"text": self._tokenizer})
+        return pipeline(dataset)
 
     def _build_vocab(self, dataset: Sequence[MultilabelClassificationExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
