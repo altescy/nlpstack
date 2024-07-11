@@ -1,3 +1,4 @@
+import asyncio
 import os
 import warnings
 from contextlib import suppress
@@ -594,8 +595,7 @@ class OpenAITextEmbedding(TextEmbedding["OpenAITextEmbedding.Fixtures"]):
         batch: Sequence[str],
         fixtures: "OpenAITextEmbedding.Fixtures",
     ) -> List[numpy.ndarray]:
-        batch = [t.replace("\n", " ") for t in batch]
-        response = fixtures.client.embeddings.create(input=batch, model=self._model_name)
+        response = fixtures.client.embeddings.create(input=list(batch), model=self._model_name)
         embeddings = sorted(response.data, key=lambda e: e.index)  # type: ignore
         return [numpy.array(embedding.embedding) for embedding in embeddings]
 
