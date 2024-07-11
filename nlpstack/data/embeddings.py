@@ -30,7 +30,7 @@ except ModuleNotFoundError:
 try:
     import sentence_transformers
 except ModuleNotFoundError:
-    sentence_transformers = None
+    sentence_transformers = None  # type: ignore[assignment]
 
 try:
     import openai
