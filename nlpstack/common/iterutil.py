@@ -132,3 +132,26 @@ def iter_with_callback(
         return SizedIterator(iterator(), len(iterable))
 
     return iterator()
+
+
+def wrap_iterator(wrapper: Callable[[Iterable[T]], Iterator[T]], iterable: Iterable[T]) -> Iterator:
+    """
+    Wrap an iterator with a function.
+
+    Note:
+        This function assume that the wrapped iterator is of the same size as the input iterator.
+
+    Args:
+        wrapper: The function to wrap the iterator.
+
+    Returns:
+        An iterator wrapped with the function.
+    """
+
+    def wrapped() -> Iterator[T]:
+        return wrapper(iterable)
+
+    if isinstance(iterable, abc.Sized):
+        return SizedIterator(wrapped(), len(iterable))
+
+    return wrapped()
