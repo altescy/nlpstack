@@ -88,6 +88,12 @@ class RuneForTorch(
         if self.random_seed is not None:
             set_random_seed(self.random_seed)
 
+        logger.info("Preprocessing training dataset...")
+        train_dataset = FileBackendSequence.from_iterable(self.datamodule.preprocess(train_dataset))
+        if valid_dataset is not None:
+            logger.info("Preprocessing validation dataset...")
+            valid_dataset = FileBackendSequence.from_iterable(self.datamodule.preprocess(valid_dataset))
+
         logger.info("Setup datamodule...")
         self.datamodule.setup(dataset=train_dataset, **self.kwargs, **kwargs)
 

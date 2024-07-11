@@ -11,6 +11,9 @@ class DataModule(Generic[Example, Inference, Prediction]):
     def setup(self, *args: Any, **kwargs: Any) -> None:
         pass
 
+    def preprocess(self, dataset: Iterable[Example], **kwargs: Any) -> Iterator[Example]:
+        return iter(dataset)
+
     def build_instance(self, example: Example) -> Instance:
         raise NotImplementedError
 
