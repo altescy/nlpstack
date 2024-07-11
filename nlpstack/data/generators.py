@@ -3,7 +3,7 @@ import json
 import os
 from contextlib import suppress
 from os import PathLike
-from typing import Any, Iterable, Iterator, List, Literal, Optional, Sequence, Union
+from typing import Any, Generic, List, Literal, NamedTuple, Optional, Sequence, TypeVar, Union
 
 import minato
 import requests
@@ -22,17 +22,17 @@ except ModuleNotFoundError:
     openai = None  # type: ignore[assignment]
 
 
-class TextGenerator(Pipeline[str, str]):
+_T_Fixtures = TypeVar("_T_Fixtures")
+
+
+class TextGenerator(Pipeline[str, str, _T_Fixtures], Generic[_T_Fixtures]):
     """
     A base class for text generators.
     Text generators are callable objects that take a list of strings as input and return a list of strings as output.
     """
 
-    def apply(self, input: str) -> str:
-        return self.apply_batch([input])[0]
 
-
-class OpenAIChatTextGenerator(TextGenerator):
+class OpenAIChatTextGenerator(TextGenerator["OpenAIChatTextGenerator.Fixtures"]):
     """
     A text generator using OpenAI chat completion API.
 
@@ -48,6 +48,9 @@ class OpenAIChatTextGenerator(TextGenerator):
 
     Role = Literal["system", "assistant", "user"]
 
+    class Fixtures(NamedTuple):
+        client: "openai.AsyncOpenAI"
+
     def __init__(
         self,
         *,
@@ -55,6 +58,7 @@ class OpenAIChatTextGenerator(TextGenerator):
         context: Optional[Union[str, Sequence["openai.types.chat.ChatCompletionMessageParam"]]] = None,
         organization: Optional[str] = None,
         base_url: Optional[str] = None,
+        api_key: Optional[str] = None,
         max_retries: int = 3,
         batch_size: int = 1,
         max_workers: int = 1,
@@ -74,22 +78,31 @@ class OpenAIChatTextGenerator(TextGenerator):
         self._model_name = model_name
         self._organization = organization
         self._base_url = base_url
+        self._api_key = api_key
         self._context = context
         self._max_retries = max_retries
         self._kwargs = kwargs
 
-    @cached_property
-    def _client(self) -> "openai.AsyncOpenAI":
+    def get_client(self) -> "openai.AsyncOpenAI":
         assert openai is not None
         return openai.AsyncOpenAI(
             organization=self._organization,
             base_url=self._base_url,
+            api_key=self._api_key,
             max_retries=self._max_retries,
         )
 
-    def apply_batch(self, inputs: Sequence[str]) -> List[str]:
+    @cached_property
+    def fixtures(self) -> "OpenAIChatTextGenerator.Fixtures":  # type: ignore[override]
+        return OpenAIChatTextGenerator.Fixtures(self.get_client())
+
+    def apply_batch(
+        self,
+        batch: Sequence[str],
+        fixtures: "OpenAIChatTextGenerator.Fixtures",
+    ) -> List[str]:
         async def task(text: str) -> str:
-            response = await self._client.chat.completions.create(
+            response = await fixtures.client.chat.completions.create(
                 model=self._model_name,
                 messages=list(self._context or []) + [{"role": "user", "content": text}],
                 **self._kwargs,
@@ -97,23 +110,12 @@ class OpenAIChatTextGenerator(TextGenerator):
             return str(response.choices[0].message.content)
 
         async def main() -> List[str]:
-            return await asyncio.gather(*[task(text) for text in inputs])
+            return await asyncio.gather(*[task(text) for text in batch])
 
         return asyncio.run(main())
 
-    def __call__(
-        self,
-        inputs: Iterable[str],
-        *,
-        batch_size: Optional[int] = None,
-        max_workers: Optional[int] = None,
-    ) -> Iterator[str]:
-        if max_workers is not None and max_workers > 1:
-            raise ValueError("OpenAIChatTextGenerator does not support parallel processing.")
-        return super().__call__(inputs, batch_size=batch_size, max_workers=max_workers)
 
-
-class HuggingfaceTextGenerator(TextGenerator):
+class HuggingfaceTextGenerator(TextGenerator["HuggingfaceTextGenerator.Fixtures"]):
     """
     A text generator using Huggingface inference API.
     This generator only supports text/text2text generation models such as `gpt2`.
@@ -124,6 +126,9 @@ class HuggingfaceTextGenerator(TextGenerator):
         retry_interval: The interval between retries in seconds. Defaults to `10.0`.
         **kwargs: Additional keyword arguments to pass to the API.
     """
+
+    class Fixtures(NamedTuple):
+        session: requests.Session
 
     def __init__(
         self,
@@ -140,10 +145,8 @@ class HuggingfaceTextGenerator(TextGenerator):
         self._max_retries = max_retries
         self._retry_interval = retry_interval
         self._kwargs = kwargs
-        self._session
 
-    @cached_property
-    def _session(self) -> requests.Session:
+    def get_session(self) -> requests.Session:
         api_key = os.environ.get("HUGGINGFACE_API_KEY")
         if api_key is None:
             raise ValueError("Please provide an HuggingFace API key.")
@@ -151,12 +154,20 @@ class HuggingfaceTextGenerator(TextGenerator):
         session.headers.update({"Authorization": f"Bearer {api_key}"})
         return session
 
-    def apply_batch(self, inputs: Sequence[str]) -> List[str]:
+    @property
+    def fixtures(self) -> "HuggingfaceTextGenerator.Fixtures":
+        return HuggingfaceTextGenerator.Fixtures(self.get_session())
+
+    def apply_batch(
+        self,
+        inputs: Sequence[str],
+        fixtures: "HuggingfaceTextGenerator.Fixtures",
+    ) -> List[str]:
         async def task(text: str) -> str:
             data = json.dumps({"inputs": text, "parameters": {**self._kwargs}})
             loop = asyncio.get_running_loop()
             for _ in range(self._max_retries):
-                response = await loop.run_in_executor(None, self._session.post, self._api_url, data)
+                response = await loop.run_in_executor(None, fixtures.session.post, self._api_url, data)
                 if response.status_code == 200:
                     return str(response.json()[0]["generated_text"])
                 elif 500 <= response.status_code < 600:
@@ -171,7 +182,7 @@ class HuggingfaceTextGenerator(TextGenerator):
         return asyncio.run(main())
 
 
-class PretrainedTransformerTextGenerator(TextGenerator):
+class PretrainedTransformerTextGenerator(TextGenerator["PretrainedTransformerTextGenerator.Fixtures"]):
     """
     A text generator using pretrained transformer models.
 
@@ -184,6 +195,9 @@ class PretrainedTransformerTextGenerator(TextGenerator):
 
     Task = Literal["text-generation", "text2text-generation"]
 
+    class Fixtures(NamedTuple):
+        pipeline: "transformers.Pipeline"
+
     def __init__(
         self,
         *,
@@ -194,31 +208,22 @@ class PretrainedTransformerTextGenerator(TextGenerator):
         max_workers: int = 1,
         **kwargs: Any,
     ) -> None:
+        if transformers is None:
+            raise ModuleNotFoundError("transformers is not installed")
+
         super().__init__(batch_size=batch_size, max_workers=max_workers)
         self._pretrained_model_name = pretrained_model_name
         self._task = task
         self._device = device
         self._kwargs = kwargs
 
-    @cached_property
-    def _pipeline(self) -> "transformers.Pipeline":
-        self._pipeline = transformers.pipeline(
-            task=self._task,
-            model=self.model if self._task is not None else self._pretrained_model_name,
-            tokenizer=self.tokenizer if self._task is not None else None,
-            device=self._device,
-            **self._kwargs,
-        )
-
-    @cached_property
-    def tokenizer(self) -> "transformers.PreTrainedTokenizer":
+    def get_tokenizer(self) -> "transformers.PreTrainedTokenizer":
         pretrained_model_name = self._pretrained_model_name
         with suppress(FileNotFoundError):
             pretrained_model_name = minato.cached_path(pretrained_model_name)
         return transformers_cache.get_pretrained_tokenizer(pretrained_model_name)
 
-    @cached_property
-    def model(self) -> "transformers.PreTrainedModel":
+    def get_model(self) -> "transformers.PreTrainedModel":
         pretrained_model_name = self._pretrained_model_name
         with suppress(FileNotFoundError):
             pretrained_model_name = minato.cached_path(pretrained_model_name)
@@ -226,9 +231,25 @@ class PretrainedTransformerTextGenerator(TextGenerator):
         model = transformers_cache.get_pretrained_model(pretrained_model_name, auto_cls=auto_cls)
         return model
 
-    def apply_batch(self, inputs: Sequence[str]) -> List[str]:
-        output = self._pipeline(
-            inputs,
+    @cached_property
+    def fixtures(self) -> "PretrainedTransformerTextGenerator.Fixtures":  # type: ignore[override]
+        return PretrainedTransformerTextGenerator.Fixtures(
+            transformers.pipeline(
+                task=self._task,
+                model=self.get_model() if self._task is not None else self._pretrained_model_name,
+                tokenizer=self.get_tokenizer() if self._task is not None else None,
+                device=self._device,
+                **self._kwargs,
+            )
+        )
+
+    def apply_batch(
+        self,
+        batch: Sequence[str],
+        fixtures: "PretrainedTransformerTextGenerator.Fixtures",
+    ) -> List[str]:
+        output = fixtures.pipeline(
+            list(batch),
             **self._kwargs,
         )
         sequence_delimiter = {**self._kwargs}.get("sequence_delimiter", "\n")
