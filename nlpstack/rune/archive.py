@@ -1,5 +1,6 @@
 import dataclasses
 import datetime
+import importlib.metadata
 import json
 import tarfile
 import tempfile
@@ -18,21 +19,16 @@ Self = TypeVar("Self", bound="RuneArchive")
 RuneType = TypeVar("RuneType", bound=Rune)
 
 
-def get_pip_packages() -> Optional[List[Tuple[str, str]]]:
-    try:
-        import pkg_resources
-
-        return sorted([(d.key, d.version) for d in iter(pkg_resources.working_set)])
-    except Exception:
-        logger.error("Error saving pip packages")
-    return None
+def get_installed_packages() -> List[Tuple[str, str]]:
+    distributions = importlib.metadata.distributions()
+    return sorted([(d.metadata["Name"], d.version) for d in distributions])
 
 
 @dataclasses.dataclass(frozen=True)
 class RuneArchive(Generic[RuneType]):
     rune: RuneType
     metadata: Optional[Mapping[str, str]] = None
-    packages: Optional[Sequence[Tuple[str, str]]] = dataclasses.field(default_factory=get_pip_packages)
+    packages: Optional[Sequence[Tuple[str, str]]] = dataclasses.field(default_factory=get_installed_packages)
     archived_at: datetime.datetime = dataclasses.field(default_factory=datetime.datetime.utcnow)
 
     _RUNE_FILENAME: ClassVar[str] = "rune.pkl"
