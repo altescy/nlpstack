@@ -105,12 +105,14 @@ class RuneForTorch(
 
         logger.info("Reading training dataset...")
         train_instances: Sequence[Instance] = FileBackendSequence.from_iterable(
-            self.datamodule.read_dataset(train_dataset)
+            self.datamodule.read_dataset(train_dataset, skip_preprocess=True)
         )
         valid_instances: Optional[Sequence[Instance]] = None
         if valid_dataset is not None:
             logger.info("Reading validation dataset...")
-            valid_instances = FileBackendSequence.from_iterable(self.datamodule.read_dataset(valid_dataset))
+            valid_instances = FileBackendSequence.from_iterable(
+                self.datamodule.read_dataset(valid_dataset, skip_preprocess=True)
+            )
 
         logger.info("Start training...")
         self.trainer.train(

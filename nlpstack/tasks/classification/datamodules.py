@@ -5,7 +5,7 @@ from typing import Any, Callable, Dict, Iterable, Iterator, List, Mapping, Optio
 
 import numpy
 
-from nlpstack.common import PassThroughPipeline, ProgressBar, wrap_iterator
+from nlpstack.common import PassThroughPipeline, wrap_iterator
 from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, LabelField, MetadataField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
@@ -199,18 +199,3 @@ class BasicClassificationDataModule(
                 )
 
         yield from self._postprocessor(prediction_iterator())
-
-    def read_dataset(self, dataset: Iterable[ClassificationExample], **kwargs: Any) -> Iterator[Instance]:
-        """
-        Read the dataset and return a generator of instances.
-
-        Args:
-            dataset: The dataset to read.
-
-        Returns:
-            A generator of instances.
-        """
-
-        logger.info("Building instances...")
-        for example in ProgressBar(self.preprocess(dataset), desc="Building instances"):
-            yield self.build_instance(example)

@@ -3,7 +3,7 @@ from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
 import numpy
 
-from nlpstack.common import PassThroughPipeline, Pipeline, ProgressBar, wrap_iterator
+from nlpstack.common import PassThroughPipeline, Pipeline, wrap_iterator
 from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, MultiLabelField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
@@ -199,18 +199,3 @@ class MultilabelClassificationDataModule(
                 top_labels=[self.vocab.get_token_by_index(self.label_namespace, index) for index in top_indices],
                 metadata=inference.metadata[i] if inference.metadata is not None else None,
             )
-
-    def read_dataset(self, dataset: Iterable[MultilabelClassificationExample], **kwargs: Any) -> Iterator[Instance]:
-        """
-        Read the dataset and return a generator of instances.
-
-        Args:
-            dataset: The dataset to read.
-
-        Returns:
-            A generator of instances.
-        """
-
-        logger.info("Building instances...")
-        for example in ProgressBar(self.preprocess(dataset), desc="Building instances"):
-            yield self.build_instance(example)

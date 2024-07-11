@@ -1,7 +1,7 @@
 from logging import getLogger
 from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
-from nlpstack.common import PassThroughPipeline, Pipeline, ProgressBar, wrap_iterator
+from nlpstack.common import PassThroughPipeline, Pipeline, wrap_iterator
 from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
@@ -186,22 +186,3 @@ class CausalLanguageModelingDataModule(
             ]
             top_texts = [self._tokenizer.detokenize(tokens) for tokens in top_tokens]
             yield CausalLanguageModelingPrediction(top_texts, top_tokens, scores)
-
-    def read_dataset(
-        self,
-        dataset: Iterable[CausalLanguageModelingExample],
-        **kwargs: Any,
-    ) -> Iterator[Instance]:
-        """
-        Read the dataset and return a generator of instances.
-
-        Args:
-            dataset: The dataset to read.
-
-        Returns:
-            A generator of instances.
-        """
-
-        logger.info("Building instances...")
-        for example in ProgressBar(self.preprocess(dataset), desc="Building instances"):
-            yield self.build_instance(example)

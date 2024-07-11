@@ -1,7 +1,7 @@
 from logging import getLogger
 from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
-from nlpstack.common import ProgressBar, wrap_iterator
+from nlpstack.common import wrap_iterator
 from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
@@ -127,18 +127,3 @@ class TopicModelingDataModule(
 
         for topic_distribution in inference.topic_distribution:
             yield TopicModelingPrediction(topic_distribution.tolist())
-
-    def read_dataset(self, dataset: Iterable[TopicModelingExample], **kwargs: Any) -> Iterator[Instance]:
-        """
-        Read the dataset and return a generator of instances.
-
-        Args:
-            dataset: The dataset to read.
-
-        Returns:
-            A generator of instances.
-        """
-
-        logger.info("Building instances...")
-        for example in ProgressBar(self.preprocess(dataset), desc="Building instances"):
-            yield self.build_instance(example)

@@ -2,7 +2,7 @@ import itertools
 from logging import getLogger
 from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
-from nlpstack.common import ProgressBar, wrap_iterator
+from nlpstack.common import wrap_iterator
 from nlpstack.data import DataModule, Instance, Token, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
@@ -192,18 +192,3 @@ class Text2TextDataModule(
             ]
             top_texts = [self._target_tokenizer.detokenize(tokens) for tokens in top_tokens]
             yield Text2TextPrediction(top_texts, top_tokens, scores)
-
-    def read_dataset(self, dataset: Iterable[Text2TextExample], **kwargs: Any) -> Iterator[Instance]:
-        """
-        Read the dataset and return a generator of instances.
-
-        Args:
-            dataset: The dataset to read.
-
-        Returns:
-            A generator of instances.
-        """
-
-        logger.info("Building instances...")
-        for example in ProgressBar(self.preprocess(dataset), desc="Building instances"):
-            yield self.build_instance(example)

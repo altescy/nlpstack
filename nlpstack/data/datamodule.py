@@ -28,6 +28,19 @@ class DataModule(Generic[Example, Inference, Prediction]):
         *,
         skip_preprocess: bool = False,
     ) -> Iterator[Instance]:
+        """
+        Read the dataset and return a generator of instances.
+
+        Args:
+            dataset: The dataset to read.
+            skip_preprocess: Whether to skip the preprocessing step. If this is
+            set to `True`, the `preprocess` method will not be called on the
+            dataset. Defaults to `False`.
+
+        Returns:
+            A generator of instances.
+        """
+
         if not skip_preprocess:
             dataset = self.preprocess(dataset)
         for example in dataset:

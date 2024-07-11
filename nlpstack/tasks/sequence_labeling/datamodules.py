@@ -3,7 +3,7 @@ from typing import Any, Dict, Iterable, Iterator, Mapping, Optional, Sequence
 
 import numpy
 
-from nlpstack.common import PassThroughPipeline, Pipeline, ProgressBar, wrap_iterator
+from nlpstack.common import PassThroughPipeline, Pipeline, wrap_iterator
 from nlpstack.data import DataModule, Instance, Vocabulary
 from nlpstack.data.fields import Field, MetadataField, SequenceLabelField, TextField
 from nlpstack.data.indexers import SingleIdTokenIndexer, Token, TokenIndexer
@@ -197,18 +197,3 @@ class SequenceLabelingDataModule(
             tokens = _nlpstack_metadata["raw_tokens"]
             metadata = None if _nlpstack_metadata["metadata_is_none"] else _metadata
             yield SequenceLabelingPrediction(tokens=tokens, top_labels=top_labels, metadata=metadata)
-
-    def read_dataset(self, dataset: Iterable[SequenceLabelingExample], **kwargs: Any) -> Iterator[Instance]:
-        """
-        Read the dataset and return a generator of instances.
-
-        Args:
-            dataset: The dataset to read.
-
-        Returns:
-            A generator of instances.
-        """
-
-        logger.info("Building instances...")
-        for example in ProgressBar(self.preprocess(dataset), desc="Building instances"):
-            yield self.build_instance(example)
