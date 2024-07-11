@@ -1,4 +1,4 @@
-from typing import Any, List, Sequence
+from typing import Any, List, Mapping, NamedTuple, Sequence
 
 from nlpstack.data import TextGenerator
 from nlpstack.rune import Rune
@@ -6,7 +6,7 @@ from nlpstack.rune import Rune
 from .types import Text2TextExample, Text2TextPrediction
 
 
-class Text2TextGenerator(TextGenerator):
+class Text2TextGenerator(TextGenerator["Text2TextGenerator.Fixtures"]):
     """
     A text generator using a rune model for text2text tasks.
 
@@ -14,6 +14,10 @@ class Text2TextGenerator(TextGenerator):
         model: The model to use.
         **kwargs: Additional keyword arguments to pass to the model.
     """
+
+    class Fixtures(NamedTuple):
+        model: Rune[Text2TextExample, Text2TextPrediction]
+        kwargs: Mapping[str, Any]
 
     def __init__(
         self,
@@ -24,10 +28,17 @@ class Text2TextGenerator(TextGenerator):
         **kwargs: Any,
     ) -> None:
         super().__init__(batch_size=batch_size, max_workers=max_workers)
-        self._model = model
-        self._kwargs = kwargs
+        self._fixtures = Text2TextGenerator.Fixtures(model, kwargs)
 
-    def apply_batch(self, inputs: Sequence[str]) -> List[str]:
+    @property
+    def fixtures(self) -> "Text2TextGenerator.Fixtures":
+        return self._fixtures
+
+    def apply_batch(
+        self,
+        inputs: Sequence[str],
+        fixtures: "Text2TextGenerator.Fixtures",
+    ) -> List[str]:
         examples = [Text2TextExample(text) for text in inputs]
-        predictions = self._model.predict(examples, **self._kwargs)
+        predictions = fixtures.model.predict(examples, **fixtures.kwargs)
         return [prediction.text for prediction in predictions]

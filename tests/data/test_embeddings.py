@@ -1,12 +1,7 @@
 import numpy
 import pytest
 
-from nlpstack.data import (
-    BagOfEmbeddingsTextEmbedding,
-    MinhashWordEmbedding,
-    PretrainedTransformerTextEmbedding,
-    TextEmbedding,
-)
+from nlpstack.data import BagOfEmbeddingsTextEmbedding, MinhashWordEmbedding, TextEmbedding
 
 
 class TestEmbedding:

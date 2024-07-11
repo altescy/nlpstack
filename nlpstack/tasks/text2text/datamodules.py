@@ -12,8 +12,8 @@ from .types import Text2TextExample, Text2TextInference, Text2TextPrediction
 
 logger = getLogger(__name__)
 
-Text2TextPreprocessor = Pipeline[Text2TextExample, Text2TextExample]
-Text2TextPostprocessor = Pipeline[Text2TextPrediction, Text2TextPrediction]
+Text2TextPreprocessor = Pipeline[Text2TextExample, Text2TextExample, Any]
+Text2TextPostprocessor = Pipeline[Text2TextPrediction, Text2TextPrediction, Any]
 
 
 class Text2TextDataModule(

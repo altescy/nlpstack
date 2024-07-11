@@ -1,4 +1,3 @@
-import asyncio
 import os
 import warnings
 from contextlib import suppress
@@ -311,6 +310,9 @@ class TextEmbedding(Pipeline[str, numpy.ndarray, _T_Fixtures], Generic[_T_Fixtur
 
     def get_output_dim(self) -> int:
         raise NotImplementedError
+
+    def embed(self, text: str) -> numpy.ndarray:
+        return next(self([text], batch_size=1, max_workers=1))
 
 
 class BagOfEmbeddingsTextEmbedding(TextEmbedding["BagOfEmbeddingsTextEmbedding.Fixtures"]):

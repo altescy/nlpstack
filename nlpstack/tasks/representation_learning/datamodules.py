@@ -11,8 +11,8 @@ from .types import RepresentationLearningExample, RepresentationLearningInferenc
 
 logger = getLogger(__name__)
 
-RepresentationLearningPreprocessor = Pipeline[RepresentationLearningExample, RepresentationLearningExample]
-RepresentationLearningPostprocessor = Pipeline[RepresentationLearningPrediction, RepresentationLearningPrediction]
+RepresentationLearningPreprocessor = Pipeline[RepresentationLearningExample, RepresentationLearningExample, Any]
+RepresentationLearningPostprocessor = Pipeline[RepresentationLearningPrediction, RepresentationLearningPrediction, Any]
 
 
 class RepresentationLearningDataModule(

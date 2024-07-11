@@ -3,7 +3,7 @@ import json
 import os
 from contextlib import suppress
 from os import PathLike
-from typing import Any, Generic, List, Literal, NamedTuple, Optional, Sequence, TypeVar, Union
+from typing import Any, Generic, List, Literal, Mapping, NamedTuple, Optional, Sequence, TypeVar, Union
 
 import minato
 import requests
@@ -197,6 +197,7 @@ class PretrainedTransformerTextGenerator(TextGenerator["PretrainedTransformerTex
 
     class Fixtures(NamedTuple):
         pipeline: "transformers.Pipeline"
+        kwargs: Mapping[str, Any]
 
     def __init__(
         self,
@@ -240,7 +241,8 @@ class PretrainedTransformerTextGenerator(TextGenerator["PretrainedTransformerTex
                 tokenizer=self.get_tokenizer() if self._task is not None else None,
                 device=self._device,
                 **self._kwargs,
-            )
+            ),
+            self._kwargs,
         )
 
     def apply_batch(
@@ -250,9 +252,9 @@ class PretrainedTransformerTextGenerator(TextGenerator["PretrainedTransformerTex
     ) -> List[str]:
         output = fixtures.pipeline(
             list(batch),
-            **self._kwargs,
+            **fixtures.kwargs,
         )
-        sequence_delimiter = {**self._kwargs}.get("sequence_delimiter", "\n")
+        sequence_delimiter = {**fixtures.kwargs}.get("sequence_delimiter", "\n")
         return [
             (
                 sequence_delimiter.join(x["generated_text"] for x in texts)

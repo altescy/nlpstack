@@ -17,8 +17,10 @@ from .types import (
 
 logger = getLogger(__name__)
 
-MultilabelClassificationPreprocessor = Pipeline[MultilabelClassificationExample, MultilabelClassificationExample]
-MultilabelClassificationPostprocessor = Pipeline[MultilabelClassificationPrediction, MultilabelClassificationPrediction]
+MultilabelClassificationPreprocessor = Pipeline[MultilabelClassificationExample, MultilabelClassificationExample, Any]
+MultilabelClassificationPostprocessor = Pipeline[
+    MultilabelClassificationPrediction, MultilabelClassificationPrediction, Any
+]
 
 
 class MultilabelClassificationDataModule(

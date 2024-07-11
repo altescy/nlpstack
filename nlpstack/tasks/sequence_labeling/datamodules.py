@@ -13,8 +13,8 @@ from .types import SequenceLabelingExample, SequenceLabelingInference, SequenceL
 
 logger = getLogger(__name__)
 
-SequenceLabelPreprocessor = Pipeline[SequenceLabelingExample, SequenceLabelingExample]
-SequenceLabelPostprocessor = Pipeline[SequenceLabelingPrediction, SequenceLabelingPrediction]
+SequenceLabelPreprocessor = Pipeline[SequenceLabelingExample, SequenceLabelingExample, Any]
+SequenceLabelPostprocessor = Pipeline[SequenceLabelingPrediction, SequenceLabelingPrediction, Any]
 
 
 class SequenceLabelingDataModule(

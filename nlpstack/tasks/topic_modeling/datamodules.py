@@ -11,8 +11,8 @@ from .types import TopicModelingExample, TopicModelingInference, TopicModelingPr
 
 logger = getLogger(__name__)
 
-TopicModelingPreprocessor = Pipeline[TopicModelingExample, TopicModelingExample]
-TopicModelingPostprocessor = Pipeline[TopicModelingPrediction, TopicModelingPrediction]
+TopicModelingPreprocessor = Pipeline[TopicModelingExample, TopicModelingExample, Any]
+TopicModelingPostprocessor = Pipeline[TopicModelingPrediction, TopicModelingPrediction, Any]
 
 
 class TopicModelingDataModule(

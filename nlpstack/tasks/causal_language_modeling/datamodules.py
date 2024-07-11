@@ -11,6 +11,9 @@ from .types import CausalLanguageModelingExample, CausalLanguageModelingInferenc
 
 logger = getLogger(__name__)
 
+CausalLanguageModelingPreprocessor = Pipeline[CausalLanguageModelingExample, CausalLanguageModelingExample, Any]
+CausalLanguageModelingPostprocessor = Pipeline[CausalLanguageModelingPrediction, CausalLanguageModelingPrediction, Any]
+
 
 class CausalLanguageModelingDataModule(
     DataModule[
@@ -27,6 +30,10 @@ class CausalLanguageModelingDataModule(
         tokenizer: The tokenizer.
         token_indexers: The token indexers to index the tokens.
         namespace: The vocabulary namespace for the tokens.
+        preprocessor: The preprocessor to apply to the dataset before tokenization.
+            Defaults to `None`.
+        postprocessor: The postprocessor to apply to the predictions after inference.
+            Defaults to `None`.
     """
 
     def __init__(
@@ -35,13 +42,15 @@ class CausalLanguageModelingDataModule(
         tokenizer: Optional[Tokenizer] = None,
         token_indexers: Optional[Mapping[str, TokenIndexer]] = None,
         namespace: str = "tokens",
-        preprocessor: Optional[Pipeline[CausalLanguageModelingExample, CausalLanguageModelingExample]] = None,
+        preprocessor: Optional[CausalLanguageModelingPreprocessor] = None,
+        postprocessor: Optional[CausalLanguageModelingPostprocessor] = None,
     ) -> None:
         self._vocab = vocab
         self._tokenizer = tokenizer or WhitespaceTokenizer()
         self._token_indexers = token_indexers or {"tokens": SingleIdTokenIndexer()}
         self._namespace = namespace
         self._preprocessor = preprocessor or PassThroughPipeline()
+        self._postprocessor = postprocessor or PassThroughPipeline()
 
         self._generation_mode = False
 
