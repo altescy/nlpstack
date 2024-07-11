@@ -236,8 +236,8 @@ files = [
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.15.0", markers = "python_version < \"3.9\""},
     {version = ">=1.19.0", markers = "python_version >= \"3.9\""},
+    {version = ">=1.15.0", markers = "python_version < \"3.9\""},
 ]
 
 [[package]]
@@ -2566,8 +2566,8 @@ files = [
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.20.3", markers = "python_version < \"3.10\""},
     {version = ">=1.23.2", markers = "python_version >= \"3.11\""},
+    {version = ">=1.20.3", markers = "python_version < \"3.10\""},
     {version = ">=1.21.0", markers = "python_version >= \"3.10\" and python_version < \"3.11\""},
 ]
 python-dateutil = ">=2.8.2"
@@ -2904,8 +2904,8 @@ files = [
 annotated-types = ">=0.4.0"
 pydantic-core = "2.20.1"
 typing-extensions = [
-    {version = ">=4.6.1", markers = "python_version < \"3.13\""},
     {version = ">=4.12.2", markers = "python_version >= \"3.13\""},
+    {version = ">=4.6.1", markers = "python_version < \"3.13\""},
 ]
 
 [package.extras]
@@ -3815,8 +3815,8 @@ jinja2 = "*"
 langcodes = ">=3.2.0,<4.0.0"
 murmurhash = ">=0.28.0,<1.1.0"
 numpy = [
-    {version = ">=1.15.0", markers = "python_version < \"3.9\""},
     {version = ">=1.19.0", markers = "python_version >= \"3.9\""},
+    {version = ">=1.15.0", markers = "python_version < \"3.9\""},
 ]
 packaging = ">=20.0"
 preshed = ">=3.0.2,<3.1.0"
@@ -4277,8 +4277,8 @@ confection = ">=0.0.1,<1.0.0"
 cymem = ">=2.0.2,<2.1.0"
 murmurhash = ">=1.0.2,<1.1.0"
 numpy = [
-    {version = ">=1.15.0,<2.0.0", markers = "python_version < \"3.9\""},
     {version = ">=1.19.0,<2.0.0", markers = "python_version >= \"3.9\""},
+    {version = ">=1.15.0,<2.0.0", markers = "python_version < \"3.9\""},
 ]
 packaging = ">=20.0"
 preshed = ">=3.0.2,<3.1.0"
@@ -4538,13 +4538,13 @@ telegram = ["requests"]
 
 [[package]]
 name = "transformers"
-version = "4.42.3"
+version = "4.42.4"
 description = "State-of-the-art Machine Learning for JAX, PyTorch and TensorFlow"
 optional = true
 python-versions = ">=3.8.0"
 files = [
-    {file = "transformers-4.42.3-py3-none-any.whl", hash = "sha256:a61a0df9609b7d69229d941b2fd857c841ba3043d6da503d0da1a4b133f65b92"},
-    {file = "transformers-4.42.3.tar.gz", hash = "sha256:7539873ff45809145265cbc94ea4619d2713c41ceaa277b692d8b0be3430f7eb"},
+    {file = "transformers-4.42.4-py3-none-any.whl", hash = "sha256:6d59061392d0f1da312af29c962df9017ff3c0108c681a56d1bc981004d16d24"},
+    {file = "transformers-4.42.4.tar.gz", hash = "sha256:f956e25e24df851f650cb2c158b6f4352dfae9d702f04c113ed24fc36ce7ae2d"},
 ]
 
 [package.dependencies]
@@ -4984,4 +4984,4 @@ all = ["fasttext-wheel", "fugashi", "mlflow", "openai", "optuna", "sentence-tran
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8,<4.0"
-content-hash = "9a678f31287162ab2c3afb2abc6ad1acf528e2a8f72c56e4c7a3dfa4f3972c16"
+content-hash = "49bddae30b0f0565ffe0619ca6fdaff3f2fc3520386eb1ee5be522ad45a2d551"
