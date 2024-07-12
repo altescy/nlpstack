@@ -1,10 +1,10 @@
+from nlpstack.integrations.torch.modules.crf import CrfDecoder
+from nlpstack.integrations.torch.modules.seq2seq_encoders import LstmSeq2SeqEncoder
+from nlpstack.integrations.torch.modules.text_embedders import TextEmbedder
+from nlpstack.integrations.torch.modules.token_embedders import Embedding
 from nlpstack.tasks.sequence_labeling.metrics import SpanBasedF1, TokenBasedAccuracy
 from nlpstack.tasks.sequence_labeling.sklearn import SklearnBasicSequenceLabeler
 from nlpstack.tasks.sequence_labeling.torch import TorchSequenceLabeler
-from nlpstack.torch.modules.crf import CrfDecoder
-from nlpstack.torch.modules.seq2seq_encoders import LstmSeq2SeqEncoder
-from nlpstack.torch.modules.text_embedders import TextEmbedder
-from nlpstack.torch.modules.token_embedders import Embedding
 
 
 def test_basic_sequence_labeler() -> None:

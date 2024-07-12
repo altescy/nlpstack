@@ -2,8 +2,8 @@ import random
 from typing import List
 
 from nlpstack.data.tokenizers import CharacterTokenizer
+from nlpstack.integrations.torch.generation import BeamSearch, MultinomialSampler
 from nlpstack.tasks.causal_language_modeling.sklearn import SklearnCausalLanguageModel
-from nlpstack.torch.generation import BeamSearch, MultinomialSampler
 
 
 def generate_dataset(num_examples: int) -> List[str]:

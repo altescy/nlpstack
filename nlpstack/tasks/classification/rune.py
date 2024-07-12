@@ -11,13 +11,13 @@ from nlpstack.data import BasicBatchSampler, DataLoader, Vocabulary
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 from nlpstack.evaluation import MultiMetrics
-from nlpstack.rune import RuneForTorch
-from nlpstack.torch.modules.seq2vec_encoders import BagOfEmbeddings
-from nlpstack.torch.modules.text_embedders import TextEmbedder
-from nlpstack.torch.modules.token_embedders import Embedding
-from nlpstack.torch.training import TorchTrainer
-from nlpstack.torch.training.callbacks import Callback
-from nlpstack.torch.training.optimizers import AdamFactory
+from nlpstack.integrations.torch.modules.seq2vec_encoders import BagOfEmbeddings
+from nlpstack.integrations.torch.modules.text_embedders import TextEmbedder
+from nlpstack.integrations.torch.modules.token_embedders import Embedding
+from nlpstack.integrations.torch.rune import RuneForTorch
+from nlpstack.integrations.torch.training import TorchTrainer
+from nlpstack.integrations.torch.training.callbacks import Callback
+from nlpstack.integrations.torch.training.optimizers import AdamFactory
 
 from .datamodules import BasicClassificationDataModule, ClassificationPostprocessor, ClassificationPreprocessor
 from .metrics import Accuracy, ClassificationMetric

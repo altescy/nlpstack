@@ -10,7 +10,8 @@ from nlpstack.common.iterutil import (  # noqa: F401
     iter_with_callback,
     wrap_iterator,
 )
-from nlpstack.common.jsonnet import load_jsonnet  # noqa: F401
+from nlpstack.common.jsonnet import FromJsonnet, load_jsonnet  # noqa: F401
 from nlpstack.common.jsonschema import generate_json_schema  # noqa: F401
 from nlpstack.common.pipeline import ChainPipeline, ComposePipeline, PassThroughPipeline, Pipeline  # noqa: F401
+from nlpstack.common.platform import PlatformInfo  # noqa: F401
 from nlpstack.common.progressbar import ProgressBar  # noqa: F401

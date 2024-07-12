@@ -17,7 +17,6 @@ import minato
 import numpy
 
 from nlpstack.common import Pipeline, cached_property
-from nlpstack.transformers import cache as transformers_cache
 from nlpstack.types import T_Dataclass
 
 try:
@@ -194,6 +193,8 @@ class PretrainedTransformerTokenizer(Tokenizer["PretrainedTransformerTokenizer.F
         self._pretrained_model_name = pretrained_model_name
 
     def get_tokenizer(self) -> "transformers.PreTrainedTokenizer":
+        from nlpstack.integrations.transformers import cache as transformers_cache
+
         if transformers is None:
             raise ModuleNotFoundError("transformers is not installed.")
         pretrained_model_name = self._pretrained_model_name

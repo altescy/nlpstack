@@ -5,13 +5,14 @@ from typing import Any, Dict, Mapping, Optional, Sequence, Set, Union
 from nlpstack.data import BasicBatchSampler, DataLoader, Vocabulary
 from nlpstack.data.indexers import SingleIdTokenIndexer, TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
-from nlpstack.rune import RuneForTorch, SetupMode
-from nlpstack.torch.generation import BeamSearch
-from nlpstack.torch.modules.seq2seq_decoders import LstmSeq2SeqDecoder
-from nlpstack.torch.modules.token_embedders import Embedding
-from nlpstack.torch.training import TorchTrainer
-from nlpstack.torch.training.callbacks import Callback
-from nlpstack.torch.training.optimizers import AdamFactory
+from nlpstack.integrations.torch.generation import BeamSearch
+from nlpstack.integrations.torch.modules.seq2seq_decoders import LstmSeq2SeqDecoder
+from nlpstack.integrations.torch.modules.token_embedders import Embedding
+from nlpstack.integrations.torch.rune import RuneForTorch
+from nlpstack.integrations.torch.training import TorchTrainer
+from nlpstack.integrations.torch.training.callbacks import Callback
+from nlpstack.integrations.torch.training.optimizers import AdamFactory
+from nlpstack.rune import SetupMode
 
 from .datamodules import CausalLanguageModelingDataModule
 from .metrics import CausalLanguageModelingMetric, Perplexity

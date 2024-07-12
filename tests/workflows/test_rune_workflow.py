@@ -1,27 +1,19 @@
 from pathlib import Path
 
-from nlpstack.workflows import RuneWorkflow
+from nlpstack.rune.workflow import RuneWorkflow
 
 
-def test_run_workflow_train_and_predict(tmp_path: Path) -> None:
-    archive_filename = tmp_path / "archive.tar.gz"
-    RuneWorkflow.run(
-        [
-            "train",
-            "tests/fixtures/configs/rune_workflow.jsonnet",
-            f"{archive_filename}",
-        ]
-    )
+def test_run_workflow_train(archive_filename: Path) -> None:
     assert archive_filename.is_file()
 
 
-def test_run_workflow_predict(tmp_path: Path) -> None:
+def test_run_workflow_predict(tmp_path: Path, archive_filename: Path) -> None:
     output_filename = tmp_path / "output.jsonl"
     RuneWorkflow.run(
         [
             "predict",
             "tests/fixtures/configs/rune_workflow.jsonnet",
-            "tests/fixtures/archives/classifier.tar.gz",
+            f"{archive_filename}",
             "--input-filename",
             "./tests/fixtures/data/classification.jsonl",
             "--output-filename",
@@ -31,13 +23,13 @@ def test_run_workflow_predict(tmp_path: Path) -> None:
     assert output_filename.is_file()
 
 
-def test_run_workflow_evaluate(tmp_path: Path) -> None:
+def test_run_workflow_evaluate(tmp_path: Path, archive_filename: Path) -> None:
     metrics_filename = tmp_path / "metrics.json"
     RuneWorkflow.run(
         [
             "evaluate",
             "tests/fixtures/configs/rune_workflow.jsonnet",
-            "tests/fixtures/archives/classifier.tar.gz",
+            f"{archive_filename}",
             "--input-filename",
             "tests/fixtures/data/classification.jsonl",
             "--output-filename",

@@ -12,20 +12,20 @@ local learning_rate = std.parseJson(std.extVar('learning_rate'));
       embedder: {
         token_embedders: {
           tokens: {
-            type: 'nlpstack.torch.modules.token_embedders.Embedding',
+            type: 'nlpstack.integrations.torch.modules.token_embedders.Embedding',
             embedding_dim: embedding_dim,
           },
         },
       },
       encoder: {
-        type: 'nlpstack.torch.modules.seq2vec_encoders.BagOfEmbeddings',
+        type: 'nlpstack.integrations.torch.modules.seq2vec_encoders.BagOfEmbeddings',
         input_dim: embedding_dim,
       },
       dropout: dropout,
     },
     training_callbacks: [
       {
-        type: 'nlpstack.torch.training.callbacks.MlflowCallback',
+        type: 'nlpstack.integrations.torch.training.callbacks.MlflowCallback',
       },
     ],
   },

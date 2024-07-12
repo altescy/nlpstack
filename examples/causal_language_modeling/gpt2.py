@@ -3,13 +3,13 @@ Run pretrained GPT-2 model
 """
 
 from nlpstack.data import PretrainedTransformerIndexer, PretrainedTransformerTokenizer
-from nlpstack.tasks.causal_language_modeling import SklearnCausalLanguageModel, TorchCausalLanguageModel
-from nlpstack.torch.generation import BeamSearch, LengthConstraint, NoRepeatNgramConstraint
-from nlpstack.torch.modules import (
+from nlpstack.integrations.torch.generation import BeamSearch, LengthConstraint, NoRepeatNgramConstraint
+from nlpstack.integrations.torch.modules import (
     PretrainedTransformerEmbedder,
     PretrainedTransformerHead,
     PretrainedTransformerSeq2SeqDecoder,
 )
+from nlpstack.tasks.causal_language_modeling import SklearnCausalLanguageModel, TorchCausalLanguageModel
 
 model = SklearnCausalLanguageModel(
     tokenizer=PretrainedTransformerTokenizer("gpt2"),
