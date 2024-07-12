@@ -8,7 +8,7 @@ import torch
 
 from nlpstack.data import Vocabulary
 from nlpstack.data.embeddings import TextEmbedding, WordEmbedding
-from nlpstack.torch.modules.lazy import LazyLinearOutput
+from nlpstack.integrations.torch.modules.lazy import LazyLinearOutput
 
 
 class Head(torch.nn.Module):

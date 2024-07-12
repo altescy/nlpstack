@@ -8,12 +8,12 @@ import torch
 
 from nlpstack.data import Vocabulary
 from nlpstack.data.embeddings import WordEmbedding
-from nlpstack.torch.modules.feedforward import FeedForward
-from nlpstack.torch.modules.lazy import LazyEmbedding
-from nlpstack.torch.modules.scalarmix import ScalarMix
-from nlpstack.torch.modules.seq2vec_encoders import BagOfEmbeddings, Seq2VecEncoder
-from nlpstack.torch.modules.time_distributed import TimeDistributed
-from nlpstack.torch.util import batched_span_select, fold, unfold
+from nlpstack.integrations.torch.modules.feedforward import FeedForward
+from nlpstack.integrations.torch.modules.lazy import LazyEmbedding
+from nlpstack.integrations.torch.modules.scalarmix import ScalarMix
+from nlpstack.integrations.torch.modules.seq2vec_encoders import BagOfEmbeddings, Seq2VecEncoder
+from nlpstack.integrations.torch.modules.time_distributed import TimeDistributed
+from nlpstack.integrations.torch.util import batched_span_select, fold, unfold
 
 
 class TokenEmbedder(torch.nn.Module):

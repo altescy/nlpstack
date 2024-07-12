@@ -7,8 +7,8 @@ import minato
 import torch
 import torch.nn.functional as F
 
-from nlpstack.torch.modules.feedforward import FeedForward
-from nlpstack.torch.util import add_positional_features, convert_to_toeplitz, fold, unfold
+from nlpstack.integrations.torch.modules.feedforward import FeedForward
+from nlpstack.integrations.torch.util import add_positional_features, convert_to_toeplitz, fold, unfold
 
 
 class Seq2SeqEncoder(torch.nn.Module):

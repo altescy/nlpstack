@@ -7,11 +7,9 @@ from typing import Any, Dict, Mapping, Optional, Sequence
 
 import torch
 
-from nlpstack.mlflow.util import flatten_dict_for_mlflow_log
-
 if typing.TYPE_CHECKING:
-    from nlpstack.torch.model import TorchModelOutput
-    from nlpstack.torch.training.trainer import TorchTrainer, TrainingState
+    from nlpstack.integrations.torch.model import TorchModelOutput
+    from nlpstack.integrations.torch.training.trainer import TorchTrainer, TrainingState
 
 
 class StopEarly(Exception):
@@ -221,6 +219,8 @@ class MlflowCallback(Callback):
         metrics: Mapping[str, Any],
         resources: Mapping[str, Any],
     ) -> None:
+        from nlpstack.integrations.mlflow.util import flatten_dict_for_mlflow_log
+
         metrics = flatten_dict_for_mlflow_log(metrics)
         for key, value in metrics.items():
             if key in ("train_loss",):

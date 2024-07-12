@@ -8,10 +8,16 @@ import torch
 from nlpstack.common import ProgressBar, batched_iterator
 from nlpstack.data import BasicBatchSampler, DataLoader, Instance
 from nlpstack.evaluation import EmptyMetric, Metric
-from nlpstack.torch.model import TorchModel, TorchModelOutput
-from nlpstack.torch.training.callbacks import Callback, StopEarly
-from nlpstack.torch.training.optimizers import AdamFactory, LRScheduler, LRSchedulerFactory, Optimizer, OptimizerFactory
-from nlpstack.torch.util import move_to_device
+from nlpstack.integrations.torch.model import TorchModel, TorchModelOutput
+from nlpstack.integrations.torch.training.callbacks import Callback, StopEarly
+from nlpstack.integrations.torch.training.optimizers import (
+    AdamFactory,
+    LRScheduler,
+    LRSchedulerFactory,
+    Optimizer,
+    OptimizerFactory,
+)
+from nlpstack.integrations.torch.util import move_to_device
 
 logger = getLogger(__name__)
 

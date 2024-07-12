@@ -3,7 +3,7 @@ from typing import Any, Mapping, Optional, cast
 import torch
 
 from nlpstack.data import Vocabulary
-from nlpstack.torch.util import get_mask_from_text
+from nlpstack.integrations.torch.util import get_mask_from_text
 
 
 class CountEmbedder(torch.nn.Module):

@@ -1,7 +1,7 @@
 import pytest
 import torch
 
-from nlpstack.torch.modules.seq2vec_encoders import (
+from nlpstack.integrations.torch.modules.seq2vec_encoders import (
     BagOfEmbeddings,
     CnnEncoder,
     ConcatSeq2VecEncoder,

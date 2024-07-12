@@ -5,9 +5,9 @@ from typing import Any, Literal, Mapping, Optional, Sequence, Union, cast
 import torch
 import torch.nn.functional as F
 
-from nlpstack.torch.model import TorchModel
-from nlpstack.torch.modules.count_embedder import CountEmbedder
-from nlpstack.torch.modules.lazy import LazyLinearOutput
+from nlpstack.integrations.torch.model import TorchModel
+from nlpstack.integrations.torch.modules.count_embedder import CountEmbedder
+from nlpstack.integrations.torch.modules.lazy import LazyLinearOutput
 
 from .datamodules import TopicModelingDataModule
 from .types import TopicModelingInference

@@ -27,7 +27,6 @@ from sklearn.utils import murmurhash3_32
 from nlpstack.common import FileBackendMapping, Pipeline, cached_property
 from nlpstack.data.tokenizers import Tokenizer, WhitespaceTokenizer
 from nlpstack.data.vocabulary import Vocabulary
-from nlpstack.transformers import cache as transformers_cache
 
 from .util import masked_pool
 
@@ -260,17 +259,21 @@ class PretrainedTransformerWordEmbedding(WordEmbedding):
 
     @cached_property
     def tokenizer(self) -> "transformers.PreTrainedTokenizer":
+        from nlpstack.integrations.transformers import cache
+
         pretrained_model_name = self._pretrained_model_name
         with suppress(FileNotFoundError):
             pretrained_model_name = minato.cached_path(pretrained_model_name)
-        return transformers_cache.get_pretrained_tokenizer(pretrained_model_name)
+        return cache.get_pretrained_tokenizer(pretrained_model_name)
 
     @cached_property
     def model(self) -> "transformers.PreTrainedModel":
+        from nlpstack.integrations.transformers import cache
+
         pretrained_model_name = self._pretrained_model_name
         with suppress(FileNotFoundError):
             pretrained_model_name = minato.cached_path(pretrained_model_name)
-        model = transformers_cache.get_pretrained_model(
+        model = cache.get_pretrained_model(
             pretrained_model_name,
             auto_cls=transformers.AutoModelWithLMHead if self._embedding_layer == "output" else None,
         )
@@ -444,16 +447,20 @@ class PretrainedTransformerTextEmbedding(TextEmbedding["PretrainedTransformerTex
         self._device = device
 
     def get_tokenizer(self) -> "transformers.PreTrainedTokenizer":
+        from nlpstack.integrations.transformers import cache
+
         pretrained_model_name = self._pretrained_model_name
         with suppress(FileNotFoundError):
             pretrained_model_name = minato.cached_path(pretrained_model_name)
-        return transformers_cache.get_pretrained_tokenizer(pretrained_model_name)
+        return cache.get_pretrained_tokenizer(pretrained_model_name)
 
     def get_model(self) -> "transformers.PreTrainedModel":
+        from nlpstack.integrations.transformers import cache
+
         pretrained_model_name = self._pretrained_model_name
         with suppress(FileNotFoundError):
             pretrained_model_name = minato.cached_path(pretrained_model_name)
-        model = transformers_cache.get_pretrained_model(pretrained_model_name)
+        model = cache.get_pretrained_model(pretrained_model_name)
         if self._submodule is not None:
             model = getattr(model, self._submodule)
         return model

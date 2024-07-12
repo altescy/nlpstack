@@ -4,8 +4,8 @@ import torch
 
 from nlpstack.common import ProgressBar, batched
 from nlpstack.data import Collator, DataModule
-from nlpstack.torch.model import TorchModel
-from nlpstack.torch.util import move_to_device
+from nlpstack.integrations.torch.model import TorchModel
+from nlpstack.integrations.torch.util import move_to_device
 
 Example = TypeVar("Example")
 Inference = TypeVar("Inference")

@@ -5,12 +5,12 @@ from typing import Any, Mapping, Optional, Sequence, cast
 import torch
 import torch.nn.functional as F
 
-from nlpstack.torch.model import TorchModel
-from nlpstack.torch.modules.feedforward import FeedForward
-from nlpstack.torch.modules.seq2seq_encoders import Seq2SeqEncoder
-from nlpstack.torch.modules.seq2vec_encoders import Seq2VecEncoder
-from nlpstack.torch.modules.text_embedders import TextEmbedder
-from nlpstack.torch.util import get_mask_from_text
+from nlpstack.integrations.torch.model import TorchModel
+from nlpstack.integrations.torch.modules.feedforward import FeedForward
+from nlpstack.integrations.torch.modules.seq2seq_encoders import Seq2SeqEncoder
+from nlpstack.integrations.torch.modules.seq2vec_encoders import Seq2VecEncoder
+from nlpstack.integrations.torch.modules.text_embedders import TextEmbedder
+from nlpstack.integrations.torch.util import get_mask_from_text
 
 from .datamodules import RepresentationLearningDataModule
 from .types import RepresentationLearningInference

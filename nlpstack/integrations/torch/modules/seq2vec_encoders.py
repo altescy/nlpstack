@@ -2,9 +2,15 @@ from typing import Callable, List, Literal, Optional, Sequence, Union, cast
 
 import torch
 
-from nlpstack.torch.modules.feedforward import FeedForward
-from nlpstack.torch.modules.time_distributed import TimeDistributed
-from nlpstack.torch.util import combine_tensors, masked_mean, masked_pool, masked_softmax, min_value_of_dtype
+from nlpstack.integrations.torch.modules.feedforward import FeedForward
+from nlpstack.integrations.torch.modules.time_distributed import TimeDistributed
+from nlpstack.integrations.torch.util import (
+    combine_tensors,
+    masked_mean,
+    masked_pool,
+    masked_softmax,
+    min_value_of_dtype,
+)
 
 
 class Seq2VecEncoder(torch.nn.Module):

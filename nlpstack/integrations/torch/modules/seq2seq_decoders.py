@@ -30,10 +30,10 @@ from typing import Any, Callable, Generic, Literal, Mapping, Optional, Tuple, Ty
 import minato
 import torch
 
-from nlpstack.torch.generation.beam_search import StepStateInterface
-from nlpstack.torch.modules.seq2vec_encoders import Seq2VecEncoder
-from nlpstack.torch.modules.transformer import CausalTransformerDecoder, CausalTransformerDecoderLayer
-from nlpstack.torch.util import add_positional_features, masked_softmax, weighted_sum
+from nlpstack.integrations.torch.generation.beam_search import StepStateInterface
+from nlpstack.integrations.torch.modules.seq2vec_encoders import Seq2VecEncoder
+from nlpstack.integrations.torch.modules.transformer import CausalTransformerDecoder, CausalTransformerDecoderLayer
+from nlpstack.integrations.torch.util import add_positional_features, masked_softmax, weighted_sum
 
 Seq2SeqDecoderState = TypeVar("Seq2SeqDecoderState", bound=StepStateInterface)
 
