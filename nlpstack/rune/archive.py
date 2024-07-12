@@ -7,7 +7,7 @@ import tempfile
 from logging import getLogger
 from os import PathLike
 from pathlib import Path
-from typing import ClassVar, Generic, List, Mapping, Optional, Sequence, Tuple, Type, TypeVar, Union
+from typing import Any, ClassVar, Generic, List, Mapping, Optional, Sequence, Tuple, Type, TypeVar, Union
 
 import dill as pickle
 
@@ -27,7 +27,7 @@ def get_installed_packages() -> List[Tuple[str, str]]:
 @dataclasses.dataclass(frozen=True)
 class RuneArchive(Generic[RuneType]):
     rune: RuneType
-    metadata: Optional[Mapping[str, str]] = None
+    metadata: Optional[Mapping[str, Any]] = None
     packages: Optional[Sequence[Tuple[str, str]]] = dataclasses.field(default_factory=get_installed_packages)
     archived_at: datetime.datetime = dataclasses.field(default_factory=datetime.datetime.utcnow)
 

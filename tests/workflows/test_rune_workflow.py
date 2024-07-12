@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from nlpstack.workflows import RuneWorkflow
+from nlpstack.rune.workflow import RuneWorkflow
 
 
 def test_run_workflow_train_and_predict(tmp_path: Path) -> None:

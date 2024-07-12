@@ -3,8 +3,9 @@ import itertools
 import json
 import os
 from os import PathLike
-from typing import Any, Dict, Iterable, List, Optional, Set, TypeVar, Union, cast
+from typing import Any, ClassVar, Dict, Iterable, List, Mapping, Optional, Set, Type, TypeVar, Union, cast
 
+import colt
 from rjsonnet import evaluate_file, evaluate_snippet
 
 T = TypeVar("T", Dict, List)
@@ -73,7 +74,7 @@ def _with_overrides(original: T, overrides_dict: Dict[str, Any], prefix: str = "
 
 def load_jsonnet(
     filename: Union[str, PathLike],
-    ext_vars: Optional[Dict[str, Any]] = None,
+    ext_vars: Optional[Mapping[str, Any]] = None,
     overrides: Optional[str] = None,
 ) -> Any:
     ext_vars = {**_environment_variables(), **(ext_vars or {})}
@@ -81,3 +82,25 @@ def load_jsonnet(
     if overrides:
         output = _with_overrides(output, _parse_overrides(overrides, ext_vars=ext_vars))
     return output
+
+
+_T_FromJsonnet = TypeVar("_T_FromJsonnet", bound="FromJsonnet")
+
+
+class FromJsonnet:
+    __COLT_BUILDER__: ClassVar = colt.ColtBuilder(typekey="type")
+
+    @classmethod
+    def from_jsonnet(
+        cls: Type[_T_FromJsonnet],
+        filename: Union[str, PathLike],
+        ext_vars: Optional[Mapping[str, Any]] = None,
+        overrides: Optional[str] = None,
+    ) -> _T_FromJsonnet:
+        json_config = load_jsonnet(filename, ext_vars=ext_vars, overrides=overrides)
+        obj: _T_FromJsonnet = cls.__COLT_BUILDER__(json_config, cls)
+        setattr(obj, "__json_config__", json_config)
+        return obj
+
+    def to_json(self) -> Any:
+        return getattr(self, "__json_config__")

@@ -5,7 +5,8 @@ from typing import Any
 
 from colt import import_modules
 
-from nlpstack.workflows import Workflow
+from nlpstack.rune import RuneWorkflow  # noqa: F401
+from nlpstack.workflow import Workflow
 
 from .subcommand import Subcommand
 
