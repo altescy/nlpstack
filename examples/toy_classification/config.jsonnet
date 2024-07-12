@@ -20,10 +20,10 @@
     },
   },
   reader: {
-    type: 'nlpstack.tasks.classification.io.JsonlReader',
+    type: 'nlpstack.tasks.classification.io:JsonlReader',
   },
   writer: {
-    type: 'nlpstack.tasks.classification.io.JsonlWriter',
+    type: 'nlpstack.tasks.classification.io:JsonlWriter',
   },
   train_dataset_filename: './data/train.jsonl',
   valid_dataset_filename: './data/valid.jsonl',
