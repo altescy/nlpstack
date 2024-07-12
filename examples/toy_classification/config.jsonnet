@@ -1,19 +1,19 @@
 {
   model: {
-    type: 'nlpstack.tasks.classification.rune.BasicClassifier',
+    type: 'nlpstack.tasks.classification.rune:BasicClassifier',
     max_epochs: 10,
     classifier: {
-      type: 'nlpstack.tasks.classification.torch.TorchBasicClassifier',
+      type: 'nlpstack.tasks.classification.torch:TorchBasicClassifier',
       embedder: {
         token_embedders: {
           tokens: {
-            type: 'nlpstack.integrations.torch.modules.token_embedders.Embedding',
+            type: 'nlpstack.integrations.torch.modules.token_embedders:Embedding',
             embedding_dim: 32,
           },
         },
       },
       encoder: {
-        type: 'nlpstack.integrations.torch.modules.seq2vec_encoders.BagOfEmbeddings',
+        type: 'nlpstack.integrations.torch.modules.seq2vec_encoders:BagOfEmbeddings',
         input_dim: 32,
       },
       dropout: 0.1,
