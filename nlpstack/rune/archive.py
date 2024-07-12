@@ -7,9 +7,11 @@ import tempfile
 from logging import getLogger
 from os import PathLike
 from pathlib import Path
-from typing import Any, ClassVar, Generic, List, Mapping, Optional, Sequence, Tuple, Type, TypeVar, Union
+from typing import Any, ClassVar, Generic, List, Mapping, Optional, Tuple, Type, TypeVar, Union
 
 import dill as pickle
+
+from nlpstack.common import PlatformInfo
 
 from .base import Rune
 
@@ -27,9 +29,9 @@ def get_installed_packages() -> List[Tuple[str, str]]:
 @dataclasses.dataclass(frozen=True)
 class RuneArchive(Generic[RuneType]):
     rune: RuneType
-    metadata: Optional[Mapping[str, Any]] = None
-    packages: Optional[Sequence[Tuple[str, str]]] = dataclasses.field(default_factory=get_installed_packages)
+    platform: PlatformInfo = dataclasses.field(default_factory=PlatformInfo)
     archived_at: datetime.datetime = dataclasses.field(default_factory=datetime.datetime.utcnow)
+    metadata: Optional[Mapping[str, Any]] = None
 
     _RUNE_FILENAME: ClassVar[str] = "rune.pkl"
     _METADATA_FILENAME: ClassVar[str] = "metadata.json"
@@ -47,7 +49,7 @@ class RuneArchive(Generic[RuneType]):
                 json.dump(
                     {
                         "metadata": self.metadata,
-                        "packages": self.packages,
+                        "platform": self.platform.to_json(),
                         "archived_at": self.archived_at.isoformat(),
                     },
                     f,
@@ -76,6 +78,6 @@ class RuneArchive(Generic[RuneType]):
         return cls(
             rune=rune,
             metadata=metadata["metadata"],
-            packages=metadata["packages"],
+            platform=PlatformInfo.from_json(metadata["platform"]),
             archived_at=datetime.datetime.fromisoformat(metadata["archived_at"]),
         )
