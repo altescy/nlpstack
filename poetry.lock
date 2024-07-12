@@ -458,13 +458,13 @@ colorama = {version = "*", markers = "sys_platform == \"win32\""}
 
 [[package]]
 name = "colt"
-version = "0.11.2"
+version = "0.11.3"
 description = "A configuration utility for Python object."
 optional = false
 python-versions = "<4.0,>=3.8"
 files = [
-    {file = "colt-0.11.2-py3-none-any.whl", hash = "sha256:079cd8bb6cec9d62c472ad59ef4cec2524f59ec7ec9865c6f8ea84d0c0602136"},
-    {file = "colt-0.11.2.tar.gz", hash = "sha256:b4be6a992b78204ae1b889a6894db04967c6aaf05fb6f2f4d3b78aa2ba24add5"},
+    {file = "colt-0.11.3-py3-none-any.whl", hash = "sha256:4f6efe716685f91b17ae6c0f8be20fc30e29ddda6154a59af99b9baf733ac97a"},
+    {file = "colt-0.11.3.tar.gz", hash = "sha256:eeb478a2a76a34a8fa6e2bcf862c13253f983bfd6fcf05d67051f3778b644a48"},
 ]
 
 [[package]]
@@ -4984,4 +4984,4 @@ all = ["fasttext-wheel", "fugashi", "mlflow", "openai", "optuna", "sentence-tran
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8,<4.0"
-content-hash = "49bddae30b0f0565ffe0619ca6fdaff3f2fc3520386eb1ee5be522ad45a2d551"
+content-hash = "e869b343d731a994a0a1761a7eb96417d2148d1a1c56de1a45272c5f4403eda0"
