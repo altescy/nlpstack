@@ -102,12 +102,11 @@ class MultilabelClassificationDataModule(
     def preprocess(
         self,
         dataset: Iterable[MultilabelClassificationExample],
-        **kwargs: Any,
     ) -> Iterator[MultilabelClassificationExample]:
         pipeline = self._preprocessor | DataclassTokenizer[MultilabelClassificationExample, Any](
             {"text": self._tokenizer}
         )
-        return pipeline(dataset, params=(None, None))
+        return pipeline(dataset)
 
     def _build_vocab(self, dataset: Sequence[MultilabelClassificationExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
@@ -186,4 +185,4 @@ class MultilabelClassificationDataModule(
                     metadata=inference.metadata[i] if inference.metadata is not None else None,
                 )
 
-        yield from self._postprocessor(prediction_iterator(), params=None)
+        yield from self._postprocessor(prediction_iterator())

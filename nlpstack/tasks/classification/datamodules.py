@@ -90,9 +90,9 @@ class BasicClassificationDataModule(
         if dataset:
             self._build_vocab(dataset)
 
-    def preprocess(self, dataset: Iterable[ClassificationExample], **kwargs: Any) -> Iterator[ClassificationExample]:
+    def preprocess(self, dataset: Iterable[ClassificationExample]) -> Iterator[ClassificationExample]:
         pipeline = self._preprocessor | DataclassTokenizer[ClassificationExample, Any]({"text": self._tokenizer})
-        return pipeline(dataset, params=(None, None))
+        return pipeline(dataset)
 
     def _build_vocab(self, dataset: Sequence[ClassificationExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:

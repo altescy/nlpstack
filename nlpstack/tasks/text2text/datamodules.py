@@ -85,11 +85,11 @@ class Text2TextDataModule(
         if dataset:
             self._build_vocab(dataset)
 
-    def preprocess(self, dataset: Iterable[Text2TextExample], **kwargs: Any) -> Iterator[Text2TextExample]:
+    def preprocess(self, dataset: Iterable[Text2TextExample]) -> Iterator[Text2TextExample]:
         pipeline = self._preprocessor | DataclassTokenizer[Text2TextExample, Any](
             {"source": self._source_tokenizer, "target": self._target_tokenizer},
         )
-        return pipeline(dataset, params=(None, None))
+        return pipeline(dataset)
 
     def _build_vocab(self, dataset: Iterable[Text2TextExample]) -> None:
         def source_iterator() -> Iterator[Sequence[Token]]:
@@ -181,4 +181,4 @@ class Text2TextDataModule(
                 top_texts = [self._target_tokenizer.detokenize(tokens) for tokens in top_tokens]
                 yield Text2TextPrediction(top_texts, top_tokens, scores)
 
-        yield from self._postprocessor(prediction_iterator(), params=None)
+        yield from self._postprocessor(prediction_iterator())

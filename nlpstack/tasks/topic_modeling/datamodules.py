@@ -72,7 +72,7 @@ class TopicModelingDataModule(
         if dataset:
             self._build_vocab(dataset)
 
-    def preprocess(self, dataset: Iterable[TopicModelingExample], **kwargs: Any) -> Iterator[TopicModelingExample]:
+    def preprocess(self, dataset: Iterable[TopicModelingExample]) -> Iterator[TopicModelingExample]:
         pipeline = self._preprocessor | DataclassTokenizer[TopicModelingExample, Any]({"text": self._tokenizer})
         return pipeline(dataset, params=(None, None))
 
@@ -123,4 +123,4 @@ class TopicModelingDataModule(
             for topic_distribution in inference.topic_distribution:
                 yield TopicModelingPrediction(topic_distribution.tolist())
 
-        yield from self._postprocessor(prediction_iterator(), params=None)
+        yield from self._postprocessor(prediction_iterator())

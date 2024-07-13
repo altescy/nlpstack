@@ -79,12 +79,11 @@ class RepresentationLearningDataModule(
     def preprocess(
         self,
         dataset: Iterable[RepresentationLearningExample],
-        **kwargs: Any,
     ) -> Iterator[RepresentationLearningExample]:
         pipeline = self._preprocessor | DataclassTokenizer[RepresentationLearningExample, Any](
             {"text": self._tokenizer}
         )
-        return pipeline(dataset, params=(None, None))
+        return pipeline(dataset)
 
     def _build_vocab(self, dataset: Iterable[RepresentationLearningExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
@@ -135,4 +134,4 @@ class RepresentationLearningDataModule(
             for embedding in inference.embeddings:
                 yield RepresentationLearningPrediction(embedding.tolist())
 
-        yield from self._postprocessor(prediction_iterator(), params=None)
+        yield from self._postprocessor(prediction_iterator())

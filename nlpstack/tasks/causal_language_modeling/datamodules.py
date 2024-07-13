@@ -96,12 +96,11 @@ class CausalLanguageModelingDataModule(
     def preprocess(
         self,
         dataset: Iterable[CausalLanguageModelingExample],
-        **kwargs: Any,
     ) -> Iterator[CausalLanguageModelingExample]:
         pipeline = self._preprocessor | DataclassTokenizer[CausalLanguageModelingExample, Any](
             {"text": self._tokenizer}
         )
-        return pipeline(dataset, params=(None, None))
+        return pipeline(dataset)
 
     def _build_vocab(self, dataset: Iterable[CausalLanguageModelingExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
@@ -179,4 +178,4 @@ class CausalLanguageModelingDataModule(
                 top_texts = [self._tokenizer.detokenize(tokens) for tokens in top_tokens]
                 yield CausalLanguageModelingPrediction(top_texts, top_tokens, scores)
 
-        return self._postprocessor(prediction_iterator(), params=None)
+        return self._postprocessor(prediction_iterator())

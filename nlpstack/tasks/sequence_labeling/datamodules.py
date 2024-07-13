@@ -85,10 +85,9 @@ class SequenceLabelingDataModule(
     def preprocess(
         self,
         dataset: Iterable[SequenceLabelingExample],
-        **kwargs: Any,
     ) -> Iterator[SequenceLabelingExample]:
         pipeline = self._preprocessor | DataclassTokenizer[SequenceLabelingExample, Any]({"text": self._tokenizer})
-        return pipeline(dataset, params=(None, None))
+        return pipeline(dataset)
 
     def _build_vocab(self, dataset: Sequence[SequenceLabelingExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
@@ -190,4 +189,4 @@ class SequenceLabelingDataModule(
                 metadata = None if _nlpstack_metadata["metadata_is_none"] else _metadata
                 yield SequenceLabelingPrediction(tokens=tokens, top_labels=top_labels, metadata=metadata)
 
-        yield from self._postprocessor(prediction_iterator(), params=None)
+        yield from self._postprocessor(prediction_iterator())
