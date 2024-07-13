@@ -13,8 +13,8 @@ from .types import SequenceLabelingExample, SequenceLabelingInference, SequenceL
 
 logger = getLogger(__name__)
 
-SequenceLabelPreprocessor = Pipeline[SequenceLabelingExample, SequenceLabelingExample, Any]
-SequenceLabelPostprocessor = Pipeline[SequenceLabelingPrediction, SequenceLabelingPrediction, Any]
+SequenceLabelPreprocessor = Pipeline[SequenceLabelingExample, SequenceLabelingExample, Any, Optional[Any]]
+SequenceLabelPostprocessor = Pipeline[SequenceLabelingPrediction, SequenceLabelingPrediction, Any, Optional[Any]]
 
 
 class SequenceLabelingDataModule(
@@ -87,8 +87,8 @@ class SequenceLabelingDataModule(
         dataset: Iterable[SequenceLabelingExample],
         **kwargs: Any,
     ) -> Iterator[SequenceLabelingExample]:
-        pipeline = self._preprocessor | DataclassTokenizer[SequenceLabelingExample]({"text": self._tokenizer})
-        return pipeline(dataset)
+        pipeline = self._preprocessor | DataclassTokenizer[SequenceLabelingExample, Any]({"text": self._tokenizer})
+        return pipeline(dataset, params=(None, None))
 
     def _build_vocab(self, dataset: Sequence[SequenceLabelingExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
@@ -190,4 +190,4 @@ class SequenceLabelingDataModule(
                 metadata = None if _nlpstack_metadata["metadata_is_none"] else _metadata
                 yield SequenceLabelingPrediction(tokens=tokens, top_labels=top_labels, metadata=metadata)
 
-        yield from self._postprocessor(prediction_iterator())
+        yield from self._postprocessor(prediction_iterator(), params=None)

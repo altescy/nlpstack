@@ -11,8 +11,12 @@ from .types import CausalLanguageModelingExample, CausalLanguageModelingInferenc
 
 logger = getLogger(__name__)
 
-CausalLanguageModelingPreprocessor = Pipeline[CausalLanguageModelingExample, CausalLanguageModelingExample, Any]
-CausalLanguageModelingPostprocessor = Pipeline[CausalLanguageModelingPrediction, CausalLanguageModelingPrediction, Any]
+CausalLanguageModelingPreprocessor = Pipeline[
+    CausalLanguageModelingExample, CausalLanguageModelingExample, Any, Optional[Any]
+]
+CausalLanguageModelingPostprocessor = Pipeline[
+    CausalLanguageModelingPrediction, CausalLanguageModelingPrediction, Any, Optional[Any]
+]
 
 
 class CausalLanguageModelingDataModule(
@@ -94,8 +98,10 @@ class CausalLanguageModelingDataModule(
         dataset: Iterable[CausalLanguageModelingExample],
         **kwargs: Any,
     ) -> Iterator[CausalLanguageModelingExample]:
-        pipeline = self._preprocessor | DataclassTokenizer[CausalLanguageModelingExample]({"text": self._tokenizer})
-        return pipeline(dataset)
+        pipeline = self._preprocessor | DataclassTokenizer[CausalLanguageModelingExample, Any](
+            {"text": self._tokenizer}
+        )
+        return pipeline(dataset, params=(None, None))
 
     def _build_vocab(self, dataset: Iterable[CausalLanguageModelingExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
@@ -155,19 +161,22 @@ class CausalLanguageModelingDataModule(
             The predictions.
         """
 
-        token_indices_to_ignore = {self._vocab.get_pad_index(self._namespace)}
-        if self._vocab.has_bos_token(self._namespace):
-            token_indices_to_ignore.add(self._vocab.get_bos_index(self._namespace))
-        if self._vocab.has_eos_token(self._namespace):
-            token_indices_to_ignore.add(self._vocab.get_eos_index(self._namespace))
-        for top_token_ids, scores in zip(inference.pred_token_ids.tolist(), inference.scores.tolist()):
-            top_tokens = [
-                [
-                    self.vocab.get_token_by_index(self._namespace, token_id)
-                    for token_id in token_ids
-                    if token_id not in token_indices_to_ignore
+        def prediction_iterator() -> Iterator[CausalLanguageModelingPrediction]:
+            token_indices_to_ignore = {self._vocab.get_pad_index(self._namespace)}
+            if self._vocab.has_bos_token(self._namespace):
+                token_indices_to_ignore.add(self._vocab.get_bos_index(self._namespace))
+            if self._vocab.has_eos_token(self._namespace):
+                token_indices_to_ignore.add(self._vocab.get_eos_index(self._namespace))
+            for top_token_ids, scores in zip(inference.pred_token_ids.tolist(), inference.scores.tolist()):
+                top_tokens = [
+                    [
+                        self.vocab.get_token_by_index(self._namespace, token_id)
+                        for token_id in token_ids
+                        if token_id not in token_indices_to_ignore
+                    ]
+                    for token_ids in top_token_ids
                 ]
-                for token_ids in top_token_ids
-            ]
-            top_texts = [self._tokenizer.detokenize(tokens) for tokens in top_tokens]
-            yield CausalLanguageModelingPrediction(top_texts, top_tokens, scores)
+                top_texts = [self._tokenizer.detokenize(tokens) for tokens in top_tokens]
+                yield CausalLanguageModelingPrediction(top_texts, top_tokens, scores)
+
+        return self._postprocessor(prediction_iterator(), params=None)

@@ -13,8 +13,8 @@ from .types import ClassificationExample, ClassificationInference, Classificatio
 
 logger = getLogger(__name__)
 
-ClassificationPreprocessor = Pipeline[ClassificationExample, ClassificationExample, Any]
-ClassificationPostprocessor = Pipeline[ClassificationPrediction, ClassificationPrediction, Any]
+ClassificationPreprocessor = Pipeline[ClassificationExample, ClassificationExample, Any, Optional[Any]]
+ClassificationPostprocessor = Pipeline[ClassificationPrediction, ClassificationPrediction, Any, Optional[Any]]
 
 
 class BasicClassificationDataModule(
@@ -91,8 +91,8 @@ class BasicClassificationDataModule(
             self._build_vocab(dataset)
 
     def preprocess(self, dataset: Iterable[ClassificationExample], **kwargs: Any) -> Iterator[ClassificationExample]:
-        pipeline = self._preprocessor | DataclassTokenizer[ClassificationExample]({"text": self._tokenizer})
-        return pipeline(dataset)
+        pipeline = self._preprocessor | DataclassTokenizer[ClassificationExample, Any]({"text": self._tokenizer})
+        return pipeline(dataset, params=(None, None))
 
     def _build_vocab(self, dataset: Sequence[ClassificationExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
@@ -169,4 +169,4 @@ class BasicClassificationDataModule(
                     metadata=inference.metadata[i] if inference.metadata is not None else None,
                 )
 
-        yield from self._postprocessor(prediction_iterator())
+        yield from self._postprocessor(prediction_iterator(), params=None)

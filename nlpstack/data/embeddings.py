@@ -54,6 +54,7 @@ except ModuleNotFoundError:
 logger = getLogger(__name__)
 
 _T_Fixtures = TypeVar("_T_Fixtures")
+_T_Params = TypeVar("_T_Params")
 
 
 class WordEmbedding:
@@ -303,7 +304,10 @@ class PretrainedTransformerWordEmbedding(WordEmbedding):
         vocab.extend_vocab(namespace, self.tokenizer.vocab.keys())
 
 
-class TextEmbedding(Pipeline[str, numpy.ndarray, _T_Fixtures], Generic[_T_Fixtures]):
+class TextEmbedding(
+    Pipeline[str, numpy.ndarray, _T_Fixtures, Optional[_T_Params]],
+    Generic[_T_Fixtures, _T_Params],
+):
     """
     A text embedding model.
     """
@@ -314,11 +318,11 @@ class TextEmbedding(Pipeline[str, numpy.ndarray, _T_Fixtures], Generic[_T_Fixtur
     def get_output_dim(self) -> int:
         raise NotImplementedError
 
-    def embed(self, text: str) -> numpy.ndarray:
-        return next(self([text], batch_size=1, max_workers=1))
+    def embed(self, text: str, params: Optional[_T_Params] = None) -> numpy.ndarray:
+        return next(self([text], params, batch_size=1, max_workers=1))
 
 
-class BagOfEmbeddingsTextEmbedding(TextEmbedding["BagOfEmbeddingsTextEmbedding.Fixtures"]):
+class BagOfEmbeddingsTextEmbedding(TextEmbedding["BagOfEmbeddingsTextEmbedding.Fixtures", None]):
     """
     A text embedding model using bag-of-embeddings.
 
@@ -377,7 +381,10 @@ class BagOfEmbeddingsTextEmbedding(TextEmbedding["BagOfEmbeddingsTextEmbedding.F
         self,
         batch: Sequence[str],
         fixtures: "BagOfEmbeddingsTextEmbedding.Fixtures",
+        params: None = None,
     ) -> List[numpy.ndarray]:
+        del params
+
         if not batch:
             return list(numpy.zeros((0, self.get_output_dim()), dtype=numpy.float32))
 
@@ -407,7 +414,7 @@ class BagOfEmbeddingsTextEmbedding(TextEmbedding["BagOfEmbeddingsTextEmbedding.F
         )
 
 
-class PretrainedTransformerTextEmbedding(TextEmbedding["PretrainedTransformerTextEmbedding.Fixtures"]):
+class PretrainedTransformerTextEmbedding(TextEmbedding["PretrainedTransformerTextEmbedding.Fixtures", None]):
     """
     A text embedding model using pretrained transformer models.
 
@@ -483,7 +490,10 @@ class PretrainedTransformerTextEmbedding(TextEmbedding["PretrainedTransformerTex
         self,
         batch: Sequence[str],
         fixtures: "PretrainedTransformerTextEmbedding.Fixtures",
+        params: None = None,
     ) -> List[numpy.ndarray]:
+        del params
+
         features = fixtures.pipeline(list(batch))
         return [
             masked_pool(
@@ -496,7 +506,7 @@ class PretrainedTransformerTextEmbedding(TextEmbedding["PretrainedTransformerTex
         ]
 
 
-class SentenceTransformerTextEmbedding(TextEmbedding["SentenceTransformerTextEmbedding.Fixtures"]):
+class SentenceTransformerTextEmbedding(TextEmbedding["SentenceTransformerTextEmbedding.Fixtures", None]):
     """
     A text embedding model using sentence-transformers.
 
@@ -539,6 +549,7 @@ class SentenceTransformerTextEmbedding(TextEmbedding["SentenceTransformerTextEmb
         self,
         batch: Sequence[str],
         fixtures: "SentenceTransformerTextEmbedding.Fixtures",
+        params: None = None,
     ) -> List[numpy.ndarray]:
         if not batch:
             return list(numpy.zeros((0, self.get_output_dim()), dtype=numpy.float32))
@@ -550,7 +561,7 @@ class SentenceTransformerTextEmbedding(TextEmbedding["SentenceTransformerTextEmb
         return cast(List[numpy.ndarray], list(embeddings))
 
 
-class OpenAITextEmbedding(TextEmbedding["OpenAITextEmbedding.Fixtures"]):
+class OpenAITextEmbedding(TextEmbedding["OpenAITextEmbedding.Fixtures", None]):
     """
     A text embedding model using OpenAI API.
 
@@ -603,13 +614,14 @@ class OpenAITextEmbedding(TextEmbedding["OpenAITextEmbedding.Fixtures"]):
         self,
         batch: Sequence[str],
         fixtures: "OpenAITextEmbedding.Fixtures",
+        params: None = None,
     ) -> List[numpy.ndarray]:
         response = fixtures.client.embeddings.create(input=list(batch), model=self._model_name)
         embeddings = sorted(response.data, key=lambda e: e.index)  # type: ignore
         return [numpy.array(embedding.embedding) for embedding in embeddings]
 
 
-class HuggingFaceTextEmbedding(TextEmbedding["HuggingFaceTextEmbedding.Fixtures"]):
+class HuggingFaceTextEmbedding(TextEmbedding["HuggingFaceTextEmbedding.Fixtures", None]):
     """
     A text embedding model using HuggingFace API.
 
@@ -646,6 +658,7 @@ class HuggingFaceTextEmbedding(TextEmbedding["HuggingFaceTextEmbedding.Fixtures"
         self,
         batch: Sequence[str],
         fixtures: "HuggingFaceTextEmbedding.Fixtures",
+        params: None = None,
     ) -> List[numpy.ndarray]:
         # Call HuggingFace Embedding API for each document
         return list(

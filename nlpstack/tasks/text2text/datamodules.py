@@ -12,8 +12,8 @@ from .types import Text2TextExample, Text2TextInference, Text2TextPrediction
 
 logger = getLogger(__name__)
 
-Text2TextPreprocessor = Pipeline[Text2TextExample, Text2TextExample, Any]
-Text2TextPostprocessor = Pipeline[Text2TextPrediction, Text2TextPrediction, Any]
+Text2TextPreprocessor = Pipeline[Text2TextExample, Text2TextExample, Any, Optional[Any]]
+Text2TextPostprocessor = Pipeline[Text2TextPrediction, Text2TextPrediction, Any, Optional[Any]]
 
 
 class Text2TextDataModule(
@@ -86,10 +86,10 @@ class Text2TextDataModule(
             self._build_vocab(dataset)
 
     def preprocess(self, dataset: Iterable[Text2TextExample], **kwargs: Any) -> Iterator[Text2TextExample]:
-        pipeline = self._preprocessor | DataclassTokenizer[Text2TextExample](
+        pipeline = self._preprocessor | DataclassTokenizer[Text2TextExample, Any](
             {"source": self._source_tokenizer, "target": self._target_tokenizer},
         )
-        return pipeline(dataset)
+        return pipeline(dataset, params=(None, None))
 
     def _build_vocab(self, dataset: Iterable[Text2TextExample]) -> None:
         def source_iterator() -> Iterator[Sequence[Token]]:
@@ -181,4 +181,4 @@ class Text2TextDataModule(
                 top_texts = [self._target_tokenizer.detokenize(tokens) for tokens in top_tokens]
                 yield Text2TextPrediction(top_texts, top_tokens, scores)
 
-        yield from self._postprocessor(prediction_iterator())
+        yield from self._postprocessor(prediction_iterator(), params=None)

@@ -6,7 +6,12 @@ from nlpstack.rune import Rune
 from .types import CausalLanguageModelingExample, CausalLanguageModelingPrediction
 
 
-class CausalLanguageModelingTextGenerator(TextGenerator["CausalLanguageModelingTextGenerator.Fixtures"]):
+class CausalLanguageModelingTextGenerator(
+    TextGenerator[
+        "CausalLanguageModelingTextGenerator.Fixtures",
+        Optional[Mapping[str, Any]],
+    ]
+):
     """
     A text generator using a rune model for causal language modeling tasks.
 
@@ -37,8 +42,9 @@ class CausalLanguageModelingTextGenerator(TextGenerator["CausalLanguageModelingT
         self,
         inputs: Sequence[str],
         fixtures: "CausalLanguageModelingTextGenerator.Fixtures",
+        params: Optional[Mapping[str, Any]] = None,
     ) -> List[str]:
         context = fixtures.context or ""
         examples = [CausalLanguageModelingExample(context + text) for text in inputs]
-        predictions = fixtures.model.predict(examples, **fixtures.kwargs)
+        predictions = fixtures.model.predict(examples, **fixtures.kwargs, **(params or {}))
         return [prediction.text for prediction in predictions]

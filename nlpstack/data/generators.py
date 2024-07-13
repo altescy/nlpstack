@@ -3,7 +3,7 @@ import json
 import os
 from contextlib import suppress
 from os import PathLike
-from typing import Any, Generic, List, Literal, Mapping, NamedTuple, Optional, Sequence, TypeVar, Union
+from typing import Any, Generic, List, Literal, Mapping, NamedTuple, Optional, Sequence, TypedDict, TypeVar, Union
 
 import minato
 import requests
@@ -22,16 +22,25 @@ except ModuleNotFoundError:
 
 
 _T_Fixtures = TypeVar("_T_Fixtures")
+_T_Params = TypeVar("_T_Params")
 
 
-class TextGenerator(Pipeline[str, str, _T_Fixtures], Generic[_T_Fixtures]):
+class TextGenerator(
+    Pipeline[str, str, _T_Fixtures, Optional[_T_Params]],
+    Generic[_T_Fixtures, _T_Params],
+):
     """
     A base class for text generators.
     Text generators are callable objects that take a list of strings as input and return a list of strings as output.
     """
 
 
-class OpenAIChatTextGenerator(TextGenerator["OpenAIChatTextGenerator.Fixtures"]):
+class OpenAIChatTextGenerator(
+    TextGenerator[
+        "OpenAIChatTextGenerator.Fixtures",
+        Optional["OpenAIChatTextGenerator.Params"],
+    ]
+):
     """
     A text generator using OpenAI chat completion API.
 
@@ -49,6 +58,12 @@ class OpenAIChatTextGenerator(TextGenerator["OpenAIChatTextGenerator.Fixtures"])
 
     class Fixtures(NamedTuple):
         client: "openai.AsyncOpenAI"
+
+    class Params(TypedDict, total=False):
+        frequency_penalty: float
+        max_tokens: int
+        temperature: float
+        top_p: float
 
     def __init__(
         self,
@@ -99,12 +114,14 @@ class OpenAIChatTextGenerator(TextGenerator["OpenAIChatTextGenerator.Fixtures"])
         self,
         batch: Sequence[str],
         fixtures: "OpenAIChatTextGenerator.Fixtures",
+        params: Optional["OpenAIChatTextGenerator.Params"] = None,
     ) -> List[str]:
         async def task(text: str) -> str:
             response = await fixtures.client.chat.completions.create(
                 model=self._model_name,
                 messages=list(self._context or []) + [{"role": "user", "content": text}],
                 **self._kwargs,
+                **(params or {}),
             )
             return str(response.choices[0].message.content)
 
@@ -114,7 +131,7 @@ class OpenAIChatTextGenerator(TextGenerator["OpenAIChatTextGenerator.Fixtures"])
         return asyncio.run(main())
 
 
-class HuggingfaceTextGenerator(TextGenerator["HuggingfaceTextGenerator.Fixtures"]):
+class HuggingfaceTextGenerator(TextGenerator["HuggingfaceTextGenerator.Fixtures", None]):
     """
     A text generator using Huggingface inference API.
     This generator only supports text/text2text generation models such as `gpt2`.
@@ -161,7 +178,10 @@ class HuggingfaceTextGenerator(TextGenerator["HuggingfaceTextGenerator.Fixtures"
         self,
         inputs: Sequence[str],
         fixtures: "HuggingfaceTextGenerator.Fixtures",
+        params: None = None,
     ) -> List[str]:
+        del params
+
         async def task(text: str) -> str:
             data = json.dumps({"inputs": text, "parameters": {**self._kwargs}})
             loop = asyncio.get_running_loop()
@@ -181,7 +201,7 @@ class HuggingfaceTextGenerator(TextGenerator["HuggingfaceTextGenerator.Fixtures"
         return asyncio.run(main())
 
 
-class PretrainedTransformerTextGenerator(TextGenerator["PretrainedTransformerTextGenerator.Fixtures"]):
+class PretrainedTransformerTextGenerator(TextGenerator["PretrainedTransformerTextGenerator.Fixtures", None]):
     """
     A text generator using pretrained transformer models.
 
@@ -252,6 +272,7 @@ class PretrainedTransformerTextGenerator(TextGenerator["PretrainedTransformerTex
         self,
         batch: Sequence[str],
         fixtures: "PretrainedTransformerTextGenerator.Fixtures",
+        params: None = None,
     ) -> List[str]:
         output = fixtures.pipeline(
             list(batch),

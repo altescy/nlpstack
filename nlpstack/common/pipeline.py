@@ -11,14 +11,19 @@ from mpire import WorkerPool
 
 from nlpstack.common.iterutil import SizedIterator, batched
 
+# inputs/outputs
 S = TypeVar("S")
 T = TypeVar("T")
 U = TypeVar("U")
+# fixtures
 E = TypeVar("E")
 F = TypeVar("F")
+# runtime params
+P = TypeVar("P")
+Q = TypeVar("Q")
 
 
-class Pipeline(Generic[S, T, F]):
+class Pipeline(Generic[S, T, F, P]):
     """
     A base class for pipelines.
 
@@ -29,10 +34,10 @@ class Pipeline(Generic[S, T, F]):
     Here is an example of pipeline that tokenizes a string by splitting on spaces:
 
     Example:
-        >>> class MyPipeline(Pipeline[str, List[str], None]):
+        >>> class MyPipeline(Pipeline[str, List[str], None, None]):
         >>>     fixtures = None
         >>>
-        >>>     def apply_batch(self, inputs: List[str]) -> List[str]:
+        >>>     def apply_batch(self, inputs: List[str], fixtures: None, params: None) -> List[str]:
         >>>         return [x.split() for x in inputs]
 
     To apply the pipeline to a sequence of inputs, call the pipeline object as a
@@ -80,13 +85,19 @@ class Pipeline(Generic[S, T, F]):
     def fixtures(self) -> F:
         raise NotImplementedError
 
-    def apply_batch(self, batch: Sequence[S], fixtures: F) -> List[T]:
+    def apply_batch(
+        self,
+        batch: Sequence[S],
+        fixtures: F,
+        params: Optional[P] = None,
+    ) -> List[T]:
         """
         Apply the pipeline to a batch of inputs.
 
         Args:
             batch: The batch of inputs.
             fixtures: The fixtures to use.
+            params: The runtime parameters.
 
         Returns:
             The batch of outputs.
@@ -97,6 +108,7 @@ class Pipeline(Generic[S, T, F]):
     def __call__(
         self,
         inputs: Iterable[S],
+        params: Optional[P] = None,
         *,
         batch_size: Optional[int] = None,
         max_workers: Optional[int] = None,
@@ -106,6 +118,7 @@ class Pipeline(Generic[S, T, F]):
 
         Args:
             inputs: The sequence of inputs.
+            params: The runtime parameters.
             batch_size: The batch size. Defaults to `1`.
             max_workers: The maximum number of workers to use for multi-thread
                 processing. Defaults to `1`.
@@ -126,15 +139,16 @@ class Pipeline(Generic[S, T, F]):
             if max_workers < 2:
                 fixtures = self.fixtures
                 for batch in batched(inputs, batch_size):
-                    yield from self.apply_batch(batch, fixtures)
+                    yield from self.apply_batch(batch, fixtures, params)
             else:
 
-                def apply_batch(fixtures: F, *batch: S) -> List[T]:
-                    return self.apply_batch(batch, fixtures)
+                def apply_batch(shared_objects: Tuple[F, Optional[P]], *batch: S) -> List[T]:
+                    fixtures, params = shared_objects
+                    return self.apply_batch(batch, fixtures, params)
 
                 with WorkerPool(
                     n_jobs=max_workers,
-                    shared_objects=self.fixtures,
+                    shared_objects=(self.fixtures, params),
                 ) as pool:
                     for results in pool.imap(
                         apply_batch,
@@ -147,16 +161,16 @@ class Pipeline(Generic[S, T, F]):
 
         return iterator()
 
-    def __or__(self, other: "Pipeline[T, U, E]") -> "Pipeline[S, U, Tuple[F, E]]":
+    def __or__(self, other: "Pipeline[T, U, E, Q]") -> "Pipeline[S, U, Tuple[F, E], Tuple[P, Q]]":
         return ComposePipeline(self, other)
 
     @classmethod
     def from_callable(
         cls,
-        func: Callable[[Sequence[S], F], List[T]],
+        func: Callable[[Sequence[S], F, Optional[Q]], List[T]],
         fixtures: F,
         **kwargs: Any,
-    ) -> "Pipeline[S, T, F]":
+    ) -> "Pipeline[S, T, F, Q]":
         """
         Create a pipeline from a callable.
 
@@ -171,7 +185,7 @@ class Pipeline(Generic[S, T, F]):
         return CallablePipeline(func, fixtures, **kwargs)
 
 
-class ComposePipeline(Pipeline[S, U, Tuple[E, F]]):
+class ComposePipeline(Pipeline[S, U, Tuple[E, F], Tuple[P, Q]]):
     """
     A pipeline that is the composition of two pipelines.
 
@@ -185,8 +199,8 @@ class ComposePipeline(Pipeline[S, U, Tuple[E, F]]):
 
     def __init__(
         self,
-        first: Pipeline[S, T, E],
-        second: Pipeline[T, U, F],
+        first: Pipeline[S, T, E, P],
+        second: Pipeline[T, U, F, Q],
         *,
         batch_size: int = 1,
         max_workers: int = 1,
@@ -195,28 +209,38 @@ class ComposePipeline(Pipeline[S, U, Tuple[E, F]]):
         self.first = first
         self.second = second
 
-    def apply_batch(self, batch: Sequence[S], fixtures: Tuple[E, F]) -> List[U]:
-        return self.second.apply_batch(self.first.apply_batch(batch, fixtures[0]), fixtures[1])
+    def apply_batch(
+        self,
+        batch: Sequence[S],
+        fixtures: Tuple[E, F],
+        params: Optional[Tuple[Optional[P], Optional[Q]]] = None,
+    ) -> List[U]:
+        params = params or (None, None)
+        return self.second.apply_batch(self.first.apply_batch(batch, fixtures[0], params[0]), fixtures[1], params[1])
 
     def __call__(
         self,
         inputs: Iterable[S],
+        params: Optional[Tuple[Optional[P], Optional[Q]]] = None,
         *,
         batch_size: Optional[int] = None,
         max_workers: Optional[int] = None,
     ) -> Iterator[U]:
+        params = params or (None, None)
         return self.second(
             self.first(
                 inputs,
+                params[0],
                 batch_size=batch_size,
                 max_workers=max_workers,
             ),
+            params[1],
             batch_size=batch_size,
             max_workers=max_workers,
         )
 
 
-class CallablePipeline(Pipeline[S, T, F]):
+class CallablePipeline(Pipeline[S, T, F, P]):
     """
     A pipeline that can be created from a callable.
 
@@ -229,7 +253,7 @@ class CallablePipeline(Pipeline[S, T, F]):
 
     def __init__(
         self,
-        func: Callable[[Sequence[S], F], List[T]],
+        func: Callable[[Sequence[S], F, Optional[P]], List[T]],
         fixtures: F,
         *,
         batch_size: int = 1,
@@ -243,11 +267,16 @@ class CallablePipeline(Pipeline[S, T, F]):
     def fixtures(self) -> F:
         return self._fixtures
 
-    def apply_batch(self, batch: Sequence[S], fixtures: F) -> List[T]:
-        return self._func(batch, fixtures)
+    def apply_batch(
+        self,
+        batch: Sequence[S],
+        fixtures: F,
+        params: Optional[P] = None,
+    ) -> List[T]:
+        return self._func(batch, fixtures, params)
 
 
-class ChainPipeline(Pipeline[S, S, List[Any]]):
+class ChainPipeline(Pipeline[S, S, List[Any], List[Any]]):
     """
     A pipeline that is the composition of multiple pipelines.
     Note that each pipeline must have the same input and output types.
@@ -260,7 +289,7 @@ class ChainPipeline(Pipeline[S, S, List[Any]]):
 
     def __init__(
         self,
-        steps: Sequence[Pipeline[S, S, Any]],
+        steps: Sequence[Pipeline[S, S, Any, Any]],
         batch_size: int = 1,
         max_workers: int = 1,
     ) -> None:
@@ -271,30 +300,47 @@ class ChainPipeline(Pipeline[S, S, List[Any]]):
     def fixtures(self) -> List[Any]:
         return [step.fixtures() for step in self._steps]
 
-    def apply_batch(self, batch: Sequence[S], fixtures: List[Any]) -> List[S]:
-        for s, f in zip(self._steps, fixtures):
-            batch = s.apply_batch(batch, f)
+    def apply_batch(
+        self,
+        batch: Sequence[S],
+        fixtures: List[Any],
+        params: Optional[List[Any]] = None,
+    ) -> List[S]:
+        if params is not None and len(params) != len(self._steps):
+            raise ValueError("params must have the same length as steps")
+        params = params or [None] * len(self._steps)
+        for s, f, p in zip(self._steps, fixtures, params):
+            batch = s.apply_batch(batch, f, p)
         return list(batch)
 
     def __call__(
         self,
         inputs: Iterable[S],
+        params: Optional[List[Any]] = None,
         *,
         batch_size: Optional[int] = None,
         max_workers: Optional[int] = None,
     ) -> Iterator[S]:
-        output = self._steps[0](inputs, batch_size=batch_size, max_workers=max_workers)
-        for step in self._steps[1:]:
-            output = step(output, batch_size=batch_size, max_workers=max_workers)
+        if params is not None and len(params) != len(self._steps):
+            raise ValueError("params must have the same length as steps")
+        params = params or [None] * len(self._steps)
+        output = self._steps[0](inputs, params[0], batch_size=batch_size, max_workers=max_workers)
+        for step, param in zip(self._steps[1:], params[1:]):
+            output = step(output, param, batch_size=batch_size, max_workers=max_workers)
         return output
 
 
-class PassThroughPipeline(Pipeline[S, S, None]):
+class PassThroughPipeline(Pipeline[S, S, None, None]):
     """
     A pipeline that does nothing.
     """
 
     fixtures = None
 
-    def apply_batch(self, batch: Sequence[S], fixtures: None) -> List[S]:
+    def apply_batch(
+        self,
+        batch: Sequence[S],
+        fixtures: None,
+        params: None = None,
+    ) -> List[S]:
         return list(batch)

@@ -1,4 +1,4 @@
-from typing import Any, List, Mapping, NamedTuple, Sequence
+from typing import Any, List, Mapping, NamedTuple, Optional, Sequence
 
 from nlpstack.data import TextGenerator
 from nlpstack.rune import Rune
@@ -6,7 +6,12 @@ from nlpstack.rune import Rune
 from .types import Text2TextExample, Text2TextPrediction
 
 
-class Text2TextGenerator(TextGenerator["Text2TextGenerator.Fixtures"]):
+class Text2TextGenerator(
+    TextGenerator[
+        "Text2TextGenerator.Fixtures",
+        Optional[Mapping[str, Any]],
+    ]
+):
     """
     A text generator using a rune model for text2text tasks.
 
@@ -38,7 +43,8 @@ class Text2TextGenerator(TextGenerator["Text2TextGenerator.Fixtures"]):
         self,
         inputs: Sequence[str],
         fixtures: "Text2TextGenerator.Fixtures",
+        params: Optional[Mapping[str, Any]] = None,
     ) -> List[str]:
         examples = [Text2TextExample(text) for text in inputs]
-        predictions = fixtures.model.predict(examples, **fixtures.kwargs)
+        predictions = fixtures.model.predict(examples, **fixtures.kwargs, **(params or {}))
         return [prediction.text for prediction in predictions]

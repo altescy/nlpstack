@@ -17,9 +17,11 @@ from .types import (
 
 logger = getLogger(__name__)
 
-MultilabelClassificationPreprocessor = Pipeline[MultilabelClassificationExample, MultilabelClassificationExample, Any]
+MultilabelClassificationPreprocessor = Pipeline[
+    MultilabelClassificationExample, MultilabelClassificationExample, Any, Optional[Any]
+]
 MultilabelClassificationPostprocessor = Pipeline[
-    MultilabelClassificationPrediction, MultilabelClassificationPrediction, Any
+    MultilabelClassificationPrediction, MultilabelClassificationPrediction, Any, Optional[Any]
 ]
 
 
@@ -102,8 +104,10 @@ class MultilabelClassificationDataModule(
         dataset: Iterable[MultilabelClassificationExample],
         **kwargs: Any,
     ) -> Iterator[MultilabelClassificationExample]:
-        pipeline = self._preprocessor | DataclassTokenizer[MultilabelClassificationExample]({"text": self._tokenizer})
-        return pipeline(dataset)
+        pipeline = self._preprocessor | DataclassTokenizer[MultilabelClassificationExample, Any](
+            {"text": self._tokenizer}
+        )
+        return pipeline(dataset, params=(None, None))
 
     def _build_vocab(self, dataset: Sequence[MultilabelClassificationExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
@@ -182,4 +186,4 @@ class MultilabelClassificationDataModule(
                     metadata=inference.metadata[i] if inference.metadata is not None else None,
                 )
 
-        yield from self._postprocessor(prediction_iterator())
+        yield from self._postprocessor(prediction_iterator(), params=None)
