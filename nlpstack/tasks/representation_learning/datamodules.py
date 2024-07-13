@@ -11,8 +11,12 @@ from .types import RepresentationLearningExample, RepresentationLearningInferenc
 
 logger = getLogger(__name__)
 
-RepresentationLearningPreprocessor = Pipeline[RepresentationLearningExample, RepresentationLearningExample, Any]
-RepresentationLearningPostprocessor = Pipeline[RepresentationLearningPrediction, RepresentationLearningPrediction, Any]
+RepresentationLearningPreprocessor = Pipeline[
+    RepresentationLearningExample, RepresentationLearningExample, Any, Optional[Any]
+]
+RepresentationLearningPostprocessor = Pipeline[
+    RepresentationLearningPrediction, RepresentationLearningPrediction, Any, Optional[Any]
+]
 
 
 class RepresentationLearningDataModule(
@@ -75,9 +79,10 @@ class RepresentationLearningDataModule(
     def preprocess(
         self,
         dataset: Iterable[RepresentationLearningExample],
-        **kwargs: Any,
     ) -> Iterator[RepresentationLearningExample]:
-        pipeline = self._preprocessor | DataclassTokenizer[RepresentationLearningExample]({"text": self._tokenizer})
+        pipeline = self._preprocessor | DataclassTokenizer[RepresentationLearningExample, Any](
+            {"text": self._tokenizer}
+        )
         return pipeline(dataset)
 
     def _build_vocab(self, dataset: Iterable[RepresentationLearningExample]) -> None:

@@ -11,8 +11,8 @@ from .types import TopicModelingExample, TopicModelingInference, TopicModelingPr
 
 logger = getLogger(__name__)
 
-TopicModelingPreprocessor = Pipeline[TopicModelingExample, TopicModelingExample, Any]
-TopicModelingPostprocessor = Pipeline[TopicModelingPrediction, TopicModelingPrediction, Any]
+TopicModelingPreprocessor = Pipeline[TopicModelingExample, TopicModelingExample, Any, Optional[Any]]
+TopicModelingPostprocessor = Pipeline[TopicModelingPrediction, TopicModelingPrediction, Any, Optional[Any]]
 
 
 class TopicModelingDataModule(
@@ -72,9 +72,9 @@ class TopicModelingDataModule(
         if dataset:
             self._build_vocab(dataset)
 
-    def preprocess(self, dataset: Iterable[TopicModelingExample], **kwargs: Any) -> Iterator[TopicModelingExample]:
-        pipeline = self._preprocessor | DataclassTokenizer[TopicModelingExample]({"text": self._tokenizer})
-        return pipeline(dataset)
+    def preprocess(self, dataset: Iterable[TopicModelingExample]) -> Iterator[TopicModelingExample]:
+        pipeline = self._preprocessor | DataclassTokenizer[TopicModelingExample, Any]({"text": self._tokenizer})
+        return pipeline(dataset, params=(None, None))
 
     def _build_vocab(self, dataset: Iterable[TopicModelingExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:

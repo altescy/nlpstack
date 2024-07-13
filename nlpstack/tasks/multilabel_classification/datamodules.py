@@ -17,9 +17,11 @@ from .types import (
 
 logger = getLogger(__name__)
 
-MultilabelClassificationPreprocessor = Pipeline[MultilabelClassificationExample, MultilabelClassificationExample, Any]
+MultilabelClassificationPreprocessor = Pipeline[
+    MultilabelClassificationExample, MultilabelClassificationExample, Any, Optional[Any]
+]
 MultilabelClassificationPostprocessor = Pipeline[
-    MultilabelClassificationPrediction, MultilabelClassificationPrediction, Any
+    MultilabelClassificationPrediction, MultilabelClassificationPrediction, Any, Optional[Any]
 ]
 
 
@@ -100,9 +102,10 @@ class MultilabelClassificationDataModule(
     def preprocess(
         self,
         dataset: Iterable[MultilabelClassificationExample],
-        **kwargs: Any,
     ) -> Iterator[MultilabelClassificationExample]:
-        pipeline = self._preprocessor | DataclassTokenizer[MultilabelClassificationExample]({"text": self._tokenizer})
+        pipeline = self._preprocessor | DataclassTokenizer[MultilabelClassificationExample, Any](
+            {"text": self._tokenizer}
+        )
         return pipeline(dataset)
 
     def _build_vocab(self, dataset: Sequence[MultilabelClassificationExample]) -> None:

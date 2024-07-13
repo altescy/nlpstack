@@ -37,6 +37,7 @@ except ModuleNotFoundError:
 
 
 _T_Fixtures = TypeVar("_T_Fixtures")
+_T_Params = TypeVar("_T_Params")
 
 
 class Token(NamedTuple):
@@ -56,44 +57,60 @@ class Token(NamedTuple):
     vector: Optional[numpy.ndarray] = None
 
 
-class Tokenizer(Pipeline[str, List[Token], _T_Fixtures], Generic[_T_Fixtures]):
+class Tokenizer(
+    Pipeline[str, List[Token], _T_Fixtures, Optional[_T_Params]],
+    Generic[_T_Fixtures, _T_Params],
+):
     """
     A base class for tokenizers.
     """
 
-    def tokenize(self, text: str) -> List[Token]:
-        return next(self([text], batch_size=1, max_workers=1))
+    def tokenize(self, text: str, params: Optional[_T_Params] = None) -> List[Token]:
+        return next(self([text], params, batch_size=1, max_workers=1))
 
     def detokenize(self, tokens: Union[Sequence[str], Sequence[Token]]) -> str:
-        raise next(self.detokenize_pipeline([tokens], batch_size=1, max_workers=1))
+        raise next(self.detokenize_pipeline([tokens], None, batch_size=1, max_workers=1))
 
-    def tokenize_batch(self, batch: Sequence[str], fixtures: _T_Fixtures) -> List[List[Token]]:
+    def tokenize_batch(
+        self,
+        batch: Sequence[str],
+        fixtures: _T_Fixtures,
+        params: Optional[_T_Params] = None,
+    ) -> List[List[Token]]:
         raise NotImplementedError
 
     def detokenize_batch(
-        self, batch: Sequence[Union[Sequence[str], Sequence[Token]]], fixtures: _T_Fixtures
+        self,
+        batch: Sequence[Union[Sequence[str], Sequence[Token]]],
+        fixtures: _T_Fixtures,
+        params: None = None,
     ) -> List[str]:
         raise NotImplementedError
 
-    def apply_batch(self, batch: Sequence[str], fixtures: _T_Fixtures) -> List[List[Token]]:
-        return self.tokenize_batch(batch, fixtures)
+    def apply_batch(
+        self,
+        batch: Sequence[str],
+        fixtures: _T_Fixtures,
+        params: Optional[_T_Params] = None,
+    ) -> List[List[Token]]:
+        return self.tokenize_batch(batch, fixtures, params)
 
-    def tokenize_pipeline(self) -> Pipeline[str, List[Token], _T_Fixtures]:
+    def tokenize_pipeline(self) -> Pipeline[str, List[Token], _T_Fixtures, Optional[_T_Params]]:
         return self
 
     @cached_property
-    def detokenize_pipeline(self) -> Pipeline[Union[Sequence[str], Sequence[Token]], str, Any]:
+    def detokenize_pipeline(self) -> Pipeline[Union[Sequence[str], Sequence[Token]], str, Any, None]:
         return Pipeline.from_callable(self.detokenize_batch, self.fixtures)
 
 
-class WhitespaceTokenizer(Tokenizer[None]):
+class WhitespaceTokenizer(Tokenizer[None, None]):
     """
     A tokenizer that splits a text into tokens by whitespace.
     """
 
     fixtures = None
 
-    def tokenize_batch(self, batch: Sequence[str], fixtures: None) -> List[List[Token]]:
+    def tokenize_batch(self, batch: Sequence[str], fixtures: None, params: None = None) -> List[List[Token]]:
         return [[Token(surface) for surface in text.split()] for text in batch]
 
     def detokenize(self, tokens: Union[Sequence[str], Sequence[Token]], **kwargs: Any) -> str:
@@ -102,14 +119,14 @@ class WhitespaceTokenizer(Tokenizer[None]):
         return " ".join(tokens)
 
 
-class CharacterTokenizer(Tokenizer[None]):
+class CharacterTokenizer(Tokenizer[None, None]):
     """
     A tokenizer that splits a text into character tokens.
     """
 
     fixtures = None
 
-    def tokenize_batch(self, batch: Sequence[str], fixtures: None) -> List[List[Token]]:
+    def tokenize_batch(self, batch: Sequence[str], fixtures: None, params: None = None) -> List[List[Token]]:
         return [[Token(surface) for surface in text] for text in batch]
 
     def detokenize(self, tokens: Union[Sequence[str], Sequence[Token]], **kwargs: Any) -> str:
@@ -118,7 +135,7 @@ class CharacterTokenizer(Tokenizer[None]):
         return "".join(tokens)
 
 
-class SpacyTokenizer(Tokenizer["SpacyTokenizer.Fixture"]):
+class SpacyTokenizer(Tokenizer["SpacyTokenizer.Fixture", None]):
     """
     A tokenizer that uses spaCy.
 
@@ -153,6 +170,7 @@ class SpacyTokenizer(Tokenizer["SpacyTokenizer.Fixture"]):
         self,
         batch: Sequence[str],
         fixtures: "SpacyTokenizer.Fixture",
+        params: None = None,
     ) -> List[List[Token]]:
         return [
             [
@@ -172,7 +190,7 @@ class SpacyTokenizer(Tokenizer["SpacyTokenizer.Fixture"]):
         return "".join(tokens)
 
 
-class PretrainedTransformerTokenizer(Tokenizer["PretrainedTransformerTokenizer.Fixture"]):
+class PretrainedTransformerTokenizer(Tokenizer["PretrainedTransformerTokenizer.Fixture", None]):
     """
     A tokenizer uses a model from Huggingface's transformers library.
     We take a model name as an argument, which will pass to `AutoTokenizer.from_pretrained`
@@ -210,6 +228,7 @@ class PretrainedTransformerTokenizer(Tokenizer["PretrainedTransformerTokenizer.F
         self,
         batch: Sequence[str],
         fixtures: "PretrainedTransformerTokenizer.Fixture",
+        params: None = None,
     ) -> List[List[Token]]:
         return [[Token(t) for t in fixtures.tokenizer.tokenize(text)] for text in batch]
 
@@ -223,7 +242,7 @@ class PretrainedTransformerTokenizer(Tokenizer["PretrainedTransformerTokenizer.F
         return str(tokenizer.convert_tokens_to_string(tokens))
 
 
-class FugashiTokenizer(Tokenizer["FugashiTokenizer.Fixture"]):
+class FugashiTokenizer(Tokenizer["FugashiTokenizer.Fixture", None]):
     """
     A tokenizer that uses fugashi for Japanese text.
 
@@ -321,6 +340,7 @@ class FugashiTokenizer(Tokenizer["FugashiTokenizer.Fixture"]):
         self,
         batch: Sequence[str],
         fixtures: "FugashiTokenizer.Fixture",
+        params: None = None,
     ) -> List[List[Token]]:
         return [[token for node in fixtures.tagger(text) for token in fixtures.parser(node)] for text in batch]
 
@@ -330,8 +350,8 @@ class FugashiTokenizer(Tokenizer["FugashiTokenizer.Fixture"]):
 
 
 class DataclassTokenizer(
-    Pipeline[T_Dataclass, T_Dataclass, "DataclassTokenizer.Fixtures"],
-    Generic[T_Dataclass],
+    Pipeline[T_Dataclass, T_Dataclass, "DataclassTokenizer.Fixtures", Optional[_T_Params]],
+    Generic[T_Dataclass, _T_Params],
 ):
     class Fixtures(NamedTuple):
         tokenizers: Mapping[str, Tokenizer]
@@ -339,7 +359,7 @@ class DataclassTokenizer(
 
     def __init__(
         self,
-        tokenizers: Mapping[str, Tokenizer[Any]],
+        tokenizers: Mapping[str, Tokenizer[Any, _T_Params]],
         **kwargs: Any,
     ) -> None:
         min_batch_size = min(tok._batch_size for tok in tokenizers.values())
@@ -358,13 +378,18 @@ class DataclassTokenizer(
         self,
         batch: Sequence[T_Dataclass],
         fixtures: "DataclassTokenizer.Fixtures",
+        params: Optional[_T_Params] = None,
     ) -> List[T_Dataclass]:
         field_values = {key: [getattr(item, key) for item in batch] for key in fixtures.tokenizers.keys()}
         for key, values in field_values.items():
             tokenizer = fixtures.tokenizers[key]
             tokenizer_fixtures = fixtures.fixtures[key]
             untokenized_indices = [index for index, value in enumerate(values) if isinstance(value, str)]
-            applyed_values = tokenizer.apply_batch([values[i] for i in untokenized_indices], tokenizer_fixtures)
+            applyed_values = tokenizer.apply_batch(
+                [values[i] for i in untokenized_indices],
+                tokenizer_fixtures,
+                params,
+            )
 
             offset = 0
             new_values = []

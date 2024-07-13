@@ -13,8 +13,8 @@ from .types import SequenceLabelingExample, SequenceLabelingInference, SequenceL
 
 logger = getLogger(__name__)
 
-SequenceLabelPreprocessor = Pipeline[SequenceLabelingExample, SequenceLabelingExample, Any]
-SequenceLabelPostprocessor = Pipeline[SequenceLabelingPrediction, SequenceLabelingPrediction, Any]
+SequenceLabelPreprocessor = Pipeline[SequenceLabelingExample, SequenceLabelingExample, Any, Optional[Any]]
+SequenceLabelPostprocessor = Pipeline[SequenceLabelingPrediction, SequenceLabelingPrediction, Any, Optional[Any]]
 
 
 class SequenceLabelingDataModule(
@@ -85,9 +85,8 @@ class SequenceLabelingDataModule(
     def preprocess(
         self,
         dataset: Iterable[SequenceLabelingExample],
-        **kwargs: Any,
     ) -> Iterator[SequenceLabelingExample]:
-        pipeline = self._preprocessor | DataclassTokenizer[SequenceLabelingExample]({"text": self._tokenizer})
+        pipeline = self._preprocessor | DataclassTokenizer[SequenceLabelingExample, Any]({"text": self._tokenizer})
         return pipeline(dataset)
 
     def _build_vocab(self, dataset: Sequence[SequenceLabelingExample]) -> None:
