@@ -9,7 +9,9 @@ Submodules
 
    nlpstack.rune.archive
    nlpstack.rune.base
-   nlpstack.rune.torch
+   nlpstack.rune.config
+   nlpstack.rune.types
+   nlpstack.rune.workflow
 
 Module contents
 ---------------

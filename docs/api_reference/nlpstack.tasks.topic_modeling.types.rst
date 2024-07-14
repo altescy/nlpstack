@@ -1,5 +1,5 @@
-types
-=====
+nlpstack.tasks.topic\_modeling.types module
+===========================================
 
 .. automodule:: nlpstack.tasks.topic_modeling.types
    :members:

@@ -1,5 +1,5 @@
-util
-====
+nlpstack.data.util module
+=========================
 
 .. automodule:: nlpstack.data.util
    :members:

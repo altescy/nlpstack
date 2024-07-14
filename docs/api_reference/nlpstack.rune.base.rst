@@ -1,5 +1,5 @@
-base
-====
+nlpstack.rune.base module
+=========================
 
 .. automodule:: nlpstack.rune.base
    :members:

@@ -1,5 +1,5 @@
-sequence\_labeling
-==================
+nlpstack.tasks.sequence\_labeling package
+=========================================
 
 Submodules
 ----------

@@ -1,5 +1,5 @@
-representation\_learning
-========================
+nlpstack.tasks.representation\_learning package
+===============================================
 
 Submodules
 ----------

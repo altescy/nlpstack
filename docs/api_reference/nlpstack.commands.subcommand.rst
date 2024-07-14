@@ -1,5 +1,5 @@
-subcommand
-==========
+nlpstack.commands.subcommand module
+===================================
 
 .. automodule:: nlpstack.commands.subcommand
    :members:

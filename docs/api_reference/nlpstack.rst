@@ -1,5 +1,5 @@
-API Reference
-=============
+nlpstack package
+================
 
 Subpackages
 -----------
@@ -11,14 +11,11 @@ Subpackages
    nlpstack.common
    nlpstack.data
    nlpstack.evaluation
-   nlpstack.mlflow
+   nlpstack.integrations
    nlpstack.rune
    nlpstack.server
-   nlpstack.sklearn
    nlpstack.tasks
-   nlpstack.torch
-   nlpstack.transformers
-   nlpstack.workflows
+   nlpstack.workflow
 
 Submodules
 ----------
@@ -26,6 +23,7 @@ Submodules
 .. toctree::
    :maxdepth: 6
 
+   nlpstack.types
    nlpstack.version
 
 Module contents

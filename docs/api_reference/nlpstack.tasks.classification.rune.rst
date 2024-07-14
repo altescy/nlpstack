@@ -1,5 +1,5 @@
-rune
-====
+nlpstack.tasks.classification.rune module
+=========================================
 
 .. automodule:: nlpstack.tasks.classification.rune
    :members:

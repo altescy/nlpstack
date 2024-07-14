@@ -1,5 +1,5 @@
-evaluators
-==========
+nlpstack.evaluation.evaluators module
+=====================================
 
 .. automodule:: nlpstack.evaluation.evaluators
    :members:
