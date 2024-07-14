@@ -66,32 +66,29 @@ class CausalLanguageModelingDataModule(
     def tokenizer(self) -> Tokenizer:
         return self._tokenizer
 
-    def setup(
-        self,
-        *args: Any,
-        dataset: Optional[Sequence[CausalLanguageModelingExample]] = None,
-        generation_mode: Optional[bool] = None,
-        **kwargs: Any,
-    ) -> None:
+    def set_generation_mode(self, generation_mode: bool) -> None:
+        """
+        Set the generation mode.
+
+        Args:
+            generation_mode: Whether to set the generation mode. If `False`, the data module will
+            build instances for training (with labels / drop the last token). If `True`, the data
+            module will build instances for generation (without labels / keep the last token).
+        """
+
+        self._generation_mode = generation_mode
+
+    def setup(self, dataset: Sequence[CausalLanguageModelingExample]) -> None:
         """
         Setup the data module.
 
-        This method tokenizes the dataset and builds the vocabulary.
+        This method builds the vocabulary from the dataset.
 
         Args:
             dataset: The dataset to tokenize and build the vocabulary from.
-            generation_mode: Whether to setup the data module for generation. Please set this to `True` if you are
-                using the data module for generation. This will disable the `labels` field in the instances returned
-                by `build_instance`. This is useful for generation because the labels are not available during
-                generation. If you are using the data module for training, please set this to `False` to enable the
-                `labels` field.
         """
 
-        if dataset is not None:
-            self._build_vocab(dataset)
-
-        if generation_mode is not None:
-            self._generation_mode = generation_mode
+        self._build_vocab(dataset)
 
     def preprocess(
         self,
@@ -102,7 +99,7 @@ class CausalLanguageModelingDataModule(
         )
         return pipeline(dataset)
 
-    def _build_vocab(self, dataset: Iterable[CausalLanguageModelingExample]) -> None:
+    def _build_vocab(self, dataset: Sequence[CausalLanguageModelingExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
             for example in dataset:
                 assert not isinstance(example.text, str), "Dataset must be tokenized."

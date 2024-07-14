@@ -4,7 +4,7 @@ import shutil
 import tempfile
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any, Optional, Sequence
 
 import minato
 
@@ -50,6 +50,11 @@ class RuneWorkflow(Workflow):
             valid_examples = FileBackendSequence.from_iterable(rune_config.reader(rune_config.valid_dataset_filename))
 
         model = rune_config.model
+
+        logger.info("Setting up model...")
+        model.setup("training", rune_config.get_setup_params(model.SetupParams))
+
+        logger.info("Start training...")
         model.train(train_examples, valid_examples)
 
         logger.info("Saving archive to %s", archive_filename)
@@ -88,9 +93,12 @@ class RuneWorkflow(Workflow):
             print("Given model is not a Rune.")
             exit(1)
 
-        model.setup("prediction", **(rune_config.predictor or {}))
+        logger.info("Setting up model...")
+        model.setup("prediction", rune_config.get_setup_params(model.SetupParams))
 
-        predictions = model.predict(rune_config.reader(input_filename))
+        params = rune_config.get_prediction_params(model.PredictionParams)
+
+        predictions = model.predict(rune_config.reader(input_filename), params)
         rune_config.writer(output_filename, predictions)
 
     def evaluate(
@@ -118,9 +126,12 @@ class RuneWorkflow(Workflow):
             print(archive)
             exit(1)
 
-        model.setup("evaluation", **(rune_config.evaluator or {}))
+        logger.info("Setting up model...")
+        model.setup("evaluation", rune_config.get_setup_params(model.EvaluationParams))
 
-        metrics = model.evaluate(rune_config.reader(input_filename))
+        params = rune_config.get_evaluation_params(model.EvaluationParams)
+
+        metrics = model.evaluate(rune_config.reader(input_filename), params)
 
         if output_filename is None:
             print(json.dumps(metrics, indent=2))
@@ -152,11 +163,8 @@ class RuneWorkflow(Workflow):
         if config_filename is not None:
             rune_config = RuneConfig.from_jsonnet(minato.cached_path(config_filename), overrides=overrides)
 
-        predicotr_config: Optional[Mapping[str, Any]] = None
-        if rune_config is not None:
-            predicotr_config = rune_config.predictor
-
-        model.setup("prediction", **predicotr_config or {})
+            logger.info("Setting up model...")
+            model.setup("prediction", rune_config.get_setup_params(model.SetupParams))
 
         server = HTTPServer(
             (host, port),

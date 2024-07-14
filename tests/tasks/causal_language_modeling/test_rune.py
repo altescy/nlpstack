@@ -1,3 +1,4 @@
+from nlpstack.integrations.torch.generation import BeamSearch
 from nlpstack.tasks.causal_language_modeling.rune import CausalLanguageModel
 from nlpstack.tasks.causal_language_modeling.types import CausalLanguageModelingExample
 
@@ -27,7 +28,9 @@ def test_rune() -> None:
                 CausalLanguageModelingExample(text="the quick brown fox"),
                 CausalLanguageModelingExample(text="i scream , you scream ,"),
             ],
-            temperature=0.0,
+            CausalLanguageModel.PredictionParams(
+                beam_search=BeamSearch.Params(sampling={"temperature": 0.0}),
+            ),
         )
     )
     assert len(predictions) == 2

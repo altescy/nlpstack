@@ -22,13 +22,13 @@ class CausalLanguageModelingTextGenerator(
     """
 
     class Fixtures(NamedTuple):
-        model: Rune[CausalLanguageModelingExample, CausalLanguageModelingPrediction]
+        model: Rune[CausalLanguageModelingExample, CausalLanguageModelingPrediction, Any, Any, Any]
         context: Optional[str]
         kwargs: Mapping[str, Any]
 
     def __init__(
         self,
-        model: Rune[CausalLanguageModelingExample, CausalLanguageModelingPrediction],
+        model: Rune[CausalLanguageModelingExample, CausalLanguageModelingPrediction, Any, Any, Any],
         context: Optional[str] = None,
         **kwargs: Any,
     ) -> None:

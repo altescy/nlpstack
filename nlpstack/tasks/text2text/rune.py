@@ -27,6 +27,7 @@ class Text2Text(
         Text2TextExample,
         Text2TextInference,
         Text2TextPrediction,
+        TorchText2Text.Params,
     ]
 ):
     """
@@ -68,6 +69,11 @@ class Text2Text(
         random_seed: The random seed. Defaults to `None`.
 
     """
+
+    Example = Text2TextExample
+    Prediction = Text2TextPrediction
+    PredictionParams = TorchText2Text.Params
+    EvaluationParams = TorchText2Text.Params
 
     def __init__(
         self,

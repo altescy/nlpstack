@@ -27,6 +27,7 @@ class CausalLanguageModel(
         CausalLanguageModelingExample,
         CausalLanguageModelingInference,
         CausalLanguageModelingPrediction,
+        TorchCausalLanguageModel.Params,
     ]
 ):
     """
@@ -66,6 +67,11 @@ class CausalLanguageModel(
         metric: The metric for evaluation. Defaults to `Perplexity()`.
         random_seed: The random seed. Defaults to `None`.
     """
+
+    Example = CausalLanguageModelingExample
+    Prediction = CausalLanguageModelingPrediction
+    PredictionParams = TorchCausalLanguageModel.Params
+    EvaluationParams = TorchCausalLanguageModel.Params
 
     def __init__(
         self,
@@ -188,14 +194,20 @@ class CausalLanguageModel(
             **kwargs,
         )
 
-    def setup(self, mode: SetupMode, **kwargs: Any) -> None:
-        super().setup(mode=mode, **kwargs)
+    def setup(
+        self,
+        mode: SetupMode,
+        params: Optional[RuneForTorch.SetupParams] = None,
+    ) -> None:
+        super().setup(mode, params)
+
+        assert isinstance(self.datamodule, CausalLanguageModelingDataModule)
 
         if mode == "training":
-            self.datamodule.setup(generation_mode=False)
+            self.datamodule.set_generation_mode(False)
         elif mode == "evaluation":
-            self.datamodule.setup(generation_mode=False)
+            self.datamodule.set_generation_mode(False)
         elif mode == "prediction":
-            self.datamodule.setup(generation_mode=True)
+            self.datamodule.set_generation_mode(True)
         else:
             raise ValueError(f"Unknown mode: {mode}")

@@ -1,4 +1,4 @@
-from typing import Any, Generic, Iterable, Iterator, TypeVar
+from typing import Generic, Iterable, Iterator, Sequence, TypeVar
 
 from collatable import Instance
 
@@ -10,7 +10,7 @@ Prediction = TypeVar("Prediction")
 
 
 class DataModule(Generic[Example, Inference, Prediction]):
-    def setup(self, *args: Any, **kwargs: Any) -> None:
+    def setup(self, dataset: Sequence[Example]) -> None:
         pass
 
     def preprocess(self, dataset: Iterable[Example]) -> Iterator[Example]:

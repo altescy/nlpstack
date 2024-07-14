@@ -5,6 +5,7 @@ from nlpstack.data import Vocabulary
 from nlpstack.data.indexers import TokenIndexer
 from nlpstack.data.tokenizers import Token
 from nlpstack.integrations.sklearn.rune import SklearnEstimatorForRune
+from nlpstack.integrations.torch.rune import RuneForTorch
 from nlpstack.integrations.torch.training import TorchTrainer
 from nlpstack.integrations.torch.training.callbacks import Callback
 
@@ -26,6 +27,9 @@ class SklearnBasicSequenceLabeler(
         BasicOutputs,
         SequenceLabelingExample,
         SequenceLabelingPrediction,
+        RuneForTorch.SetupParams,
+        TorchSequenceLabeler.Params,
+        TorchSequenceLabeler.Params,
     ]
 ):
     primary_metric = "token_accuracy"

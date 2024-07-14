@@ -5,6 +5,7 @@ from nlpstack.data import Vocabulary
 from nlpstack.data.indexers import TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer
 from nlpstack.integrations.sklearn.rune import SklearnEstimatorForRune
+from nlpstack.integrations.torch.rune import RuneForTorch
 from nlpstack.integrations.torch.training import TorchTrainer
 from nlpstack.integrations.torch.training.callbacks import Callback
 
@@ -29,6 +30,9 @@ class SklearnCausalLanguageModel(
         Outputs,
         CausalLanguageModelingExample,
         CausalLanguageModelingPrediction,
+        RuneForTorch.SetupParams,
+        TorchCausalLanguageModel.Params,
+        TorchCausalLanguageModel.Params,
     ]
 ):
     primary_metric = "perplexity"

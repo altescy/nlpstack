@@ -54,29 +54,23 @@ class TopicModelingDataModule(
     def vocab(self) -> Vocabulary:
         return self._vocab
 
-    def setup(
-        self,
-        *args: Any,
-        dataset: Optional[Sequence[TopicModelingExample]] = None,
-        **kwargs: Any,
-    ) -> None:
+    def setup(self, dataset: Sequence[TopicModelingExample]) -> None:
         """
         Setup the data module.
 
-        This method tokenizes the dataset and builds the vocabulary.
+        This method builds the vocabulary from the given dataset.
 
         Args:
             dataset: The dataset to tokenize and build the vocabulary from.
         """
 
-        if dataset:
-            self._build_vocab(dataset)
+        self._build_vocab(dataset)
 
     def preprocess(self, dataset: Iterable[TopicModelingExample]) -> Iterator[TopicModelingExample]:
         pipeline = self._preprocessor | DataclassTokenizer[TopicModelingExample, Any]({"text": self._tokenizer})
         return pipeline(dataset, params=(None, None))
 
-    def _build_vocab(self, dataset: Iterable[TopicModelingExample]) -> None:
+    def _build_vocab(self, dataset: Sequence[TopicModelingExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
             for example in dataset:
                 assert not isinstance(example.text, str), "Dataset must be tokenized."

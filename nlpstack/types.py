@@ -7,3 +7,7 @@ class DataclassInstance(Protocol):
 
 
 T_Dataclass = TypeVar("T_Dataclass", bound=DataclassInstance)
+
+Example = TypeVar("Example")
+Inference = TypeVar("Inference")
+Prediction = TypeVar("Prediction")

@@ -19,7 +19,7 @@
       batch_size: 200,
       learning_rate: 0.005,
       callbacks: [
-        { type: 'nlpstack.torch.training.callbacks.EarlyStopping', metric: '+valid_npmi', patience: 10 },
+        { type: 'nlpstack.integrations.torch.training.callbacks.EarlyStopping', metric: '+valid_npmi', patience: 10 },
       ],
     },
     metric: [

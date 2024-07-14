@@ -5,6 +5,7 @@ from nlpstack.data.indexers import TokenIndexer
 from nlpstack.data.tokenizers import Tokenizer
 from nlpstack.evaluation import Metric
 from nlpstack.integrations.sklearn.rune import SklearnEstimatorForRune
+from nlpstack.integrations.torch.rune import RuneForTorch
 from nlpstack.integrations.torch.training import TorchTrainer
 from nlpstack.integrations.torch.training.callbacks import Callback
 
@@ -25,6 +26,9 @@ class SklearnProdLDA(
         ProdLDAOutputs,
         TopicModelingExample,
         TopicModelingPrediction,
+        RuneForTorch.SetupParams,
+        TorchProdLDA.Params,
+        TorchProdLDA.Params,
     ]
 ):
     primary_metric = "perplexity"

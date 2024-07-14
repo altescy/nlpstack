@@ -21,12 +21,12 @@ class Text2TextGenerator(
     """
 
     class Fixtures(NamedTuple):
-        model: Rune[Text2TextExample, Text2TextPrediction]
+        model: Rune[Text2TextExample, Text2TextPrediction, Any, Any, Any]
         kwargs: Mapping[str, Any]
 
     def __init__(
         self,
-        model: Rune[Text2TextExample, Text2TextPrediction],
+        model: Rune[Text2TextExample, Text2TextPrediction, Any, Any, Any],
         *,
         batch_size: int = 1,
         max_workers: int = 1,

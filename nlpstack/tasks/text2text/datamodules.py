@@ -76,14 +76,8 @@ class Text2TextDataModule(
     def target_tokenizer(self) -> Tokenizer:
         return self._target_tokenizer
 
-    def setup(
-        self,
-        *args: Any,
-        dataset: Optional[Sequence[Text2TextExample]] = None,
-        **kwargs: Any,
-    ) -> None:
-        if dataset:
-            self._build_vocab(dataset)
+    def setup(self, dataset: Sequence[Text2TextExample]) -> None:
+        self._build_vocab(dataset)
 
     def preprocess(self, dataset: Iterable[Text2TextExample]) -> Iterator[Text2TextExample]:
         pipeline = self._preprocessor | DataclassTokenizer[Text2TextExample, Any](
@@ -91,7 +85,7 @@ class Text2TextDataModule(
         )
         return pipeline(dataset)
 
-    def _build_vocab(self, dataset: Iterable[Text2TextExample]) -> None:
+    def _build_vocab(self, dataset: Sequence[Text2TextExample]) -> None:
         def source_iterator() -> Iterator[Sequence[Token]]:
             for example in dataset:
                 assert not isinstance(example.source, str), "Dataset must be tokenized."

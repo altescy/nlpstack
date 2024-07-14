@@ -1,6 +1,6 @@
 import dataclasses
 from logging import getLogger
-from typing import Any, Mapping, Optional, Sequence, cast
+from typing import Any, Mapping, NamedTuple, Optional, Sequence, cast
 
 import torch
 import torch.nn.functional as F
@@ -24,7 +24,13 @@ class TorchUnsupervisedSimCSEOutput:
     loss: Optional[torch.FloatTensor] = None
 
 
-class TorchUnsupervisedSimCSE(TorchModel[RepresentationLearningInference]):
+class TorchUnsupervisedSimCSE(
+    TorchModel[
+        RepresentationLearningInference,
+        "TorchUnsupervisedSimCSE.Inputs",
+        "TorchUnsupervisedSimCSE.Params",
+    ]
+):
     """
     An unsupervised SimCSE model for PyTorch.
 
@@ -40,6 +46,12 @@ class TorchUnsupervisedSimCSE(TorchModel[RepresentationLearningInference]):
         temperature: The tempareture parameter for SimCSE training. Defaults to `0.05`.
         use_feedforward_for_only_training: If `True`, the feedforward is used only for trainig. Defaults to `False`.
     """
+
+    class Inputs(NamedTuple):
+        text: Mapping[str, Mapping[str, torch.Tensor]]
+        metadata: Optional[Sequence[Mapping[str, Any]]] = None
+
+    class Params(NamedTuple): ...
 
     def __init__(
         self,
@@ -63,12 +75,15 @@ class TorchUnsupervisedSimCSE(TorchModel[RepresentationLearningInference]):
     def setup(self, *args: Any, datamodule: RepresentationLearningDataModule, **kwargs: Any) -> None:
         super().setup(*args, datamodel=datamodule, vocab=datamodule.vocab, **kwargs)
 
-    def forward(  # type: ignore[override]
+    def forward(
         self,
-        text: Mapping[str, Mapping[str, torch.Tensor]],
-        metadata: Optional[Sequence[Mapping[str, Any]]] = None,
-        *args: Any,
+        inputs: "TorchUnsupervisedSimCSE.Inputs",
+        params: Optional["TorchUnsupervisedSimCSE.Params"] = None,
     ) -> TorchUnsupervisedSimCSEOutput:
+        del params
+
+        text, metadata = inputs
+
         def compute_embeddings(text: Mapping[str, Mapping[str, torch.Tensor]]) -> torch.FloatTensor:
             mask = get_mask_from_text(text)
             embedding = self._embedder(text)

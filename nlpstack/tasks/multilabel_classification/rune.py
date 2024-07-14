@@ -30,6 +30,7 @@ class MultilabelClassifier(
         MultilabelClassificationExample,
         MultilabelClassificationInference,
         MultilabelClassificationPrediction,
+        TorchMultilabelClassifier.Params,
     ]
 ):
     """
@@ -65,6 +66,11 @@ class MultilabelClassifier(
         metric: The metric for evaluation. Defaults to `MultilabelAccuracy()`.
         random_seed: The random seed. Defaults to `None`.
     """
+
+    Example = MultilabelClassificationExample
+    Prediction = MultilabelClassificationPrediction
+    PredictionParams = TorchMultilabelClassifier.Params
+    EvaluationParams = TorchMultilabelClassifier.Params
 
     def __init__(
         self,

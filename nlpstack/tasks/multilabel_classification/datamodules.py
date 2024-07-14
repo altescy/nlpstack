@@ -81,12 +81,7 @@ class MultilabelClassificationDataModule(
             return sorted(self._vocab.get_token_to_index(self.label_namespace))
         return self._labels
 
-    def setup(
-        self,
-        *args: Any,
-        dataset: Optional[Sequence[MultilabelClassificationExample]] = None,
-        **kwargs: Any,
-    ) -> None:
+    def setup(self, dataset: Sequence[MultilabelClassificationExample]) -> None:
         """
         Setup the data module.
 
@@ -96,8 +91,7 @@ class MultilabelClassificationDataModule(
             dataset: The dataset to tokenize and build the vocabulary from.
         """
 
-        if dataset:
-            self._build_vocab(dataset)
+        self._build_vocab(dataset)
 
     def preprocess(
         self,
