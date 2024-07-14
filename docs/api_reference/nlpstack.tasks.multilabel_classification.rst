@@ -1,5 +1,5 @@
-multilabel\_classification
-==========================
+nlpstack.tasks.multilabel\_classification package
+=================================================
 
 Submodules
 ----------

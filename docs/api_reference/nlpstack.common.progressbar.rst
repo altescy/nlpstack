@@ -1,4 +1,4 @@
-progressbar
+nlpstack.common.progressbar module
 ==================================
 
 .. automodule:: nlpstack.common.progressbar

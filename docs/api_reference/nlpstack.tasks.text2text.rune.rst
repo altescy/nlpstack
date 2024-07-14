@@ -1,5 +1,5 @@
-rune
-====
+nlpstack.tasks.text2text.rune module
+====================================
 
 .. automodule:: nlpstack.tasks.text2text.rune
    :members:

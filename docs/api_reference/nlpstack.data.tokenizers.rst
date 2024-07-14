@@ -1,5 +1,5 @@
-tokenizers
-==========
+nlpstack.data.tokenizers module
+===============================
 
 .. automodule:: nlpstack.data.tokenizers
    :members:

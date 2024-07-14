@@ -1,5 +1,5 @@
-jsonnet
-=======
+nlpstack.common.jsonnet module
+==============================
 
 .. automodule:: nlpstack.common.jsonnet
    :members:

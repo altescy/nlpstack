@@ -1,5 +1,5 @@
-cacheutil
-=========
+nlpstack.common.cacheutil module
+================================
 
 .. automodule:: nlpstack.common.cacheutil
    :members:

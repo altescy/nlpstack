@@ -1,5 +1,5 @@
-pipeline
-========
+nlpstack.common.pipeline module
+===============================
 
 .. automodule:: nlpstack.common.pipeline
    :members:

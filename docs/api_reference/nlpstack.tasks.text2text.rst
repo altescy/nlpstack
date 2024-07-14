@@ -1,5 +1,5 @@
-text2text
-=========
+nlpstack.tasks.text2text package
+================================
 
 Submodules
 ----------
@@ -8,6 +8,7 @@ Submodules
    :maxdepth: 6
 
    nlpstack.tasks.text2text.datamodules
+   nlpstack.tasks.text2text.generators
    nlpstack.tasks.text2text.metrics
    nlpstack.tasks.text2text.rune
    nlpstack.tasks.text2text.sklearn

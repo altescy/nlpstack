@@ -1,5 +1,5 @@
-rune module
-===========
+nlpstack.tasks.sequence\_labeling.rune module
+=============================================
 
 .. automodule:: nlpstack.tasks.sequence_labeling.rune
    :members:

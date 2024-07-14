@@ -1,5 +1,5 @@
-automaton
-=========
+nlpstack.common.automaton module
+================================
 
 .. automodule:: nlpstack.common.automaton
    :members:

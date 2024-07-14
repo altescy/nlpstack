@@ -1,5 +1,5 @@
-hashutil
-========
+nlpstack.common.hashutil module
+===============================
 
 .. automodule:: nlpstack.common.hashutil
    :members:

@@ -1,5 +1,5 @@
-classification
-==============
+nlpstack.tasks.classification package
+=====================================
 
 Submodules
 ----------

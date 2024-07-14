@@ -1,5 +1,5 @@
-metrics
-=======
+nlpstack.tasks.classification.metrics module
+============================================
 
 .. automodule:: nlpstack.tasks.classification.metrics
    :members:

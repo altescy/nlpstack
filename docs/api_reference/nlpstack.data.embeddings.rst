@@ -1,5 +1,5 @@
-embeddings
-==========
+nlpstack.data.embeddings module
+===============================
 
 .. automodule:: nlpstack.data.embeddings
    :members:

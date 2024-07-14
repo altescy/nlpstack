@@ -1,5 +1,5 @@
-handler
-=======
+nlpstack.server.handler module
+==============================
 
 .. automodule:: nlpstack.server.handler
    :members:

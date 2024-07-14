@@ -1,5 +1,5 @@
-causal\_language\_modeling
-==========================
+nlpstack.tasks.causal\_language\_modeling package
+=================================================
 
 Submodules
 ----------
@@ -8,6 +8,7 @@ Submodules
    :maxdepth: 6
 
    nlpstack.tasks.causal_language_modeling.datamodules
+   nlpstack.tasks.causal_language_modeling.generators
    nlpstack.tasks.causal_language_modeling.metrics
    nlpstack.tasks.causal_language_modeling.rune
    nlpstack.tasks.causal_language_modeling.sklearn

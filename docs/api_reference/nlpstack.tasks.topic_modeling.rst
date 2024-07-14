@@ -1,5 +1,5 @@
-topic\_modeling
-===============
+nlpstack.tasks.topic\_modeling package
+======================================
 
 Submodules
 ----------

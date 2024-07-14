@@ -1,5 +1,5 @@
-indexers
-========
+nlpstack.data.indexers module
+=============================
 
 .. automodule:: nlpstack.data.indexers
    :members:

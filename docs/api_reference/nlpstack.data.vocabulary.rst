@@ -1,5 +1,5 @@
-vocabulary
-==========
+nlpstack.data.vocabulary module
+===============================
 
 .. automodule:: nlpstack.data.vocabulary
    :members:

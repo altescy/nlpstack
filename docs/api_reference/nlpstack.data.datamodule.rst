@@ -1,5 +1,5 @@
-datamodule
-==========
+nlpstack.data.datamodule module
+===============================
 
 .. automodule:: nlpstack.data.datamodule
    :members:

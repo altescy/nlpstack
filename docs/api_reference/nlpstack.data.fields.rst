@@ -1,5 +1,5 @@
-fields
-======
+nlpstack.data.fields module
+===========================
 
 .. automodule:: nlpstack.data.fields
    :members:
