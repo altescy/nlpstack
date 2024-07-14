@@ -58,12 +58,7 @@ class RepresentationLearningDataModule(
     def vocab(self) -> Vocabulary:
         return self._vocab
 
-    def setup(
-        self,
-        *args: Any,
-        dataset: Optional[Sequence[RepresentationLearningExample]] = None,
-        **kwargs: Any,
-    ) -> None:
+    def setup(self, dataset: Sequence[RepresentationLearningExample]) -> None:
         """
         Setup the data module.
 
@@ -73,8 +68,7 @@ class RepresentationLearningDataModule(
             dataset: The dataset to tokenize and build the vocabulary from.
         """
 
-        if dataset:
-            self._build_vocab(dataset)
+        self._build_vocab(dataset)
 
     def preprocess(
         self,
@@ -85,7 +79,7 @@ class RepresentationLearningDataModule(
         )
         return pipeline(dataset)
 
-    def _build_vocab(self, dataset: Iterable[RepresentationLearningExample]) -> None:
+    def _build_vocab(self, dataset: Sequence[RepresentationLearningExample]) -> None:
         def text_iterator() -> Iterator[Sequence[Token]]:
             for example in dataset:
                 assert not isinstance(example.text, str), "Dataset must be tokenized."

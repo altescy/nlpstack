@@ -26,6 +26,7 @@ class BasicSequenceLabeler(
         SequenceLabelingExample,
         SequenceLabelingInference,
         SequenceLabelingPrediction,
+        TorchSequenceLabeler.Params,
     ]
 ):
     """
@@ -56,6 +57,11 @@ class BasicSequenceLabeler(
         metric: The metric for evaluation. Defaults to `TokenBasedAccuracy()`.
         random_seed: The random seed. Defaults to `None`.
     """
+
+    Example = SequenceLabelingExample
+    Prediction = SequenceLabelingPrediction
+    PredictionParams = TorchSequenceLabeler.Params
+    EvaluationParams = TorchSequenceLabeler.Params
 
     def __init__(
         self,

@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Any, Generic, Mapping, Optional, Sequence, Tuple, cast
+from typing import Any, Generic, Mapping, NamedTuple, Optional, Sequence, Tuple, cast
 
 import numpy
 import torch
@@ -22,7 +22,14 @@ class TorchCausalLanguageModelOutput:
     loss: Optional[torch.FloatTensor] = None
 
 
-class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference], Generic[Seq2SeqDecoderState]):
+class TorchCausalLanguageModel(
+    TorchModel[
+        CausalLanguageModelingInference,
+        "TorchCausalLanguageModel.Inputs",
+        "TorchCausalLanguageModel.Params",
+    ],
+    Generic[Seq2SeqDecoderState],
+):
     """
     A causal language model for PyTorch.
 
@@ -35,6 +42,15 @@ class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference], Gene
         beam_search: The beam search module.
         token_namespace: The namespace of the tokens.
     """
+
+    class Inputs(NamedTuple):
+        text: Mapping[str, Mapping[str, torch.Tensor]]
+        labels: Optional[Mapping[str, Mapping[str, torch.Tensor]]] = None
+        metadata: Optional[Sequence[Any]] = None
+
+    class Params(NamedTuple):
+        return_only_generated: bool = False
+        beam_search: Optional[BeamSearch.Params] = None
 
     def __init__(
         self,
@@ -113,15 +129,14 @@ class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference], Gene
             output_mask[i, :, :extracted_length] = extracted_mask[i]
         return cast(torch.LongTensor, output_token_ids), cast(torch.BoolTensor, output_mask)
 
-    def forward(  # type: ignore[override]
+    def forward(
         self,
-        text: Mapping[str, Mapping[str, torch.Tensor]],
-        labels: Optional[Mapping[str, Mapping[str, torch.Tensor]]] = None,
-        metadata: Optional[Sequence[Any]] = None,
-        *,
-        return_only_generated: bool = False,
-        **kwargs: Any,
+        inputs: "TorchCausalLanguageModel.Inputs",
+        params: Optional["TorchCausalLanguageModel.Params"] = None,
     ) -> TorchCausalLanguageModelOutput:
+        text, labels, metadata = inputs
+        params = params or TorchCausalLanguageModel.Params()
+
         token_ids = get_token_ids_from_text(text)
         mask = get_mask_from_text(text)
 
@@ -176,9 +191,11 @@ class TorchCausalLanguageModel(TorchModel[CausalLanguageModelingInference], Gene
                 return log_probs, state
 
             state = self._decoder.get_initial_state(embeddings, inputs_mask=mask)
-            pred_token_ids, pred_mask, scores = self._beam_search.search(token_ids, mask, state, step, **kwargs)
+            pred_token_ids, pred_mask, scores = self._beam_search.search(
+                token_ids, mask, state, step, params=params.beam_search
+            )
 
-            if return_only_generated:
+            if params.return_only_generated:
                 pred_token_ids, pred_mask = self._get_generated_sequences(token_ids, pred_token_ids, mask, pred_mask)
 
             inference.pred_token_ids = pred_token_ids.detach().cpu().numpy()

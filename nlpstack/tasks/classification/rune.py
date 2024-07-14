@@ -2,7 +2,7 @@ import tempfile
 import warnings
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, Literal, Mapping, Optional, Sequence, Set, Union
+from typing import Any, Dict, Iterable, Iterator, Literal, Mapping, NamedTuple, Optional, Sequence, Set, Union
 
 import numpy
 
@@ -18,6 +18,7 @@ from nlpstack.integrations.torch.rune import RuneForTorch
 from nlpstack.integrations.torch.training import TorchTrainer
 from nlpstack.integrations.torch.training.callbacks import Callback
 from nlpstack.integrations.torch.training.optimizers import AdamFactory
+from nlpstack.rune import Rune
 
 from .datamodules import BasicClassificationDataModule, ClassificationPostprocessor, ClassificationPreprocessor
 from .metrics import Accuracy, ClassificationMetric
@@ -32,6 +33,7 @@ class BasicClassifier(
         ClassificationExample,
         ClassificationInference,
         ClassificationPrediction,
+        TorchBasicClassifier.Params,
     ]
 ):
     """
@@ -71,6 +73,11 @@ class BasicClassifier(
         metric: The metric for evaluation. Defaults to `Accuracy()`.
         random_seed: The random seed. Defaults to `None`.
     """
+
+    Example = ClassificationExample
+    Prediction = ClassificationPrediction
+    PredictionParams = TorchBasicClassifier.Params
+    EvaluationParams = TorchBasicClassifier.Params
 
     def __init__(
         self,
@@ -220,10 +227,12 @@ class BasicClassifier(
 
 
 class FastTextClassifier(
-    RuneForTorch[
+    Rune[
         ClassificationExample,
-        ClassificationInference,
         ClassificationPrediction,
+        "FastTextClassifier.SetupParams",
+        "FastTextClassifier.PredictionParams",
+        "FastTextClassifier.EvaluationParams",
     ]
 ):
     """
@@ -255,6 +264,18 @@ class FastTextClassifier(
             trained with autotune. Defaults to `None`.
         metric: The metric for evaluation. Defaults to `Accuracy()`.
     """
+
+    Example = ClassificationExample
+    Prediction = ClassificationPrediction
+
+    class SetupParams(NamedTuple): ...
+
+    class PredictionParams(NamedTuple):
+        k: Optional[int] = None
+        threshold: float = 0.0
+
+    class EvaluationParams(NamedTuple):
+        batch_size: int = 32
 
     def __init__(
         self,
@@ -374,13 +395,12 @@ class FastTextClassifier(
 
         return self
 
-    def predict(  # type: ignore[override]
+    def predict(
         self,
         dataset: Iterable[ClassificationExample],
-        *,
-        k: Optional[int] = None,
-        threshold: float = 0.0,
+        params: Optional["FastTextClassifier.PredictionParams"] = None,
     ) -> Iterator[ClassificationPrediction]:
+        k, threshold = params or FastTextClassifier.PredictionParams()
         if self._model is None:
             raise RuntimeError("model is not trained")
         k = k or len(self._labels)
@@ -394,12 +414,12 @@ class FastTextClassifier(
                 metadata=example.metadata,
             )
 
-    def evaluate(  # type: ignore[override]
+    def evaluate(
         self,
         dataset: Iterable[ClassificationExample],
-        *,
-        batch_size: int = 32,
+        params: Optional["FastTextClassifier.EvaluationParams"] = None,
     ) -> Mapping[str, float]:
+        (batch_size,) = params or FastTextClassifier.EvaluationParams()
         if self._model is None:
             raise RuntimeError("model is not trained")
         label_to_index = {label: i for i, label in enumerate(self._labels)}

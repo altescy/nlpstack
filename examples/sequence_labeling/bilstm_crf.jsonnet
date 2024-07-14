@@ -16,14 +16,14 @@ local token_character_namespace = 'token_characters';
       embedder: {
         token_embedders: {
           token_characters: {
-            type: 'nlpstack.torch.modules.token_embedders.TokenSubwordsEmbedder',
+            type: 'nlpstack.integrations.torch.modules.token_embedders.TokenSubwordsEmbedder',
             embedder: {
-              type: 'nlpstack.torch.modules.token_embedders.Embedding',
+              type: 'nlpstack.integrations.torch.modules.token_embedders.Embedding',
               embedding_dim: 64,
               namespace: token_character_namespace,
             },
             encoder: {
-              type: 'nlpstack.torch.modules.seq2vec_encoders.CnnEncoder',
+              type: 'nlpstack.integrations.torch.modules.seq2vec_encoders.CnnEncoder',
               input_dim: 64,
               num_filters: 16,
               ngram_filter_sizes: [1, 2, 3, 4],
@@ -33,7 +33,7 @@ local token_character_namespace = 'token_characters';
         },
       },
       encoder: {
-        type: 'nlpstack.torch.modules.seq2seq_encoders.LstmSeq2SeqEncoder',
+        type: 'nlpstack.integrations.torch.modules.seq2seq_encoders.LstmSeq2SeqEncoder',
         input_dim: 64,
         hidden_dim: 32,
         num_layers: 1,
@@ -54,12 +54,12 @@ local token_character_namespace = 'token_characters';
       max_epochs: 80,
       batch_size: 32,
       optimizer_factory: {
-        type: 'nlpstack.torch.training.optimizers.AdamFactory',
+        type: 'nlpstack.integrations.torch.training.optimizers.AdamFactory',
         lr: 0.01,
       },
       callbacks: [
         {
-          type: 'nlpstack.torch.training.callbacks.EarlyStopping',
+          type: 'nlpstack.integrations.torch.training.callbacks.EarlyStopping',
           patience: 3,
           metric: '+valid_f1_overall',
         },

@@ -18,9 +18,9 @@ local pretrained_model_name = 'bert-base-cased';
       embedder: {
         token_embedders: {
           tokens: {
-            type: 'nlpstack.torch.modules.token_embedders.AggregativeTokenEmbedder',
+            type: 'nlpstack.integrations.torch.modules.token_embedders.AggregativeTokenEmbedder',
             embedder: {
-              type: 'nlpstack.torch.modules.token_embedders.PretrainedTransformerEmbedder',
+              type: 'nlpstack.integrations.torch.modules.token_embedders.PretrainedTransformerEmbedder',
               pretrained_model_name: pretrained_model_name,
               train_parameters: false,
               layer_to_use: 'all',
@@ -30,7 +30,7 @@ local pretrained_model_name = 'bert-base-cased';
         },
       },
       encoder: {
-        type: 'nlpstack.torch.modules.seq2seq_encoders.PassThroughSeq2SeqEncoder',
+        type: 'nlpstack.integrations.torch.modules.seq2seq_encoders.PassThroughSeq2SeqEncoder',
         input_dim: 768,
       },
       decoder: {
@@ -48,12 +48,12 @@ local pretrained_model_name = 'bert-base-cased';
       max_epochs: 80,
       batch_size: 32,
       optimizer_factory: {
-        type: 'nlpstack.torch.training.optimizers.AdamFactory',
+        type: 'nlpstack.integrations.torch.training.optimizers.AdamFactory',
         lr: 0.01,
       },
       callbacks: [
         {
-          type: 'nlpstack.torch.training.callbacks.EarlyStopping',
+          type: 'nlpstack.integrations.torch.training.callbacks.EarlyStopping',
           patience: 3,
           metric: '+valid_f1_overall',
         },

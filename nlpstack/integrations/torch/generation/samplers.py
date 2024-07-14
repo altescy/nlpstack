@@ -1,11 +1,18 @@
-from typing import Any, Generic, Optional, Tuple, TypeVar, cast
+from typing import Any, Generic, NamedTuple, Optional, Tuple, Type, TypeVar, cast
 
 import torch
 
 SamplerState = TypeVar("SamplerState")
+SamplerParams = TypeVar("SamplerParams")
 
 
-class Sampler(Generic[SamplerState]):
+class EmptyParams(NamedTuple):
+    pass
+
+
+class Sampler(Generic[SamplerState, SamplerParams]):
+    Params: Type[SamplerParams]
+
     def setup(self, *args: Any, **kwargs: Any) -> None:
         pass
 
@@ -24,13 +31,14 @@ class Sampler(Generic[SamplerState]):
         log_probs: torch.Tensor,
         size: int,
         state: SamplerState,
-        **kwargs: Any,
+        params: Optional[SamplerParams] = None,
     ) -> Tuple[torch.Tensor, torch.LongTensor, SamplerState]:
         """
         Args:
             log_probs: Tensor of shape `(batch_size, num_nodes)`.
             size: Number of nodes to sample.
             state: State of the sampler.
+            params: Additional parameters for sampling.
 
         Returns:
             selected_log_probs: Tensor of shape `(batch_size, size)`.
@@ -44,14 +52,15 @@ class Sampler(Generic[SamplerState]):
         log_probs: torch.Tensor,
         size: int,
         state: SamplerState,
-        **kwargs: Any,
     ) -> Tuple[torch.Tensor, torch.LongTensor, SamplerState]:
         size = min(size, log_probs.size(-1))
         selected_log_probs, selected_indices = torch.topk(log_probs, size, dim=-1)
         return selected_log_probs, cast(torch.LongTensor, selected_indices), state
 
 
-class DeterministicSampler(Sampler[None]):
+class DeterministicSampler(Sampler[None, EmptyParams]):
+    Params = EmptyParams
+
     def init_state(self, token_ids: torch.LongTensor, mask: torch.BoolTensor) -> None:
         return None
 
@@ -60,14 +69,21 @@ class DeterministicSampler(Sampler[None]):
         log_probs: torch.Tensor,
         size: int,
         state: None,
-        **kwargs: Any,
+        params: Optional[EmptyParams] = None,
     ) -> Tuple[torch.Tensor, torch.LongTensor, None]:
+        del params
         size = min(size, log_probs.size(-1))
         selected_log_probs, selected_indices = torch.topk(log_probs, size, dim=-1)
         return selected_log_probs, cast(torch.LongTensor, selected_indices), state
 
 
-class MultinomialSampler(Sampler[None]):
+class MultinomialSampler(Sampler[None, "MultinomialSampler.Params"]):
+    class Params(NamedTuple):
+        top_k: Optional[int] = None
+        top_p: Optional[float] = None
+        temperature: Optional[float] = None
+        with_replacement: Optional[bool] = None
+
     def __init__(
         self,
         top_k: Optional[int] = None,
@@ -88,17 +104,13 @@ class MultinomialSampler(Sampler[None]):
         log_probs: torch.Tensor,
         size: int,
         state: None,
-        *,
-        top_k: Optional[int] = None,
-        top_p: Optional[float] = None,
-        temperature: Optional[float] = None,
-        with_replacement: Optional[bool] = None,
-        **kwargs: Any,
+        params: Optional["MultinomialSampler.Params"] = None,
     ) -> Tuple[torch.Tensor, torch.LongTensor, None]:
-        top_k = self._top_k if top_k is None else top_k
-        top_p = self._top_p if top_p is None else top_p
-        temperature = self._temperature if temperature is None else temperature
-        with_replacement = self._with_replacement if with_replacement is None else with_replacement
+        params = params or MultinomialSampler.Params()
+        top_k = self._top_k if params.top_k is None else params.top_k
+        top_p = self._top_p if params.top_p is None else params.top_p
+        temperature = self._temperature if params.temperature is None else params.temperature
+        with_replacement = self._with_replacement if params.with_replacement is None else params.with_replacement
 
         if top_k is not None and not size <= top_k <= log_probs.size(-1):
             raise ValueError("top_k must be size <= top_k <= vocabulary size")

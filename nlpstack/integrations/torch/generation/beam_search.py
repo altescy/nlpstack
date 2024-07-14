@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Any, Callable, List, NamedTuple, Optional, Protocol, Tuple, TypeVar, Union, cast
+from typing import Any, Callable, List, Mapping, NamedTuple, Optional, Protocol, Tuple, TypeVar, Union, cast
 
 import torch
 
@@ -22,21 +22,32 @@ class StepStateInterface(Protocol):
 StepState = TypeVar("StepState", bound=StepStateInterface)
 
 
-class BeamSearchOutput(NamedTuple):
-    """Output of beam search.
-
-    Attributes:
-        token_ids: Tensor of shape `(batch_size, beam_size, max_steps)`.
-        mask: Tensor of shape `(batch_size, beam_size, max_steps)`.
-        scores: Tensor of shape `(batch_size, beam_size)`.
-    """
-
-    token_ids: torch.LongTensor
-    mask: torch.BoolTensor
-    scores: torch.Tensor
-
-
 class BeamSearch:
+    class Output(NamedTuple):
+        """Output of beam search.
+
+        Attributes:
+            token_ids: Tensor of shape `(batch_size, beam_size, max_steps)`.
+            mask: Tensor of shape `(batch_size, beam_size, max_steps)`.
+            scores: Tensor of shape `(batch_size, beam_size)`.
+        """
+
+        token_ids: torch.LongTensor
+        mask: torch.BoolTensor
+        scores: torch.Tensor
+
+    class Params(NamedTuple):
+        """Parameters for beam search.
+
+        Attributes:
+            beam_size: Number of beams to search.
+            max_steps: Maximum number of steps to search.
+        """
+
+        beam_size: Optional[int] = None
+        max_steps: Optional[int] = None
+        sampling: Optional[Mapping[str, Any]] = None
+
     def __init__(
         self,
         max_steps: int = 50,
@@ -76,11 +87,9 @@ class BeamSearch:
         mask: torch.BoolTensor,
         state: StepState,
         step: Callable[[torch.LongTensor, StepState], Tuple[torch.Tensor, StepState]],
-        *,
-        beam_size: Optional[int] = None,
-        max_steps: Optional[int] = None,
+        params: Optional["BeamSearch.Params"] = None,
         **kwargs: Any,
-    ) -> BeamSearchOutput:
+    ) -> "BeamSearch.Output":
         """
         Args:
             token_ids: Tensor of shape `(batch_size, initial_length)`.
@@ -93,6 +102,8 @@ class BeamSearch:
         Returns:
             Output of beam search with attributes `token_ids` and `scores`.
         """
+
+        beam_size, max_steps, sampling_params = params or BeamSearch.Params()
 
         beam_size = self._beam_size if beam_size is None else beam_size
         batch_size = token_ids.size(0)
@@ -167,7 +178,9 @@ class BeamSearch:
                 top_log_probs,  # Shape: (batch_size, beam_size, sampling_size_per_node)
                 top_next_token_ids,  # Shape: (batch_size, beam_size, sampling_size_per_node)
                 sampler_state,
-            ) = self._sampler.sample_nodes(log_probs, sampling_size_per_node, sampler_state, **kwargs)
+            ) = self._sampler.sample_nodes(
+                log_probs, sampling_size_per_node, sampler_state, self._sampler.Params(**(sampling_params or {}))
+            )
 
             # Shape: (batch_size, beam_size * sampling_size_per_node)
             top_scores = scorer.score(scorer_state, top_log_probs).view(batch_size, -1)
@@ -176,7 +189,7 @@ class BeamSearch:
                 beam_scores,  # Shape: (batch_size, beam_size)
                 beam_indices,  # Shape: (batch_size, beam_size)
                 sampler_state,
-            ) = self._sampler.sample_beams(top_scores, beam_size, sampler_state, **kwargs)
+            ) = self._sampler.sample_beams(top_scores, beam_size, sampler_state)
 
             # Shape: (batch_size, beam_size)
             last_token_ids = cast(torch.LongTensor, top_next_token_ids.view(batch_size, -1).gather(1, beam_indices))
@@ -239,7 +252,7 @@ class BeamSearch:
         )
         sorted_final_mask = final_mask.gather(1, sorted_final_indices.unsqueeze(-1).expand_as(final_mask))
 
-        return BeamSearchOutput(
+        return BeamSearch.Output(
             cast(torch.LongTensor, sorted_final_token_ids),
             cast(torch.BoolTensor, sorted_final_mask),
             sorted_final_scores,

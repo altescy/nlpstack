@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Any, Mapping, Optional, Sequence
+from typing import Any, Mapping, NamedTuple, Optional, Sequence
 
 import torch
 
@@ -21,7 +21,13 @@ class SequenceLabelerOutput:
     loss: Optional[torch.FloatTensor] = None
 
 
-class TorchSequenceLabeler(TorchModel[SequenceLabelingInference]):
+class TorchSequenceLabeler(
+    TorchModel[
+        SequenceLabelingInference,
+        "TorchSequenceLabeler.Inputs",
+        "TorchSequenceLabeler.Params",
+    ]
+):
     """
     A neural sequence labeling model for PyTorch.
 
@@ -33,6 +39,14 @@ class TorchSequenceLabeler(TorchModel[SequenceLabelingInference]):
         top_k: The top-k parameter for the CRF decoder. If given, top-k predictions are returned. Defaults to `None`,
         label_namespace: The namespace of the labels. Defaults to `"labels"`.
     """
+
+    class Inputs(NamedTuple):
+        tokens: Mapping[str, Mapping[str, torch.Tensor]]
+        labels: Optional[torch.LongTensor] = None
+        metadata: Optional[Sequence[Any]] = None
+
+    class Params(NamedTuple):
+        top_k: Optional[int] = None
 
     def __init__(
         self,
@@ -70,15 +84,14 @@ class TorchSequenceLabeler(TorchModel[SequenceLabelingInference]):
         if self._decoder is not None:
             self._decoder.setup(*args, datamodule=datamodule, vocab=datamodule.vocab, **kwargs)
 
-    def forward(  # type: ignore[override]
+    def forward(
         self,
-        tokens: Mapping[str, Mapping[str, torch.Tensor]],
-        labels: Optional[torch.LongTensor] = None,
-        metadata: Optional[Sequence[Any]] = None,
-        *,
-        top_k: Optional[int] = None,
-        **kwargs: Any,
+        inputs: "TorchSequenceLabeler.Inputs",
+        params: Optional["TorchSequenceLabeler.Params"] = None,
     ) -> SequenceLabelerOutput:
+        tokens, labels, metadata = inputs
+        (top_k,) = params or TorchSequenceLabeler.Params()
+
         top_k = top_k or self._top_k
         mask = get_mask_from_text(tokens)
 

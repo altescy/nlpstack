@@ -25,6 +25,7 @@ class UnsupervisedSimCSE(
         RepresentationLearningExample,
         RepresentationLearningInference,
         RepresentationLearningPrediction,
+        TorchUnsupervisedSimCSE.Params,
     ]
 ):
     """
@@ -55,6 +56,11 @@ class UnsupervisedSimCSE(
             otherwise the trainer will be constructed from the related arguments. Defaults to `None`.
         random_seed: The random seed. Defaults to `None`.
     """
+
+    Example = RepresentationLearningExample
+    Prediction = RepresentationLearningPrediction
+    PredictionParams = TorchUnsupervisedSimCSE.Params
+    EvaluationParams = TorchUnsupervisedSimCSE.Params
 
     def __init__(
         self,

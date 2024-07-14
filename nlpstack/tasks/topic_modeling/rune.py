@@ -23,6 +23,7 @@ class ProdLDA(
         TopicModelingExample,
         TopicModelingInference,
         TopicModelingPrediction,
+        TorchProdLDA.Params,
     ]
 ):
     """
@@ -55,6 +56,11 @@ class ProdLDA(
         metric: The metric for evaluation. Defaults to `Perplexity()`.
         random_seed: The random seed. Defaults to `None`.
     """
+
+    Example = TopicModelingExample
+    Prediction = TopicModelingPrediction
+    PredictionParams = TorchProdLDA.Params
+    EvaluationParams = TorchProdLDA.Params
 
     def __init__(
         self,
@@ -165,7 +171,10 @@ class ProdLDA(
 
     def get_topics(self) -> numpy.ndarray:
         assert isinstance(self.model, TorchProdLDA)
-        return cast(numpy.ndarray, self.model.get_topics().numpy())
+        return cast(
+            numpy.ndarray,
+            self.model.get_topics().numpy(),  # type: ignore[attr-defined]
+        )
 
     def get_topic_terms(self, topic_id: int, top_n: int = 10) -> List[str]:
         assert isinstance(self.model, TorchProdLDA)
@@ -173,5 +182,9 @@ class ProdLDA(
         topic_word_distribution = self.get_topics()[topic_id]
         top_word_indices = numpy.argsort(topic_word_distribution)[::-1][:top_n]
         return [
-            self.datamodule.vocab.get_token_by_index(self.model._token_namespace, index) for index in top_word_indices
+            self.datamodule.vocab.get_token_by_index(
+                self.model._token_namespace,  # type: ignore[attr-defined]
+                index,
+            )
+            for index in top_word_indices
         ]

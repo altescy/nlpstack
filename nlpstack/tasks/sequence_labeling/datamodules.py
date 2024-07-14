@@ -63,12 +63,7 @@ class SequenceLabelingDataModule(
     def label_namespace(self) -> str:
         return self._label_namespace
 
-    def setup(
-        self,
-        *args: Any,
-        dataset: Optional[Sequence[SequenceLabelingExample]] = None,
-        **kwargs: Any,
-    ) -> None:
+    def setup(self, dataset: Sequence[SequenceLabelingExample]) -> None:
         """
         Setup the data module.
 
@@ -79,8 +74,7 @@ class SequenceLabelingDataModule(
                 tokenized before calling this method.
         """
 
-        if dataset:
-            self._build_vocab(dataset)
+        self._build_vocab(dataset)
 
     def preprocess(
         self,

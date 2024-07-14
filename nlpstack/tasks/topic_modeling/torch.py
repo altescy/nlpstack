@@ -1,6 +1,6 @@
 import dataclasses
 from logging import getLogger
-from typing import Any, Literal, Mapping, Optional, Sequence, Union, cast
+from typing import Any, Literal, Mapping, NamedTuple, Optional, Sequence, Union, cast
 
 import torch
 import torch.nn.functional as F
@@ -21,7 +21,13 @@ class TorchProdLDAOutput:
     loss: Optional[torch.FloatTensor] = None
 
 
-class TorchProdLDA(TorchModel[TopicModelingInference]):
+class TorchProdLDA(
+    TorchModel[
+        TopicModelingInference,
+        "TorchProdLDA.Inputs",
+        "TorchProdLDA.Params",
+    ]
+):
     """
     ProdLDA model for PyTorch.
 
@@ -33,6 +39,14 @@ class TorchProdLDA(TorchModel[TopicModelingInference]):
         prior: The prior distribution. Defaults to `"dirichlet"`.
         token_namespaces: The vocabulary namespace of tokens. Defaults to `"tokens"`.
     """
+
+    class Inputs(NamedTuple):
+        text: Mapping[str, Mapping[str, torch.Tensor]]
+        metadata: Optional[Sequence[Mapping[str, Any]]] = None
+
+    class Params(NamedTuple):
+        text: Mapping[str, Mapping[str, torch.Tensor]]
+        metadata: Optional[Sequence[Mapping[str, Any]]] = None
 
     class HiddenToLogNormal(torch.nn.Module):
         def __init__(self, hidden_dim: int, num_topics: int) -> None:
@@ -117,10 +131,12 @@ class TorchProdLDA(TorchModel[TopicModelingInference]):
 
     def forward(  # type: ignore[override]
         self,
-        text: Mapping[str, Mapping[str, torch.Tensor]],
-        metadata: Optional[Sequence[Mapping[str, Any]]] = None,
-        *args: Any,
+        inputs: "TorchProdLDA.Inputs",
+        params: Optional["TorchProdLDA.Params"] = None,
     ) -> TorchProdLDAOutput:
+        del params
+        text, metadata = inputs
+
         embedding = self._embedder(text)
         hidden = self._encoder(embedding)
         posterior = self._projector(hidden)

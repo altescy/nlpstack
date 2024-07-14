@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Any, Literal, Mapping, Optional, Sequence, Union, cast
+from typing import Any, Literal, Mapping, NamedTuple, Optional, Sequence, Union, cast
 
 import torch
 import torch.nn.functional as F
@@ -23,7 +23,13 @@ class BasicClassifierOutput:
     loss: Optional[torch.FloatTensor] = None
 
 
-class TorchBasicClassifier(TorchModel[ClassificationInference]):
+class TorchBasicClassifier(
+    TorchModel[
+        ClassificationInference,
+        "TorchBasicClassifier.Inputs",
+        "TorchBasicClassifier.Params",
+    ]
+):
     """
     A basic classifier for PyTorch.
 
@@ -45,6 +51,15 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
             are returned. Defaults to `None`.
         label_namespace: The namespace of the labels. Defaults to `"labels"`.
     """
+
+    class Inputs(NamedTuple):
+        text: Mapping[str, Mapping[str, torch.Tensor]]
+        label: Optional[torch.LongTensor] = None
+        metadata: Optional[Sequence[Any]] = None
+
+    class Params(NamedTuple):
+        top_k: Optional[int] = None
+        threshold: Optional[float] = None
 
     def __init__(
         self,
@@ -102,15 +117,14 @@ class TorchBasicClassifier(TorchModel[ClassificationInference]):
                     label_index = vocab.get_index_by_token(self._label_namespace, label)
                     self._loss_weight[label_index] = weight
 
-    def forward(  # type: ignore[override]
+    def forward(
         self,
-        text: Mapping[str, Mapping[str, torch.Tensor]],
-        label: Optional[torch.LongTensor] = None,
-        metadata: Optional[Sequence[Any]] = None,
-        *,
-        top_k: Optional[int] = None,
-        threshold: Optional[float] = None,
+        inputs: "TorchBasicClassifier.Inputs",
+        params: Optional["TorchBasicClassifier.Params"] = None,
     ) -> BasicClassifierOutput:
+        text, label, metadata = inputs
+        top_k, threshold = params or TorchBasicClassifier.Params()
+
         mask = get_mask_from_text(text)
 
         embeddings = self._embedder(text)

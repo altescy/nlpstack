@@ -22,11 +22,10 @@ from nlpstack.integrations.torch.util import move_to_device
 logger = getLogger(__name__)
 
 Inference = TypeVar("Inference")
-TorchModelOutputType = TypeVar("TorchModelOutputType", bound=TorchModelOutput)
 
 
 @dataclasses.dataclass
-class TrainingState(Generic[TorchModelOutputType]):
+class TrainingState(Generic[Inference]):
     """The state of the training loop.
 
     TrainingState is a dataclass that stores the state of the training loop. It is used by the Trainer
@@ -42,7 +41,7 @@ class TrainingState(Generic[TorchModelOutputType]):
 
     epoch: int
     step: int
-    model: TorchModel[TorchModelOutputType]
+    model: TorchModel[Inference, Any, Any]
     optimizer: Optimizer
     lrscheduler: Optional[LRScheduler] = None
 
@@ -68,36 +67,36 @@ class TrainingEngine:
     def create_state(
         self,
         trainer: "TorchTrainer",
-        model: TorchModel[TorchModelOutputType],
-    ) -> TrainingState[TorchModelOutputType]:
+        model: TorchModel[Inference, Any, Any],
+    ) -> TrainingState[Inference]:
         optimizer = trainer._optimizer_factory.setup(model)
         lrscheduler = trainer._lrscheduler_factory.setup(optimizer) if trainer._lrscheduler_factory else None
         return TrainingState(epoch=0, step=0, model=model, optimizer=optimizer, lrscheduler=lrscheduler)
 
-    def zero_grad(self, trainer: "TorchTrainer", state: TrainingState[TorchModelOutputType]) -> None:
+    def zero_grad(self, trainer: "TorchTrainer", state: TrainingState[Inference]) -> None:
         state.optimizer.zero_grad()
 
     def train_forwrad(
         self,
         trainer: "TorchTrainer",
-        state: TrainingState[TorchModelOutputType],
+        state: TrainingState[Inference],
         inputs: Mapping[str, Any],
         device: torch.device,
-    ) -> TorchModelOutputType:
-        inputs = move_to_device(inputs, device)
-        output = cast(TorchModelOutputType, state.model(**inputs))
+    ) -> TorchModelOutput[Inference]:
+        inputs = state.model.Inputs(**move_to_device(inputs, device))
+        output = state.model(inputs)
         return output
 
     def eval_forward(
         self,
         trainer: "TorchTrainer",
-        state: TrainingState[TorchModelOutputType],
+        state: TrainingState[Inference],
         inputs: Mapping[str, Any],
         device: torch.device,
-    ) -> TorchModelOutputType:
-        inputs = move_to_device(inputs, device)
+    ) -> TorchModelOutput[Inference]:
+        inputs = state.model.Inputs(**move_to_device(inputs, device))
         with torch.inference_mode():
-            output = cast(TorchModelOutputType, state.model(**inputs))
+            output = state.model(inputs)
         return output
 
     def step(self, trainer: "TorchTrainer", state: TrainingState, loss: torch.FloatTensor) -> None:
@@ -202,13 +201,13 @@ class TorchTrainer:
 
     def train(
         self,
-        model: TorchModel[TorchModelOutputType],
+        model: TorchModel[Inference, Any, Any],
         train: Sequence[Instance],
         valid: Optional[Sequence[Instance]] = None,
         *,
         metric: Optional[Metric[Inference]] = None,
         resources: Optional[Mapping[str, Any]] = None,
-    ) -> TrainingState[TorchModelOutputType]:
+    ) -> TrainingState[Inference]:
         """Runs the training/validation loop with the given model and training data.
 
         Args:
@@ -260,7 +259,8 @@ class TorchTrainer:
 
         # compute forward pass to initialize model parameters
         with torch.no_grad():
-            model(**(move_to_device(next(iter(self._train_dataloader(train))), device)))
+            inputs = model.Inputs(**(move_to_device(next(iter(self._train_dataloader(train))), device)))
+            model(inputs)
 
         for callback in self._callbacks:
             callback.on_start(
@@ -290,7 +290,7 @@ class TorchTrainer:
 
                             loss: torch.FloatTensor = 0.0  # type: ignore[assignment]
                             batch_inputs: List[Mapping[str, Any]] = []
-                            batch_outputs: List[TorchModelOutputType] = []
+                            batch_outputs: List[TorchModelOutput[Inference]] = []
                             for inputs in micro_batches:
                                 output = self._training_engine.train_forwrad(self, state, inputs, device)
 

@@ -1,6 +1,6 @@
 import dataclasses
 from functools import lru_cache
-from typing import Any, Mapping, Optional, Sequence, Tuple, cast
+from typing import Any, Mapping, NamedTuple, Optional, Sequence, Tuple, cast
 
 import numpy
 import torch
@@ -21,10 +21,16 @@ from .types import Text2TextInference
 @dataclasses.dataclass
 class TorchText2TextOutput:
     inference: Text2TextInference
-    loss: Optional[torch.Tensor] = None
+    loss: Optional[torch.FloatTensor] = None
 
 
-class TorchText2Text(TorchModel[Text2TextInference]):
+class TorchText2Text(
+    TorchModel[
+        Text2TextInference,
+        "TorchText2Text.Inputs",
+        "TorchText2Text.Params",
+    ]
+):
     """
     A text-to-text model for PyTorch.
 
@@ -43,6 +49,14 @@ class TorchText2Text(TorchModel[Text2TextInference]):
         source_namespace: The vocabulary namespace of source tokens. Defaults to `"tokens"`.
         target_namespace: The vocabulary namespace of target tokens. Defaults to `"tokens"`.
     """
+
+    class Inputs(NamedTuple):
+        source: Mapping[str, Mapping[str, torch.Tensor]]
+        target: Optional[Mapping[str, Mapping[str, torch.Tensor]]] = None
+        metadata: Optional[Sequence[Mapping[str, Any]]] = None
+
+    class Params(NamedTuple):
+        beam_search: Optional[BeamSearch.Params] = None
 
     def __init__(
         self,
@@ -108,13 +122,14 @@ class TorchText2Text(TorchModel[Text2TextInference]):
         assert embedding_weight is not None
         return cast(torch.FloatTensor, F.linear(inputs, embedding_weight))
 
-    def forward(  # type: ignore[override]
+    def forward(
         self,
-        source: Mapping[str, Mapping[str, torch.Tensor]],
-        target: Optional[Mapping[str, Mapping[str, torch.Tensor]]] = None,
-        metadata: Optional[Sequence[Mapping[str, Any]]] = None,
-        **kwargs: Any,
+        inputs: "TorchText2Text.Inputs",
+        params: Optional["TorchText2Text.Params"] = None,
     ) -> TorchText2TextOutput:
+        source, target, metadata = inputs
+        params = params or TorchText2Text.Params()
+
         if self._target_bos_index is None:
             raise RuntimeError("Target BOS index is not set")
 
@@ -214,7 +229,7 @@ class TorchText2Text(TorchModel[Text2TextInference]):
 
             state = self._decoder.get_initial_state(target_embeddings, memory=memory, memory_mask=source_mask)
             pred_token_ids, pred_mask, scores = self._beam_search.search(
-                target_token_ids, target_mask, state, step, **kwargs
+                target_token_ids, target_mask, state, step, params.beam_search
             )
 
             inference.pred_token_ids = pred_token_ids.detach().cpu().numpy()

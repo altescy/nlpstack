@@ -1,10 +1,9 @@
 import dataclasses
 import json
-import typing
 from http.server import SimpleHTTPRequestHandler
 from logging import getLogger
 from pathlib import Path
-from typing import Any, Generic, Tuple, Type, TypeVar
+from typing import Any, Generic, Optional, Tuple, Type, TypeVar
 
 from colt import ColtBuilder
 from colt.error import ConfigurationError
@@ -17,53 +16,33 @@ coltbuilder = ColtBuilder(typekey="type", strict=True)
 
 Example = TypeVar("Example")
 Prediction = TypeVar("Prediction")
+PredictionParams = TypeVar("PredictionParams")
 
 
-class RuneHandler(SimpleHTTPRequestHandler, Generic[Example, Prediction]):
+class RuneHandler(SimpleHTTPRequestHandler, Generic[Example, Prediction, PredictionParams]):
     @staticmethod
-    def _extract_example_and_prediction_classes(
-        rune: Rune[Example, Prediction]
-    ) -> Tuple[Type[Example], Type[Prediction]]:
-        bases = getattr(rune, "__orig_bases__", None)
-        if bases is None:
-            raise ValueError("Rune must be a generic type")
-
-        rune_bases = [
-            base
-            for base in bases
-            if (isinstance(base, typing._GenericAlias) and issubclass(base.__origin__, Rune))  # type: ignore
-        ]
-        if len(bases) < 1:
-            raise ValueError("Rune must be a subclass of Rune")
-
-        rune_base = rune_bases[0]
-        rune_args = typing.get_args(rune_base)
-        if len(rune_args) < 2:
-            raise ValueError("Rune must have two type arguments")
-
-        input_class, output_class = rune_args[:2]
-        if not dataclasses.is_dataclass(input_class):
-            raise ValueError("Input class must be a dataclass")
-        if not dataclasses.is_dataclass(output_class):
-            raise ValueError("Output class must be a dataclass")
-
-        return input_class, output_class
+    def _extract_classes(
+        rune: Rune[Example, Prediction, Any, PredictionParams, Any]
+    ) -> Tuple[Type[Example], Type[Prediction], Type[PredictionParams]]:
+        return rune.Example, rune.Prediction, rune.PredictionParams
 
     def __init__(
         self,
         *args: Any,
-        rune: Rune[Example, Prediction],
+        rune: Rune[Example, Prediction, Any, PredictionParams, Any],
         health_check: str = "/health",
         **kwargs: Any,
     ) -> None:
-        input_class, output_class = self._extract_example_and_prediction_classes(rune)
+        input_class, output_class, params_class = self._extract_classes(rune)
 
         self._rune = rune
         self._health_check = health_check
         self._input_class = input_class
         self._output_class = output_class
+        self._params_class = params_class
         self._input_schema = json.dumps(generate_json_schema(input_class))
         self._output_schema = json.dumps(generate_json_schema(output_class))
+        self._params_schema = json.dumps(generate_json_schema(params_class))
 
         super().__init__(*args, **kwargs)
 
@@ -93,8 +72,8 @@ class RuneHandler(SimpleHTTPRequestHandler, Generic[Example, Prediction]):
         self.end_headers()
         self.wfile.write(schema.encode())
 
-    def _serve_prediction(self, example: Example, **kwargs: Any) -> None:
-        prediction = next(self._rune.predict([example], **kwargs))
+    def _serve_prediction(self, example: Example, params: Optional[PredictionParams]) -> None:
+        prediction = next(self._rune.predict([example], params))
         self.send_response(200)
         self.send_header("Content-type", "application/json")
         self.end_headers()
@@ -151,10 +130,12 @@ class RuneHandler(SimpleHTTPRequestHandler, Generic[Example, Prediction]):
                     inputs = body.pop("inputs")
                     kwargs = body.pop("params", {})
                     example = coltbuilder(inputs, self._input_class)
+                    params = coltbuilder(kwargs, self._params_class) if kwargs else None
+                    print(params)
                 except (json.JSONDecodeError, ValueError, ConfigurationError, KeyError):
                     self._handle_error_response(400, "Bad Request")
                     return
-                self._serve_prediction(example, **kwargs)
+                self._serve_prediction(example, params)
             else:
                 self._handle_error_response(404, "Not Found")
         except Exception as e:
