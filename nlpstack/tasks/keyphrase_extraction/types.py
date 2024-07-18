@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Any, Mapping, Optional, Sequence, Set, Tuple, Union
+from typing import Any, List, Mapping, Optional, Sequence, Set, Tuple, Union
 
 import numpy
 
@@ -22,5 +22,6 @@ class KeyphraseExtractionInference:
 
 @dataclasses.dataclass
 class KeyphraseExtractionPrediction:
-    spans: Set[Tuple[str, Tuple[int, int]]]
+    phrases: List[str]
+    scores: Optional[List[float]] = None
     metadata: Optional[Mapping[str, Any]] = None
