@@ -1,7 +1,5 @@
 import dataclasses
-from typing import Any, List, Mapping, Optional, Sequence, Set, Tuple, Union
-
-import numpy
+from typing import Any, List, Mapping, Optional, Sequence, Set, Union
 
 from nlpstack.data import Token
 
@@ -9,15 +7,15 @@ from nlpstack.data import Token
 @dataclasses.dataclass
 class KeyphraseExtracionExample:
     text: Union[str, Sequence[Token]]
-    spans: Optional[Set[Tuple[int, int]]] = None
+    phrases: Optional[Set[str]] = None
     metadata: Optional[Mapping[str, Any]] = None
 
 
 @dataclasses.dataclass
 class KeyphraseExtractionInference:
-    pred_spans: numpy.ndarray
-    gold_spans: Optional[numpy.ndarray] = None
-    metadata: Optional[Sequence[Mapping[str, Any]]] = None
+    pred_phrases: List[str]
+    gold_phrases: Optional[Set[str]] = None
+    pred_scores: Optional[List[float]] = None
 
 
 @dataclasses.dataclass

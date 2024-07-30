@@ -1,3 +1,4 @@
+import itertools
 import math
 import re
 from logging import getLogger
@@ -5,9 +6,10 @@ from typing import Any, Dict, Iterable, Iterator, List, Mapping, NamedTuple, Opt
 
 from nlpstack.common import ProgressBar, wrap_iterator
 from nlpstack.data.tokenizers import Token, Tokenizer, WhitespaceTokenizer
+from nlpstack.evaluation import EmptyMetric, Metric, MultiMetrics
 from nlpstack.rune import Rune
 
-from .types import KeyphraseExtracionExample, KeyphraseExtractionPrediction
+from .types import KeyphraseExtracionExample, KeyphraseExtractionInference, KeyphraseExtractionPrediction
 from .util import iter_candidate_phrases
 
 logger = getLogger(__name__)
@@ -41,7 +43,17 @@ class CValue(
         ngram_range: Tuple[int, int] = (1, 3),
         tokenizer: Optional[Tokenizer] = None,
         candidate_postag_pattern: Optional[Union[str, Pattern]] = None,
+        metric: Optional[
+            Union[Metric[KeyphraseExtractionInference], Sequence[Metric[KeyphraseExtractionInference]]]
+        ] = None,
     ) -> None:
+        if metric is None:
+            metric = EmptyMetric()
+        if isinstance(metric, Sequence):
+            metric = MultiMetrics(metric)
+
+        super().__init__()
+
         self._top_k = top_k
         self._threshold = threshold
         self._ngram_range = ngram_range
@@ -49,6 +61,7 @@ class CValue(
         self._candidate_postag_pattern = (
             re.compile(candidate_postag_pattern) if candidate_postag_pattern is not None else None
         )
+        self._metric = metric
 
         self._extracted_phrases: Optional[Mapping[Tuple[Token, ...], float]] = None
 
@@ -135,3 +148,25 @@ class CValue(
                 )
 
         return wrap_iterator(prediction_iterator, dataset)
+
+    def evaluate(
+        self,
+        dataset: Iterable[KeyphraseExtracionExample],
+        params: Optional["CValue.EvaluationParams"] = None,
+    ) -> Mapping[str, Any]:
+        prediction_params = CValue.PredictionParams(params.threshold) if params is not None else None
+        dataset, dataset_for_prediction = itertools.tee(dataset)
+        predictions = self.predict(dataset_for_prediction, prediction_params)
+
+        self._metric.reset()
+        with ProgressBar(dataset, desc="Evaluating") as progress:
+            for example, prediction in zip(progress, predictions):
+                assert example.phrases is not None
+                inference = KeyphraseExtractionInference(
+                    pred_phrases=prediction.phrases,
+                    gold_phrases=example.phrases,
+                )
+                self._metric.update(inference)
+                progress.set_postfix(**{key: f"{val:.2f}" for key, val in self._metric.compute().items()})
+
+        return self._metric.compute()
