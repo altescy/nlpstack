@@ -8,6 +8,7 @@ from nlpstack.data.tokenizers import Token, Tokenizer, WhitespaceTokenizer
 from nlpstack.rune import Rune
 
 from .types import KeyphraseExtracionExample, KeyphraseExtractionPrediction
+from .util import iter_candidate_phrases
 
 logger = getLogger(__name__)
 
@@ -56,20 +57,6 @@ class CValue(
             raise RuntimeError("CValue has not been trained yet.")
         return self._extracted_phrases
 
-    def _is_acceptable_phrase(self, phrase: Tuple[Token, ...]) -> bool:
-        if self._candidate_postag_pattern is None:
-            return True
-        postags = "".join(f"<{token.postag or '__NULL__'}>" for token in phrase)
-        return bool(self._candidate_postag_pattern.match(postags))
-
-    def _iter_candidate_phrases(self, text: Union[str, Sequence[Token]]) -> Iterator[Tuple[Token, ...]]:
-        tokens = self._tokenizer.tokenize(text) if isinstance(text, str) else text
-        for n in range(self._ngram_range[0], self._ngram_range[1] + 1):
-            for i in range(len(tokens) - n + 1):
-                phrase = tuple(tokens[i : i + n])
-                if self._is_acceptable_phrase(phrase):
-                    yield phrase
-
     def train(
         self,
         train_dataset: Sequence[KeyphraseExtracionExample],
@@ -80,8 +67,8 @@ class CValue(
         logger.info("[1/3] Counting n-grams...")
         phrase_frequencies: Dict[Tuple[Token, ...], int] = {}
         for example in ProgressBar(train_dataset, desc="[1/3] Counting n-grams  "):
-            text = example.text
-            for phrase in self._iter_candidate_phrases(text):
+            tokens = self._tokenizer.tokenize(example.text) if isinstance(example.text, str) else example.text
+            for phrase in iter_candidate_phrases(tokens, self._ngram_range, self._candidate_postag_pattern):
                 phrase_frequencies[phrase] = phrase_frequencies.get(phrase, 0) + 1
 
         logger.info("[2/3] Collecting phrases...")
@@ -127,10 +114,10 @@ class CValue(
                 raise RuntimeError("CValue has not been trained yet.")
 
             for example in dataset:
-                text = example.text
                 phrases: List[str] = []
                 scores: List[float] = []
-                for phrase in self._iter_candidate_phrases(text):
+                tokens = self._tokenizer.tokenize(example.text) if isinstance(example.text, str) else example.text
+                for phrase in iter_candidate_phrases(tokens, self._ngram_range, self._candidate_postag_pattern):
                     phrase_score = self._extracted_phrases.get(phrase)
                     if phrase_score is None or phrase_score < threshold:
                         continue
