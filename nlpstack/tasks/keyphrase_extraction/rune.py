@@ -4,7 +4,10 @@ import re
 from logging import getLogger
 from typing import Any, Dict, Iterable, Iterator, List, Mapping, NamedTuple, Optional, Pattern, Sequence, Tuple, Union
 
+import numpy
+
 from nlpstack.common import ProgressBar, wrap_iterator
+from nlpstack.data.embeddings import TextEmbedding
 from nlpstack.data.tokenizers import Token, Tokenizer, WhitespaceTokenizer
 from nlpstack.evaluation import EmptyMetric, Metric, MultiMetrics
 from nlpstack.rune import Rune
@@ -155,6 +158,136 @@ class CValue(
         params: Optional["CValue.EvaluationParams"] = None,
     ) -> Mapping[str, Any]:
         prediction_params = CValue.PredictionParams(params.threshold) if params is not None else None
+        dataset, dataset_for_prediction = itertools.tee(dataset)
+        predictions = self.predict(dataset_for_prediction, prediction_params)
+
+        self._metric.reset()
+        with ProgressBar(dataset, desc="Evaluating") as progress:
+            for example, prediction in zip(progress, predictions):
+                assert example.phrases is not None
+                inference = KeyphraseExtractionInference(
+                    pred_phrases=prediction.phrases,
+                    gold_phrases=example.phrases,
+                )
+                self._metric.update(inference)
+                progress.set_postfix(**{key: f"{val:.2f}" for key, val in self._metric.compute().items()})
+
+        return self._metric.compute()
+
+
+class PatternRank(
+    Rune[
+        KeyphraseExtracionExample,
+        KeyphraseExtractionPrediction,
+        "PatternRank.SetupParams",
+        "PatternRank.PredictionParams",
+        "PatternRank.EvaluationParams",
+    ]
+):
+    Example = KeyphraseExtracionExample
+    Prediction = KeyphraseExtractionPrediction
+
+    class SetupParams(NamedTuple): ...
+
+    class PredictionParams(NamedTuple): ...
+
+    class EvaluationParams(NamedTuple): ...
+
+    def __init__(
+        self,
+        *,
+        embedder: TextEmbedding,
+        top_k: int = 10,
+        ngram_range: Tuple[int, int] = (1, 3),
+        tokenizer: Optional[Tokenizer] = None,
+        candidate_postag_pattern: Optional[Union[str, Pattern]] = None,
+        metric: Optional[
+            Union[Metric[KeyphraseExtractionInference], Sequence[Metric[KeyphraseExtractionInference]]]
+        ] = None,
+    ) -> None:
+        if metric is None:
+            metric = EmptyMetric()
+        if isinstance(metric, Sequence):
+            metric = MultiMetrics(metric)
+
+        super().__init__()
+
+        self._embedder = embedder
+        self._top_k = top_k
+        self._ngram_range = ngram_range
+        self._tokenizer = tokenizer or WhitespaceTokenizer()
+        self._candidate_postag_pattern = (
+            re.compile(candidate_postag_pattern) if candidate_postag_pattern is not None else None
+        )
+        self._metric = metric
+
+    def train(
+        self,
+        train_dataset: Sequence[KeyphraseExtracionExample],
+        valid_dataset: Optional[Sequence[KeyphraseExtracionExample]] = None,
+        resources: Optional[Mapping[str, Any]] = None,
+        **kwargs: Any,
+    ) -> "PatternRank":
+        return self
+
+    def predict(
+        self,
+        dataset: Iterable[KeyphraseExtracionExample],
+        params: Optional["PatternRank.PredictionParams"] = None,
+    ) -> Iterator[KeyphraseExtractionPrediction]:
+        def text_iterator(examples: Iterable[KeyphraseExtracionExample]) -> Iterator[str]:
+            for example in examples:
+                yield example.text if isinstance(example.text, str) else self._tokenizer.detokenize(example.text)
+
+        def tokenized_text_iterator(examples: Iterable[KeyphraseExtracionExample]) -> Iterator[Sequence[Token]]:
+            for example in examples:
+                yield self._tokenizer.tokenize(example.text) if isinstance(example.text, str) else example.text
+
+        def text_embedding_iterator(examples: Iterable[KeyphraseExtracionExample]) -> Iterator[numpy.ndarray]:
+            yield from self._embedder(text_iterator(examples))
+
+        def phrase_iterator(examples: Iterable[KeyphraseExtracionExample]) -> Iterator[List[Tuple[str, numpy.ndarray]]]:
+            for tokens in tokenized_text_iterator(examples):
+                phrases = list(
+                    set(
+                        self._tokenizer.detokenize(phrase)
+                        for phrase in iter_candidate_phrases(tokens, self._ngram_range, self._candidate_postag_pattern)
+                    )
+                )
+                embeddings = list(self._embedder(phrases))
+                yield list(zip(phrases, embeddings))
+
+        def compute_similarity(
+            text_embedding: numpy.ndarray,
+            phrase_embeddings: numpy.ndarray,
+        ) -> List[float]:
+            normalized_text_embedding = text_embedding / numpy.linalg.norm(text_embedding)
+            normalized_phrase_embeddings = phrase_embeddings / numpy.linalg.norm(phrase_embeddings, axis=1)[:, None]
+            return [float(x) for x in (normalized_phrase_embeddings @ normalized_text_embedding)]
+
+        a, b, c = itertools.tee(dataset, 3)
+        for example, text_embedding, phrases in zip(a, text_embedding_iterator(b), phrase_iterator(c)):
+            if not phrases:
+                yield KeyphraseExtractionPrediction(phrases=[], scores=[], metadata=example.metadata)
+                continue
+            phrase_texts, phrase_embeddings = zip(*phrases)
+            phrase_scores = compute_similarity(text_embedding, numpy.array(phrase_embeddings))
+            sorted_indices = sorted(range(len(phrases)), key=lambda i: -phrase_scores[i])
+            phrase_texts = [phrase_texts[i] for i in sorted_indices][: self._top_k]
+            phrase_scores = [phrase_scores[i] for i in sorted_indices][: self._top_k]
+
+            yield KeyphraseExtractionPrediction(
+                phrases=phrase_texts,
+                scores=phrase_scores,
+                metadata=example.metadata,
+            )
+
+    def evaluate(
+        self,
+        dataset: Iterable[KeyphraseExtracionExample],
+        params: Optional["PatternRank.EvaluationParams"] = None,
+    ) -> Mapping[str, Any]:
+        prediction_params = PatternRank.PredictionParams() if params is not None else None
         dataset, dataset_for_prediction = itertools.tee(dataset)
         predictions = self.predict(dataset_for_prediction, prediction_params)
 
