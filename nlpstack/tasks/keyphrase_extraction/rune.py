@@ -70,6 +70,11 @@ class CValue(
             raise RuntimeError("CValue has not been trained yet.")
         return self._extracted_phrases
 
+    def get_keyphrases(self) -> Mapping[str, float]:
+        if self._extracted_phrases is None:
+            raise RuntimeError("CValue has not been trained yet.")
+        return {self._tokenizer.detokenize(phrase): cvalue for phrase, cvalue in self._extracted_phrases.items()}
+
     def train(
         self,
         train_dataset: Sequence[KeyphraseExtracionExample],
