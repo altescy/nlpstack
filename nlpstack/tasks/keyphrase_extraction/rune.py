@@ -65,11 +65,6 @@ class CValue(
 
         self._extracted_phrases: Optional[Mapping[Tuple[Token, ...], float]] = None
 
-    def get_cvalues(self) -> Mapping[Tuple[Token, ...], float]:
-        if self._extracted_phrases is None:
-            raise RuntimeError("CValue has not been trained yet.")
-        return self._extracted_phrases
-
     def get_keyphrases(self) -> Mapping[str, float]:
         if self._extracted_phrases is None:
             raise RuntimeError("CValue has not been trained yet.")
