@@ -3,6 +3,7 @@ import math
 from collections import abc
 from typing import Any, Callable, Generic, Iterable, Iterator, List, TypeVar
 
+S = TypeVar("S")
 T = TypeVar("T")
 
 
@@ -134,7 +135,7 @@ def iter_with_callback(
     return iterator()
 
 
-def wrap_iterator(wrapper: Callable[[Iterable[T]], Iterator[T]], iterable: Iterable[T]) -> Iterator:
+def wrap_iterator(wrapper: Callable[[Iterable[S]], Iterator[T]], iterable: Iterable[S]) -> Iterator[T]:
     """
     Wrap an iterator with a function.
 

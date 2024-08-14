@@ -501,7 +501,7 @@ class PretrainedTransformerTextEmbedding(TextEmbedding["PretrainedTransformerTex
                 pooling=self._pooling,
                 normalize=self._normalize,
                 window_size=self._window_size,
-            )
+            )[0]
             for x in features
         ]
 
