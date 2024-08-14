@@ -38,14 +38,26 @@ class CValue(
     class EvaluationParams(NamedTuple):
         threshold: Optional[float] = None
 
+    class _Phrase(NamedTuple):
+        text: str
+        tokens: Tuple[Token, ...]
+
+        def __hash__(self) -> int:
+            return hash(self.text)
+
+        def __eq__(self, other: Any) -> bool:
+            return bool(self.text == other.text)
+
     def __init__(
         self,
         *,
         top_k: int = 10,
         threshold: float = 0.0,
+        nc_weight: float = 0.0,
         ngram_range: Tuple[int, int] = (1, 3),
         tokenizer: Optional[Tokenizer] = None,
         candidate_postag_pattern: Optional[Union[str, Pattern]] = None,
+        lowercase: bool = False,
         metric: Optional[
             Union[Metric[KeyphraseExtractionInference], Sequence[Metric[KeyphraseExtractionInference]]]
         ] = None,
@@ -59,19 +71,27 @@ class CValue(
 
         self._top_k = top_k
         self._threshold = threshold
+        self._nc_weight = nc_weight
         self._ngram_range = ngram_range
         self._tokenizer = tokenizer or WhitespaceTokenizer()
         self._candidate_postag_pattern = (
             re.compile(candidate_postag_pattern) if candidate_postag_pattern is not None else None
         )
+        self._lowercase = lowercase
         self._metric = metric
 
-        self._extracted_phrases: Optional[Mapping[Tuple[Token, ...], float]] = None
+        self._extracted_phrases: Optional[Mapping[str, float]] = None
 
     def get_keyphrases(self) -> Mapping[str, float]:
         if self._extracted_phrases is None:
             raise RuntimeError("CValue has not been trained yet.")
-        return {self._tokenizer.detokenize(phrase): cvalue for phrase, cvalue in self._extracted_phrases.items()}
+        return self._extracted_phrases
+
+    def _build_phrase_from_tokens(self, tokens: Sequence[Token]) -> "CValue._Phrase":
+        text = self._tokenizer.detokenize(tokens).strip()
+        if self._lowercase:
+            text = text.lower()
+        return CValue._Phrase(text=text, tokens=tuple(tokens))
 
     def train(
         self,
@@ -81,19 +101,20 @@ class CValue(
         **kwargs: Any,
     ) -> "CValue":
         logger.info("[1/3] Counting n-grams...")
-        phrase_frequencies: Dict[Tuple[Token, ...], int] = {}
+        phrase_frequencies: Dict[CValue._Phrase, int] = {}
         for example in ProgressBar(train_dataset, desc="[1/3] Counting n-grams  "):
             tokens = self._tokenizer.tokenize(example.text) if isinstance(example.text, str) else example.text
-            for phrase in iter_candidate_phrases(tokens, self._ngram_range, self._candidate_postag_pattern):
+            for phrase_tokens in iter_candidate_phrases(tokens, self._ngram_range, self._candidate_postag_pattern):
+                phrase = self._build_phrase_from_tokens(phrase_tokens)
                 phrase_frequencies[phrase] = phrase_frequencies.get(phrase, 0) + 1
 
         logger.info("[2/3] Collecting phrases...")
-        longer_phrase_average_frequencies: Dict[Tuple[Token, ...], float] = {}
-        longer_phrase_count: Dict[Tuple[Token, ...], int] = {}
+        longer_phrase_average_frequencies: Dict[CValue._Phrase, float] = {}
+        longer_phrase_count: Dict[CValue._Phrase, int] = {}
         for phrase in ProgressBar(phrase_frequencies, desc="[2/3] Collecting phrases"):
-            for n in range(1, len(phrase) - 1):
-                for i in range(len(phrase) - n + 1):
-                    subphrase = phrase[i : i + n]
+            for n in range(1, len(phrase.tokens) - 1):
+                for i in range(len(phrase.tokens) - n + 1):
+                    subphrase = self._build_phrase_from_tokens(phrase.tokens[i : i + n])
                     if subphrase in phrase_frequencies:
                         longer_phrase_count[subphrase] = longer_phrase_count.get(subphrase, 0) + 1
                         longer_phrase_average_frequencies[subphrase] = (
@@ -104,13 +125,41 @@ class CValue(
         }
 
         logger.info("[3/3] Computing C-values...")
-        cvalues: Dict[Tuple[Token, ...], float] = {}
+        cvalues: Dict[str, float] = {}
         for phrase, freq in ProgressBar(phrase_frequencies.items(), desc="[3/3] Computing C-values"):
-            cvalue = math.log2(len(phrase)) * (freq - longer_phrase_average_frequencies.get(phrase, 0.0))
-            if cvalue > self._threshold:
-                cvalues[phrase] = cvalue
+            cvalue = cvalues.get(phrase.text, 0) + math.log2(len(phrase.tokens)) * (
+                freq - longer_phrase_average_frequencies.get(phrase, 0.0)
+            )
+            cvalues[phrase.text] = cvalue
+
+        if self._nc_weight > 0:
+            logger.info("Applying NC weighting...")
+            term_frequency: Dict[Token, int] = {}
+            context_word_frequency: Dict[Tuple[str, Token], int] = {}
+            phrase_to_tokens: Dict[str, Sequence[Token]] = {
+                phrase.text: [Token(t.surface.strip(), t.postag) for t in phrase.tokens]
+                for phrase in phrase_frequencies
+            }
+            for phrase_text in cvalues:
+                for token in set(phrase_to_tokens[phrase_text]):
+                    term_frequency[token] = term_frequency.get(token, 0) + 1
+                    context_word_frequency[phrase_text, token] = context_word_frequency.get((phrase_text, token), 0) + 1
+            for phrase_text, cvalue in cvalues.items():
+                weight = sum(
+                    term_frequency[t] * context_word_frequency[phrase_text, t] / len(cvalues)
+                    for t in phrase_to_tokens[phrase_text]
+                )
+                cvalues[phrase_text] = (1 - self._nc_weight) * cvalue + self._nc_weight * weight
+
+        if self._threshold > 0:
+            cvalues = {phrase: cvalue for phrase, cvalue in cvalues.items() if cvalue >= self._threshold}
 
         self._extracted_phrases = cvalues
+
+        if valid_dataset is not None:
+            logger.info("Start validation...")
+            valid_metrics = self.evaluate(valid_dataset)
+            logger.info("Validation metrics %s", valid_metrics)
 
         logger.info("Done.")
         return self
@@ -130,23 +179,20 @@ class CValue(
                 raise RuntimeError("CValue has not been trained yet.")
 
             for example in dataset:
-                phrases: List[str] = []
-                scores: List[float] = []
+                phrases: Dict[str, float] = {}
                 tokens = self._tokenizer.tokenize(example.text) if isinstance(example.text, str) else example.text
-                for phrase in iter_candidate_phrases(tokens, self._ngram_range, self._candidate_postag_pattern):
-                    phrase_score = self._extracted_phrases.get(phrase)
+                for phrase_tokens in iter_candidate_phrases(tokens, self._ngram_range, self._candidate_postag_pattern):
+                    phrase = self._build_phrase_from_tokens(phrase_tokens)
+                    phrase_score = self._extracted_phrases.get(phrase.text)
                     if phrase_score is None or phrase_score < threshold:
                         continue
-                    phrases.append(self._tokenizer.detokenize(phrase))
-                    scores.append(phrase_score)
+                    phrases[phrase.text] = phrase_score
 
-                sorted_indices = sorted(range(len(phrases)), key=lambda i: -scores[i])
-                phrases = [phrases[i] for i in sorted_indices[: self._top_k]]
-                scores = [scores[i] for i in sorted_indices[: self._top_k]]
+                phrase_and_score_list = sorted(phrases.items(), key=lambda x: x[1], reverse=True)
 
                 yield KeyphraseExtractionPrediction(
-                    phrases=phrases,
-                    scores=scores,
+                    phrases=[phrase for phrase, _ in phrase_and_score_list],
+                    scores=[score for _, score in phrase_and_score_list],
                     metadata=example.metadata,
                 )
 
