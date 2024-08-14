@@ -1,4 +1,5 @@
-from typing import Iterator, Optional, Pattern, Sequence, Tuple
+import re
+from typing import Iterator, Optional, Pattern, Sequence, Tuple, Union
 
 from nlpstack.data import Token
 
@@ -6,9 +7,12 @@ from nlpstack.data import Token
 def iter_candidate_phrases(
     tokens: Sequence[Token],
     ngram_range: Tuple[int, int] = (1, 3),
-    postag_pattern: Optional[Pattern] = None,
+    postag_pattern: Optional[Union[str, Pattern]] = None,
     default_postag: str = "__NULL__",
 ) -> Iterator[Tuple[Token, ...]]:
+    if postag_pattern is not None:
+        postag_pattern = re.compile(postag_pattern)
+
     def _is_acceptable_phrase(phrase: Sequence[Token]) -> bool:
         if postag_pattern is None:
             return True
