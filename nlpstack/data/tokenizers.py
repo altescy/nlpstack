@@ -56,6 +56,9 @@ class Token(NamedTuple):
     lemma: Optional[str] = None
     vector: Optional[numpy.ndarray] = None
 
+    def __hash__(self) -> int:
+        return hash((self.surface, self.postag, self.lemma))
+
 
 class Tokenizer(
     Pipeline[str, List[Token], _T_Fixtures, Optional[_T_Params]],
@@ -153,11 +156,13 @@ class SpacyTokenizer(Tokenizer["SpacyTokenizer.Fixture", None]):
         self,
         lang: str,
         with_whitespace: bool = False,
+        with_vector: bool = False,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
         self._lang = lang
         self._with_whitespace = with_whitespace
+        self._with_vector = with_vector
 
     def get_nlp(self) -> "spacy.language.Language":
         return spacy.load(self._lang)
@@ -176,9 +181,9 @@ class SpacyTokenizer(Tokenizer["SpacyTokenizer.Fixture", None]):
             [
                 Token(
                     t.text_with_ws if self._with_whitespace else t.text,
-                    t.pos_,
+                    f"{t.pos_}:{t.tag_}",
                     t.lemma_,
-                    vector=numpy.array(t.vector) if t.has_vector else None,
+                    vector=numpy.array(t.vector) if self._with_vector and t.has_vector else None,
                 )
                 for t in fixtures.nlp(text)
             ]
