@@ -15,10 +15,12 @@ class FBeta(Metric[KeyphraseExtractionInference]):
         beta: float = 1.0,
         average: Union[FBetaAverage, Sequence[FBetaAverage]] = "macro",
         topk: Optional[int] = None,
+        ignore_case: bool = False,
     ) -> None:
         self._beta = beta
         self._average = average
         self._topk = topk
+        self._ignore_case = ignore_case
         self._true_positives: List[int] = []
         self._false_positives: List[int] = []
         self._false_negatives: List[int] = []
@@ -32,6 +34,10 @@ class FBeta(Metric[KeyphraseExtractionInference]):
         )
         pred_phrases = set(inference.pred_phrases[i] for i in sorted_indices[: self._topk])
         gold_phrases = inference.gold_phrases or set()
+
+        if self._ignore_case:
+            pred_phrases = {phrase.lower() for phrase in pred_phrases}
+            gold_phrases = {phrase.lower() for phrase in gold_phrases}
 
         self._true_positives.append(len(pred_phrases & gold_phrases))
         self._false_positives.append(len(pred_phrases - gold_phrases))
